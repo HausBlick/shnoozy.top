@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from './lib/supabase';
 import { Auth } from './Auth';
 import { Calendar } from './Calendar';
@@ -81,6 +82,13 @@ function App() {
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
   const [notifStatus, setNotifStatus] = useState<'unsupported' | 'default' | 'granted' | 'denied'>('unsupported');
   const [toast, setToast] = useState<string | null>(null);
+  const [wifiSsid, setWifiSsid] = useState('');
+  const [wifiPassword, setWifiPassword] = useState('');
+  const [wifiSecurity, setWifiSecurity] = useState('WPA');
+  const [wifiEditing, setWifiEditing] = useState(false);
+  const [wifiEditSsid, setWifiEditSsid] = useState('');
+  const [wifiEditPassword, setWifiEditPassword] = useState('');
+  const [wifiSaving, setWifiSaving] = useState(false);
   const swReg = useRef<ServiceWorkerRegistration | null>(null);
   const toastTimer = useRef<number | null>(null);
 
@@ -110,8 +118,37 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (session) fetchUpcomingEvents();
+    if (session) {
+      fetchUpcomingEvents();
+      fetchWifiSettings();
+    }
   }, [session]);
+
+  async function fetchWifiSettings() {
+    const { data } = await supabase.from('app_settings').select('key, value').in('key', ['wifi_ssid', 'wifi_password', 'wifi_security']);
+    if (data) {
+      data.forEach(row => {
+        if (row.key === 'wifi_ssid') setWifiSsid(row.value);
+        if (row.key === 'wifi_password') setWifiPassword(row.value);
+        if (row.key === 'wifi_security') setWifiSecurity(row.value);
+      });
+    }
+  }
+
+  async function saveWifiSettings() {
+    setWifiSaving(true);
+    try {
+      await supabase.from('app_settings').upsert([
+        { key: 'wifi_ssid', value: wifiEditSsid, updated_at: new Date().toISOString() },
+        { key: 'wifi_password', value: wifiEditPassword, updated_at: new Date().toISOString() },
+      ]);
+      setWifiSsid(wifiEditSsid);
+      setWifiPassword(wifiEditPassword);
+      setWifiEditing(false);
+    } finally {
+      setWifiSaving(false);
+    }
+  }
 
   async function fetchUpcomingEvents() {
     const today = new Date();
@@ -295,17 +332,49 @@ function App() {
       </nav>
 
       {isWifiModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsWifiModalOpen(false)}>
+        <div className="modal-overlay" onClick={() => { setIsWifiModalOpen(false); setWifiEditing(false); }}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="text-title-md">Guest WiFi</h2>
-              <button className="icon-button-circle" onClick={() => setIsWifiModalOpen(false)}><CloseIcon /></button>
+              <button className="icon-button-circle" onClick={() => { setIsWifiModalOpen(false); setWifiEditing(false); }}><CloseIcon /></button>
             </div>
-            <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-              <p className="text-body-md">Guest-Network-5G</p>
-              <p className="text-body-sm text-muted">Password: SecretPassword123!</p>
-            </div>
-            <button className="btn-secondary" onClick={() => setIsWifiModalOpen(false)}>Done</button>
+
+            {wifiEditing ? (
+              <>
+                <div style={{ marginBottom: 'var(--spacing-md)' }}>
+                  <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: '4px' }}>Network name (SSID)</label>
+                  <input className="form-input" value={wifiEditSsid} onChange={e => setWifiEditSsid(e.target.value)} placeholder="Network name" />
+                </div>
+                <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+                  <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: '4px' }}>Password</label>
+                  <input className="form-input" value={wifiEditPassword} onChange={e => setWifiEditPassword(e.target.value)} placeholder="Password" />
+                </div>
+                <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+                  <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setWifiEditing(false)}>Cancel</button>
+                  <button className="btn-primary" style={{ flex: 1 }} onClick={saveWifiSettings} disabled={wifiSaving}>
+                    {wifiSaving ? '…' : 'Save'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--spacing-lg)', marginTop: 'var(--spacing-sm)' }}>
+                  <QRCodeSVG
+                    value={`WIFI:T:${wifiSecurity};S:${wifiSsid};P:${wifiPassword};;`}
+                    size={180}
+                    level="M"
+                  />
+                </div>
+                <div style={{ marginBottom: 'var(--spacing-lg)', textAlign: 'center' }}>
+                  <p className="text-body-md" style={{ fontWeight: 600 }}>{wifiSsid || '—'}</p>
+                  <p className="text-body-sm text-muted">{wifiPassword || '—'}</p>
+                </div>
+                <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+                  <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsWifiModalOpen(false); }}>Done</button>
+                  <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setWifiEditSsid(wifiSsid); setWifiEditPassword(wifiPassword); setWifiEditing(true); }}>Edit</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
