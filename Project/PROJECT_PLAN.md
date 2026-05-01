@@ -14,13 +14,14 @@
 - [x] Basic Layout & Navigation (PWA structure)
 - [x] Dashboard & Menu UI Mockups
 
-### Phase 2: Infrastructure & Auth 🛠️ (Next)
-- [ ] Supabase Project Creation & Setup
-- [ ] Database Schema Design (Initial tables)
-- [ ] Supabase Auth Integration (Login/Logout)
-- [ ] Row Level Security (RLS) configuration
+### Phase 2: Infrastructure & Auth ✅
+- [x] Supabase Project Creation & Setup
+- [x] Environment Config (.env)
+- [x] Database Schema Design (Initial tables)
+- [x] Supabase Auth Integration (Login/Logout)
+- [x] Row Level Security (RLS) configuration
 
-### Phase 3: Module 3.1 - Calendar & Reminders
+### Phase 3: Module 3.1 - Calendar & Reminders 🛠️ (Next)
 - [ ] Supabase table for events
 - [ ] UI for adding/viewing events
 - [ ] ICS Export logic
