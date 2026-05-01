@@ -68,6 +68,42 @@ const CloseIcon = () => (
   </svg>
 );
 
+const NoteIcon = ({ color = 'currentColor', size = 20 }: { color?: string; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+  </svg>
+);
+
+const HouseInfoIcon = ({ color = 'currentColor', size = 20 }: { color?: string; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+    <polyline points="9 22 9 12 15 12 15 22"/>
+  </svg>
+);
+
+const CarIcon = ({ color = 'currentColor', size = 20 }: { color?: string; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="1" y="3" width="15" height="13" rx="2"/>
+    <path d="M16 8h4l3 5v3h-3"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+  </svg>
+);
+
+const CakeIcon = ({ color = 'currentColor', size = 14 }: { color?: string; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/>
+    <path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2 1 2 1"/>
+    <path d="M2 21h20"/><path d="M7 8v3"/><path d="M12 8v3"/><path d="M17 8v3"/>
+    <path d="M7 4h.01"/><path d="M12 4h.01"/><path d="M17 4h.01"/>
+  </svg>
+);
+
+const BellIcon = ({ color = 'currentColor', size = 20 }: { color?: string; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+  </svg>
+);
+
 function urlBase64ToUint8Array(base64: string): ArrayBuffer {
   const padding = '='.repeat((4 - (base64.length % 4)) % 4);
   const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -219,7 +255,9 @@ function App() {
 
             {/* Sticky Notes widget — always on top */}
             <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
-              <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)' }}>📝 Notes</h2>
+              <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <NoteIcon color="var(--color-primary)" size={18} /> Notes
+              </h2>
               <StickyNotes
                 session={session}
                 compact
@@ -236,7 +274,10 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
                   {upcomingEvents.map(e => (
                     <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', borderBottom: '1px solid var(--color-hairline-soft)', paddingBottom: '4px' }}>
-                      <span>{e.category === 'birthday' ? '🎂 ' : ''}{e.title}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        {e.category === 'birthday' && <CakeIcon color="var(--color-luxe)" size={13} />}
+                        {e.title}
+                      </span>
                       <span className="text-muted">
                         {e.display_time.toLocaleDateString([], { day: 'numeric', month: 'short' })}
                       </span>
@@ -255,7 +296,7 @@ function App() {
             {notifStatus === 'default' && import.meta.env.VITE_VAPID_PUBLIC_KEY && (
               <div className="card" style={{ marginTop: 'var(--spacing-lg)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xs)' }}>
-                  <span style={{ fontSize: '20px' }}>🔔</span>
+                  <BellIcon color="var(--color-primary)" size={20} />
                   <h3 className="text-title-md">Enable Notifications</h3>
                 </div>
                 <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>
@@ -265,7 +306,9 @@ function App() {
               </div>
             )}
             {notifStatus === 'granted' && (
-              <p className="text-body-sm text-muted" style={{ marginTop: 'var(--spacing-md)' }}>🔔 Notifications enabled</p>
+              <p className="text-body-sm text-muted" style={{ marginTop: 'var(--spacing-md)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <BellIcon color="var(--color-primary)" size={14} /> Notifications enabled
+              </p>
             )}
 
             <button className="btn-primary" style={{ marginTop: 'var(--spacing-lg)' }} onClick={() => setIsWifiModalOpen(true)}>
@@ -304,17 +347,17 @@ function App() {
             <h1 className="text-display-lg" style={{ marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>More</h1>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
               <button className="menu-card" style={{ width: '100%' }} onClick={() => setActiveTab('stickies')}>
-                <span style={{ fontSize: '28px', marginBottom: 'var(--spacing-xs)' }}>📝</span>
+                <span style={{ marginBottom: 'var(--spacing-xs)' }}><NoteIcon color="var(--color-primary)" size={28} /></span>
                 <span className="text-title-md">Sticky Notes</span>
                 <span className="text-body-sm text-muted" style={{ marginTop: '2px' }}>Leave notes for each other</span>
               </button>
               <button className="menu-card" style={{ width: '100%' }} onClick={() => setActiveTab('home-info')}>
-                <span style={{ fontSize: '28px', marginBottom: 'var(--spacing-xs)' }}>🏠</span>
+                <span style={{ marginBottom: 'var(--spacing-xs)' }}><HouseInfoIcon color="#f57c00" size={28} /></span>
                 <span className="text-title-md">Home</span>
                 <span className="text-body-sm text-muted" style={{ marginTop: '2px' }}>Meter readings, contracts & more</span>
               </button>
               <button className="menu-card" style={{ width: '100%' }} onClick={() => setActiveTab('car')}>
-                <span style={{ fontSize: '28px', marginBottom: 'var(--spacing-xs)' }}>🚗</span>
+                <span style={{ marginBottom: 'var(--spacing-xs)' }}><CarIcon color="#1e88e5" size={28} /></span>
                 <span className="text-title-md">Car</span>
                 <span className="text-body-sm text-muted" style={{ marginTop: '2px' }}>Insurance, service & documents</span>
               </button>
@@ -326,7 +369,8 @@ function App() {
           <div style={{ paddingBottom: '120px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
               <button onClick={() => setActiveTab('more')} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: 0 }}>←</button>
-              <h1 className="text-display-lg">🏠 Home</h1>
+              <HouseInfoIcon color="#f57c00" size={28} />
+              <h1 className="text-display-lg">Home</h1>
             </div>
             <p className="text-body-md text-muted">Coming soon — meter readings, contracts, landlord contacts and more.</p>
           </div>
@@ -336,7 +380,8 @@ function App() {
           <div style={{ paddingBottom: '120px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
               <button onClick={() => setActiveTab('more')} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: 0 }}>←</button>
-              <h1 className="text-display-lg">🚗 Car</h1>
+              <CarIcon color="#1e88e5" size={28} />
+              <h1 className="text-display-lg">Car</h1>
             </div>
             <p className="text-body-md text-muted">Coming soon — insurance, service history, TÜV dates and documents.</p>
           </div>

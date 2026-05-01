@@ -9,13 +9,42 @@ interface ShoppingItem {
   created_at: string;
 }
 
-const CATEGORY_META: Record<string, { icon: string }> = {
-  Groceries: { icon: '🛒' },
-  Drogerie:  { icon: '💊' },
-  Cleaning:  { icon: '🧹' },
-  Luna:      { icon: '🐕' },
-  Misc:      { icon: '📦' },
+const CategoryIcon = ({ cat }: { cat: string }) => {
+  const style = { flexShrink: 0 as const };
+  switch (cat) {
+    case 'Groceries': return (
+      <svg {...style} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#43a047" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+      </svg>
+    );
+    case 'Drogerie': return (
+      <svg {...style} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8e24aa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M10.5 20H4a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2v3"/>
+        <circle cx="18" cy="18" r="4"/><path d="M18 16v4"/><path d="M16 18h4"/>
+      </svg>
+    );
+    case 'Cleaning': return (
+      <svg {...style} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#039be5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 22l4-4"/><path d="M6.5 17.5 3 21"/><path d="m14 3-4 4 7 7 4-4z"/>
+        <path d="m14 3 3 3"/><path d="m10 7-3 3"/>
+      </svg>
+    );
+    case 'Luna': return (
+      <svg {...style} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 13c-2.5 0-4.5 2-4.5 4.5S9.5 22 12 22s4.5-2 4.5-4.5S14.5 13 12 13z"/>
+        <circle cx="7" cy="10" r="2.5"/><circle cx="10.5" cy="7" r="2.5"/>
+        <circle cx="14.5" cy="7" r="2.5"/><circle cx="18" cy="10" r="2.5"/>
+      </svg>
+    );
+    default: return (
+      <svg {...style} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#757575" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+      </svg>
+    );
+  }
 };
+
 const CATEGORY_ORDER = ['Groceries', 'Drogerie', 'Cleaning', 'Luna', 'Misc'];
 
 export function Lists() {
@@ -130,11 +159,10 @@ export function Lists() {
         CATEGORY_ORDER.map(cat => {
           const catItems = grouped[cat];
           if (catItems.length === 0) return null;
-          const { icon } = CATEGORY_META[cat];
           return (
             <div key={cat} style={{ marginBottom: 'var(--spacing-lg)' }}>
-              <div className="schedule-month-divider" style={{ marginBottom: 'var(--spacing-sm)' }}>
-                {icon} {cat}
+              <div className="schedule-month-divider" style={{ marginBottom: 'var(--spacing-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CategoryIcon cat={cat} /> {cat}
               </div>
               {catItems.map(item => (
                 <div
