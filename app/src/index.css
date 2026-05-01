@@ -1,0 +1,267 @@
+:root {
+  /* Colors */
+  --color-primary: #14d8db;
+  --color-primary-active: #02b3d6;
+  --color-primary-disabled: #cafafa;
+  --color-primary-error-text: #1596bd;
+  --color-primary-error-text-hover: #04b384;
+  --color-luxe: #7a041f;
+  --color-plus: #961d4d;
+  --color-ink: #222222;
+  --color-body: #3f3f3f;
+  --color-muted: #6a6a6a;
+  --color-muted-soft: #929292;
+  --color-hairline: #dddddd;
+  --color-hairline-soft: #ebebeb;
+  --color-border-strong: #c1c1c1;
+  --color-canvas: #ffffff;
+  --color-surface-soft: #f7f7f7;
+  --color-surface-card: #ffffff;
+  --color-surface-strong: #f2f2f2;
+  --color-on-primary: #ffffff;
+  --color-on-dark: #ffffff;
+  --color-legal-link: #23a4ca;
+  --color-star-rating: #222222;
+  --color-scrim: rgba(0, 0, 0, 0.5);
+
+  /* Rounded */
+  --rounded-none: 0px;
+  --rounded-xs: 4px;
+  --rounded-sm: 8px;
+  --rounded-md: 14px;
+  --rounded-lg: 20px;
+  --rounded-xl: 32px;
+  --rounded-full: 9999px;
+
+  /* Spacing */
+  --spacing-xxs: 2px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-base: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-xxl: 48px;
+  --spacing-section: 64px;
+
+  /* Fonts */
+  --font-family: 'Airbnb Cereal VF', Circular, -apple-system, system-ui, Roboto, 'Helvetica Neue', sans-serif;
+  
+  /* Shadows */
+  --shadow-hover: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 6px, rgba(0, 0, 0, 0.1) 0 4px 8px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Typography Utility Classes */
+.text-display-lg { font-size: 22px; font-weight: 500; line-height: 1.18; letter-spacing: -0.44px; }
+.text-title-md { font-size: 16px; font-weight: 600; line-height: 1.25; }
+.text-body-md { font-size: 16px; font-weight: 400; line-height: 1.5; }
+.text-body-sm { font-size: 14px; font-weight: 400; line-height: 1.43; }
+.text-caption { font-size: 14px; font-weight: 500; line-height: 1.29; }
+.text-muted { color: var(--color-muted); }
+
+/* Layout classes */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding-bottom: 80px; /* Space for bottom nav */
+}
+
+.main-content {
+  flex: 1;
+  padding: var(--spacing-base);
+}
+
+/* Bottom Navigation */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background-color: var(--color-canvas);
+  border-top: 1px solid var(--color-hairline);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom); /* PWA iOS support */
+}
+
+.bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-muted);
+  width: 100%;
+  height: 100%;
+}
+
+.bottom-nav-item.active {
+  color: var(--color-ink);
+}
+
+.bottom-nav-icon {
+  margin-bottom: var(--spacing-xs);
+  display: flex;
+}
+
+.bottom-nav-label {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.18;
+}
+
+/* Card */
+.card {
+  background-color: var(--color-canvas);
+  border-radius: var(--rounded-md);
+  box-shadow: var(--shadow-hover);
+  padding: var(--spacing-base);
+  margin-bottom: var(--spacing-base);
+}
+
+/* Button */
+.btn-primary {
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+  border-radius: var(--rounded-sm);
+  padding: 14px 24px;
+  height: 48px;
+  font-size: 16px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.btn-primary:active {
+  background-color: var(--color-primary-active);
+}
+
+.btn-secondary {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  border: 1px solid var(--color-ink);
+  border-radius: var(--rounded-sm);
+  padding: 13px 23px;
+  height: 48px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.icon-button-circle {
+  background-color: var(--color-surface-strong);
+  color: var(--color-ink);
+  border-radius: var(--rounded-full);
+  height: 32px;
+  width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--color-scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--spacing-base);
+}
+
+.modal-content {
+  background-color: var(--color-canvas);
+  border-radius: var(--rounded-md);
+  padding: var(--spacing-lg);
+  width: 100%;
+  max-width: 400px;
+  box-shadow: var(--shadow-hover);
+  position: relative;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-base);
+}
+
+.qr-placeholder {
+  width: 100%;
+  aspect-ratio: 1;
+  background-color: var(--color-surface-soft);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--spacing-base);
+  color: var(--color-muted);
+}
+
+/* Menu Grid */
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-base);
+  margin-top: var(--spacing-base);
+}
+
+.menu-card {
+  background-color: var(--color-canvas);
+  border-radius: var(--rounded-md);
+  box-shadow: var(--shadow-hover);
+  padding: var(--spacing-base);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  cursor: pointer;
+  border: none;
+  text-align: left;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.menu-card:active {
+  transform: scale(0.98);
+  box-shadow: none;
+}
+
+.menu-card-icon {
+  margin-bottom: var(--spacing-sm);
+  color: var(--color-primary); /* Rausch as an accent for icons inside cards */
+}

@@ -51,3 +51,9 @@
 *   **Konzept:** Interaktive Karte (via Leaflet oder Google Maps API).
 *   **Funktionen:** Setzen eigener Pins mit eigenen Kategorien (z. B. "Been with Luna").
 *   **Erweiterung:** Import-Möglichkeit von bestehenden Google-Maps-Listen.
+
+---
+
+## Log
+*   **2024-05-01:** Grundgerüst fertiggestellt. Design-System (Airbnb) und Navigation implementiert.
+*   **2024-05-01:** `PROJECT_PLAN.md` erstellt, um Fortschritt und nächste Schritte detailliert zu tracken. Start von Phase 2 (Infrastruktur) vorbereitet.
