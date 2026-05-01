@@ -2,58 +2,73 @@
 
 ## 1. Grundprinzipien & Regeln für die KI
 *   **Design-Konformität:** Jede generierte UI-Komponente MUSS sich strikt an die Vorgaben in der `DESIGN.md` halten (Farben, Typografie 'Airbnb Cereal VF' / Fallbacks, Radius-Werte, Shadow-Tiers). Keine Accent-Border verwenden!
-*   **Architektur:** Cloud-native SPA (Single Page Application) als PWA (Progressive Web App). Frontend gehostet auf GitHub Pages, Backend über Supabase (Free Tier).
+*   **Architektur:** Cloud-native SPA (Single Page Application) als PWA (Progressive Web App). Frontend gehostet auf GitHub Pages (`shnoozy.top`), Backend über Supabase (Free Tier).
 *   **Setup-Transparenz:** Bevor Code für externe Dienste (Supabase Edge Functions, Webhooks, Google APIs) generiert wird, muss der Nutzer eine präzise, schrittweise Anleitung zur manuellen Einrichtung im jeweiligen Dashboard erhalten.
 *   **Sprache:** UI ist auf Englisch (mit gelegentlichen deutschen Begriffen in den Kategorien).
 
 ## 2. Kerninfrastruktur
 *   **Authentifizierung:** Supabase Auth (E-Mail/Passwort) für 2 spezifische Nutzer. Row Level Security (RLS) schützt alle Tabellen.
 *   **PWA-Features:** Install-Popup ("Add to Homescreen") für schnelle Erreichbarkeit auf dem Smartphone. Service Worker für Offline-Caching und Push-Mitteilungen.
-*   **Startseite (Dashboard):** 
-    *   Quicklinks zu allen Tools.
-    *   Widget: Anstehende Termine.
-    *   Widget: Letzte Aktivitäten (Was wurde neu hinzugefügt/geändert).
-    *   Gast-WLAN QR-Code-Anzeige.
+*   **Deployment:** GitHub Actions → GitHub Pages → Custom Domain `shnoozy.top` (GoDaddy DNS). Auto-deploy bei jedem Push auf `main`.
+*   **Nutzer:** nikolakrnic2@gmail.com (Farbe: Primary #14d8db), heromustafi@gmail.com (Farbe: Luxe #7a041f)
+*   **Startseite (Dashboard):**
+    *   Widget: Sticky Notes (oben, max. 2, mit "See all" Link)
+    *   Widget: Anstehende Termine (14 Tage)
+    *   Gast-WLAN Anzeige
+    *   Push-Notification Opt-in
 
 ## 3. Funktionsmodule (Tools)
 
-### 3.1 Kalender & Erinnerungen
-*   **Konzept:** Eigene Supabase-Tabelle für Termine (Geburtstage, Apartment, Luna, Abwesenheiten).
-*   **Benachrichtigungen:** Web-Push-Mitteilungen über PWA Service Worker an die Smartphones.
-*   **Export:** ICS-Feed-Generierung, um den Kalender in externen Apps (Tablet/Büro) "Read-Only" zu abonnieren.
+### 3.1 Kalender & Erinnerungen ✅
+*   Supabase-Tabelle `events` (Geburtstage, Trash, Sonstiges)
+*   Kategorien: birthday (Luxe), event (Primary), reminder, trash (#bf7300)
+*   Wiederkehrende Events: `recurrence_type = 'yearly'`
+*   ICS-Export (RFC 5545, RRULE für Geburtstage)
+*   Web-Push-Mitteilungen via Edge Function `send-daily-push` (pg_cron, 8:30 MESZ)
+*   74 Müllabfuhr-Termine importiert, Geburtstage importiert
 
-### 3.2 Smart Shopping List
-*   **Konzept:** Live-synchronisierte Checkliste via Supabase Realtime.
-*   **Sprachsteuerung:** Todoist als unsichtbares Backend. Google Home fügt Items via Sprache zu Todoist hinzu, Webhook pusht diese in Supabase.
-*   **KI-Kategorisierung:** Supabase Edge Function nutzt Google Gemini API (Free Tier). Neue Einträge werden in Millisekunden in 5 Kategorien sortiert: *Groceries, Cleaning Supplies, Luna, Drogerie, Misc*.
+### 3.2 Smart Shopping List ✅
+*   Live-synchronisierte Checkliste via Supabase Realtime (`shopping_items` Tabelle)
+*   Kategorien: Groceries 🛒, Drogerie 💊, Cleaning 🧹, Luna 🐕, Misc 📦
+*   KI-Kategorisierung: Supabase Edge Function `add-shopping-item` mit Gemini API
+*   Google Tasks Sync: Edge Function `sync-google-tasks` (OAuth2, alle 2 Min. via pg_cron)
+*   Google Home Nest: Items per Sprache zu "Shopping list" in Google Tasks → automatisch in App
+*   IFTTT-Alternative: `add-shopping-item` auch per IFTTT-Secret aufrufbar
 
 ### 3.3 Luna Portal (Pet Management)
-*   **Konzept:** Info-Dashboard für den Hund (Chipnummer, Versicherung, Futterplan).
-*   **Termine:** Verwaltung wiederkehrender Termine (Impfungen, Entwurmung), die automatisch in den Hauptkalender (3.1) eingespeist werden.
+*   **Status:** Placeholder (Coming soon)
+*   **Geplant:** Info-Dashboard für Luna (Chipnummer, Versicherung, Futterplan), Termine
 
 ### 3.4 Document Storage
-*   **Konzept:** Klassische Ordner- und Unterordner-Struktur (Apartment, Car, Insurances, Luna).
-*   **Verknüpfung:** Der "Luna"-Ordner ist direkt mit dem Luna Portal (3.3) verknüpft.
-*   **Storage:** Google Drive API oder Supabase Storage.
+*   **Status:** Nicht gestartet
+*   **Geplant:** Ordnerstruktur (Apartment, Car, Insurances, Luna), Google Drive oder Supabase Storage
 
-### 3.5 Post-it Board
-*   **Konzept:** Digitale Pinnwand für flüchtige Notizen und kurze Nachrichten an den Partner.
+### 3.5 Post-it Board ✅
+*   Supabase-Tabelle `sticky_notes` mit RLS
+*   Farben: Ersteller-basiert (Primary für Niko, Luxe für Partner)
+*   Sichtbarkeit: "For both" oder "For partner" (Toggle beim Erstellen)
+*   Eigene Notes editierbar und löschbar
+*   Realtime: Toast-Notification wenn Partner eine Note erstellt
+*   Dashboard-Widget: max. 2 Notes + "See all" Link zur Vollansicht
 
 ### 3.6 Moodboard & Wishlist
-*   **Konzept:** Visuelle Sammlung für Ideen und Produktwünsche.
-*   **Sharing:** Nutzt die Web Share Target API. Links (z. B. aus der Amazon-App) können direkt über das Smartphone-Teilen-Menü an das Moodboard gesendet werden.
+*   **Status:** Nicht gestartet
+*   **Geplant:** Web Share Target API, visuelle Sammlung für Ideen und Produktwünsche
 
 ### 3.7 Entertainment & Dining
-*   **Medien-Watchlist:** Sammelstelle für Filme/Serien. Inklusive "Spin the Wheel" (Zufallsgenerator).
-*   **Restaurant Favorites:** Kuratierte Liste lokaler Restaurants. Inklusive "Spin the Wheel".
+*   **Status:** Nicht gestartet
+*   **Geplant:** Medien-Watchlist + "Spin the Wheel", Restaurant Favorites + "Spin the Wheel"
 
 ### 3.8 Custom Map (Places & Memories)
-*   **Konzept:** Interaktive Karte (via Leaflet oder Google Maps API).
-*   **Funktionen:** Setzen eigener Pins mit eigenen Kategorien (z. B. "Been with Luna").
-*   **Erweiterung:** Import-Möglichkeit von bestehenden Google-Maps-Listen.
+*   **Status:** Nicht gestartet
+*   **Geplant:** Leaflet oder Google Maps API, eigene Pins mit Kategorien, Google Maps Import
 
 ---
 
 ## Log
-*   **2024-05-01:** Grundgerüst fertiggestellt. Design-System (Airbnb) und Navigation implementiert.
-*   **2024-05-01:** `PROJECT_PLAN.md` erstellt, um Fortschritt und nächste Schritte detailliert zu tracken. Start von Phase 2 (Infrastruktur) vorbereitet.
+*   **2026-05-01:** Grundgerüst fertiggestellt. Design-System (Airbnb) und Navigation implementiert.
+*   **2026-05-01:** `PROJECT_PLAN.md` erstellt. Phase 2 (Infrastruktur & Auth) abgeschlossen.
+*   **2026-05-01:** Phase 3 abgeschlossen: Kalender mit allen Kategorien, ICS Export, Web-Push Notifications. Müllabfuhr- und Geburtstagsimport. Push-Subscriptions via VAPID.
+*   **2026-05-01:** Phase 4 abgeschlossen: Smart Shopping List mit Realtime, Gemini-Kategorisierung, Google Tasks Sync für Google Home Nest Sprachsteuerung.
+*   **2026-05-01:** Deployment auf `shnoozy.top` via GitHub Pages + GoDaddy DNS + GitHub Actions CI/CD.
+*   **2026-05-01:** Post-it Board (3.5) implementiert: farbcodierte Sticky Notes, Realtime Notifications, Dashboard-Widget.
