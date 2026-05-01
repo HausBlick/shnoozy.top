@@ -116,7 +116,7 @@ export function Lists() {
           onClick={addItem}
           className="btn-primary"
           disabled={adding || !inputValue.trim()}
-          style={{ padding: '0 var(--spacing-lg)', minWidth: '52px', fontSize: '22px', fontWeight: 400 }}
+          style={{ padding: '0 var(--spacing-lg)', width: '52px', flexShrink: 0, fontSize: '22px', fontWeight: 400 }}
         >
           {adding ? '…' : '+'}
         </button>
