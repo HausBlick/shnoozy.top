@@ -259,7 +259,8 @@ export function Calendar() {
       };
 
       if (editingEvent) {
-        const { error } = await supabase.from('events').update(eventData).eq('id', editingEvent.id);
+        const dbId = editingEvent.original_id || editingEvent.id;
+        const { error } = await supabase.from('events').update(eventData).eq('id', dbId);
         if (error) throw error;
       } else {
         const { error } = await supabase.from('events').insert([eventData]);
@@ -276,7 +277,8 @@ export function Calendar() {
   async function deleteEvent() {
     if (!editingEvent) return;
     try {
-      const { error } = await supabase.from('events').delete().eq('id', editingEvent.id);
+      const dbId = editingEvent.original_id || editingEvent.id;
+      const { error } = await supabase.from('events').delete().eq('id', dbId);
       if (error) throw error;
       closePortal();
       fetchEvents();
