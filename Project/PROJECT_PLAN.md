@@ -54,13 +54,23 @@
 
 ## 📋 Nächste Module (offen)
 
+### Home Info (neu)
+- [ ] Zählernummern (Strom, Gas, Wasser)
+- [ ] Vertragsdaten (Anbieter, Vertragsnummer, Laufzeit, Kündigungsfrist)
+- [ ] Vermieter-Kontakte
+- [ ] Übergabeprotokoll / wichtige Dokumente
+- [ ] Wiederkehrende Kosten (Nebenkosten, etc.)
+
+### Car (neu)
+- [ ] Fahrzeugdaten (Kennzeichen, Modell, Erstzulassung, Fahrgestellnummer)
+- [ ] Versicherungsdaten (Anbieter, Vertragsnummer, Ablaufdatum)
+- [ ] TÜV / HU-Datum mit Kalender-Erinnerung
+- [ ] Servicetermine & Kilometerstand-Verlauf
+- [ ] Dokumente (Fahrzeugschein, Versicherungsnachweis)
+
 ### Luna Portal (3.3)
 - [ ] Info-Dashboard (Chipnummer, Versicherung, Futterplan)
 - [ ] Wiederkehrende Tierarzt-Termine → Hauptkalender
-
-### Document Storage (3.4)
-- [ ] Ordnerstruktur: Apartment, Car, Insurances, Luna
-- [ ] Google Drive API oder Supabase Storage
 
 ### Moodboard & Wishlist (3.6)
 - [ ] Web Share Target API

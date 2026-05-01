@@ -298,8 +298,48 @@ function App() {
           <div><h1 className="text-display-lg" style={{ marginTop: 'var(--spacing-md)' }}>Luna Portal</h1><p className="text-body-md text-muted">Coming soon...</p></div>
         )}
         {activeTab === 'lists' && <Lists />}
+
         {activeTab === 'more' && (
-          <div><h1 className="text-display-lg" style={{ marginTop: 'var(--spacing-md)' }}>Menu</h1><p className="text-body-md text-muted">Coming soon...</p></div>
+          <div style={{ paddingBottom: '120px' }}>
+            <h1 className="text-display-lg" style={{ marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>More</h1>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+              <button className="menu-card" style={{ width: '100%' }} onClick={() => setActiveTab('stickies')}>
+                <span style={{ fontSize: '28px', marginBottom: 'var(--spacing-xs)' }}>📝</span>
+                <span className="text-title-md">Sticky Notes</span>
+                <span className="text-body-sm text-muted" style={{ marginTop: '2px' }}>Leave notes for each other</span>
+              </button>
+              <button className="menu-card" style={{ width: '100%' }} onClick={() => setActiveTab('home-info')}>
+                <span style={{ fontSize: '28px', marginBottom: 'var(--spacing-xs)' }}>🏠</span>
+                <span className="text-title-md">Home</span>
+                <span className="text-body-sm text-muted" style={{ marginTop: '2px' }}>Meter readings, contracts & more</span>
+              </button>
+              <button className="menu-card" style={{ width: '100%' }} onClick={() => setActiveTab('car')}>
+                <span style={{ fontSize: '28px', marginBottom: 'var(--spacing-xs)' }}>🚗</span>
+                <span className="text-title-md">Car</span>
+                <span className="text-body-sm text-muted" style={{ marginTop: '2px' }}>Insurance, service & documents</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'home-info' && (
+          <div style={{ paddingBottom: '120px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
+              <button onClick={() => setActiveTab('more')} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: 0 }}>←</button>
+              <h1 className="text-display-lg">🏠 Home</h1>
+            </div>
+            <p className="text-body-md text-muted">Coming soon — meter readings, contracts, landlord contacts and more.</p>
+          </div>
+        )}
+
+        {activeTab === 'car' && (
+          <div style={{ paddingBottom: '120px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
+              <button onClick={() => setActiveTab('more')} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: 0 }}>←</button>
+              <h1 className="text-display-lg">🚗 Car</h1>
+            </div>
+            <p className="text-body-md text-muted">Coming soon — insurance, service history, TÜV dates and documents.</p>
+          </div>
         )}
       </main>
 
