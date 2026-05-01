@@ -3,6 +3,7 @@ import { supabase } from './lib/supabase';
 import { Auth } from './Auth';
 import { Calendar } from './Calendar';
 import { Lists } from './Lists';
+import { StickyNotes } from './StickyNotes';
 import './index.css';
 
 // SVG Icons
@@ -59,7 +60,6 @@ const LogoutIcon = () => (
   </svg>
 );
 
-
 const CloseIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -80,7 +80,15 @@ function App() {
   const [isWifiModalOpen, setIsWifiModalOpen] = useState(false);
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
   const [notifStatus, setNotifStatus] = useState<'unsupported' | 'default' | 'granted' | 'denied'>('unsupported');
+  const [toast, setToast] = useState<string | null>(null);
   const swReg = useRef<ServiceWorkerRegistration | null>(null);
+  const toastTimer = useRef<number | null>(null);
+
+  function showToast(message: string) {
+    setToast(message);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(null), 4000);
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -102,9 +110,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (session) {
-      fetchUpcomingEvents();
-    }
+    if (session) fetchUpcomingEvents();
   }, [session]);
 
   async function fetchUpcomingEvents() {
@@ -121,23 +127,12 @@ function App() {
       data.forEach(e => {
         const d = new Date(e.start_time);
         if (e.recurrence_type === 'yearly') {
-          // Project to current or next year to see if it falls in the 14 day window
           let dProj = new Date(d);
           dProj.setFullYear(currentYear);
-          
-          // If the birthday already happened this year and is not in the next 14 days,
-          // check if it falls in the window early next year (e.g. late December case)
-          if (dProj < today) {
-            dProj.setFullYear(currentYear + 1);
-          }
-
-          if (dProj >= today && dProj <= rangeEnd) {
-            processed.push({ ...e, display_time: dProj });
-          }
+          if (dProj < today) dProj.setFullYear(currentYear + 1);
+          if (dProj >= today && dProj <= rangeEnd) processed.push({ ...e, display_time: dProj });
         } else {
-          if (d >= today && d <= rangeEnd) {
-            processed.push({ ...e, display_time: d });
-          }
+          if (d >= today && d <= rangeEnd) processed.push({ ...e, display_time: d });
         }
       });
       processed.sort((a, b) => a.display_time.getTime() - b.display_time.getTime());
@@ -184,7 +179,18 @@ function App() {
                 <LogoutIcon />
               </button>
             </div>
-            
+
+            {/* Sticky Notes widget — always on top */}
+            <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
+              <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)' }}>📝 Notes</h2>
+              <StickyNotes
+                session={session}
+                compact
+                onSeeAll={() => setActiveTab('stickies')}
+                onNewNote={(note) => showToast(`📝 New note from ${note.creator_email.split('@')[0]}`)}
+              />
+            </div>
+
             <div className="card">
               <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)' }}>Upcoming 14 Days</h2>
               {upcomingEvents.length === 0 ? (
@@ -201,7 +207,7 @@ function App() {
                   ))}
                 </div>
               )}
-              <button 
+              <button
                 onClick={() => setActiveTab('calendar')}
                 style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontWeight: 600, marginTop: 'var(--spacing-sm)', cursor: 'pointer', padding: 0 }}
               >
@@ -231,8 +237,29 @@ function App() {
           </div>
         )}
 
+        {activeTab === 'stickies' && (
+          <div style={{ paddingBottom: '120px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
+              <button
+                onClick={() => setActiveTab('home')}
+                style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: 0 }}
+                aria-label="Back"
+              >
+                ←
+              </button>
+              <h1 className="text-display-lg">Notes</h1>
+            </div>
+            <StickyNotes
+              session={session}
+              onNewNote={(note) => showToast(`📝 New note from ${note.creator_email.split('@')[0]}`)}
+            />
+          </div>
+        )}
+
         {activeTab === 'calendar' && <Calendar />}
-        {activeTab === 'luna' && <div><h1 className="text-display-lg" style={{ marginTop: 'var(--spacing-md)' }}>Luna Portal</h1><p className="text-body-md text-muted">Coming soon...</p></div>}
+        {activeTab === 'luna' && (
+          <div><h1 className="text-display-lg" style={{ marginTop: 'var(--spacing-md)' }}>Luna Portal</h1><p className="text-body-md text-muted">Coming soon...</p></div>
+        )}
         {activeTab === 'lists' && <Lists />}
         {activeTab === 'more' && (
           <div><h1 className="text-display-lg" style={{ marginTop: 'var(--spacing-md)' }}>Menu</h1><p className="text-body-md text-muted">Coming soon...</p></div>
@@ -282,6 +309,8 @@ function App() {
           </div>
         </div>
       )}
+
+      {toast && <div className="toast">{toast}</div>}
     </div>
   );
 }

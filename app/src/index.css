@@ -502,6 +502,89 @@ body {
   border-color: var(--color-ink);
 }
 
+/* Sticky Notes */
+.sticky-note {
+  border-radius: var(--rounded-sm);
+  width: calc(50% - 4px);
+  min-height: 90px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+}
+
+.sticky-note-primary {
+  background: rgba(20, 216, 219, 0.09);
+}
+
+.sticky-note-luxe {
+  background: rgba(122, 4, 31, 0.07);
+}
+
+.sticky-note-strip {
+  height: 5px;
+  flex-shrink: 0;
+}
+
+.sticky-note-strip-primary { background: var(--color-primary); }
+.sticky-note-strip-luxe    { background: var(--color-luxe); }
+
+.sticky-note-content {
+  padding: 10px 12px 4px;
+  font-size: 14px;
+  line-height: 1.5;
+  flex: 1;
+  word-break: break-word;
+}
+
+.sticky-note-footer {
+  padding: 4px 8px 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sticky-note-meta {
+  font-size: 11px;
+  color: var(--color-muted-soft);
+  font-weight: 500;
+}
+
+.sticky-note-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-muted);
+  padding: 2px 4px;
+  display: flex;
+  align-items: center;
+  opacity: 0.6;
+}
+
+.sticky-note-btn:hover { opacity: 1; }
+
+/* Toast notification */
+.toast {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-ink);
+  color: white;
+  padding: 10px 20px;
+  border-radius: var(--rounded-full);
+  font-size: 14px;
+  z-index: 999;
+  white-space: nowrap;
+  animation: toast-in 0.25s ease;
+  pointer-events: none;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
 .auth-error {
   background-color: #fff8f6;
   color: #c13515;
