@@ -49,6 +49,12 @@
 - [x] Sichtbarkeit-Toggle: "For both" / "For partner"
 - [x] Realtime Toast-Notification bei neuer Note vom Partner
 - [x] Dashboard-Widget: Top 2 Notes + "See all" Link
+- [x] More-Tab: Cards für Sticky Notes, Home, Car
+- [x] Home & Car Placeholder-Seiten angelegt
+- [x] WiFi-Modal: QR-Code (qrcode.react), editierbare Credentials via `app_settings`
+- [x] Events RLS: alle User können alle Kalendereinträge sehen, bearbeiten und löschen
+- [x] Kalender Bug-Fix: Update/Delete auf projizierten Geburtstags-Events (original_id)
+- [x] SVG-Icons statt Emojis in Lists, Dashboard, More-Tab
 
 ---
 
@@ -99,6 +105,7 @@
 | 006 | `006_create_push_subscriptions.sql` | Push-Subscriptions |
 | 007 | `007_create_shopping_items.sql` | Shopping List |
 | 008 | `008_create_sticky_notes.sql` | Sticky Notes |
+| 009 | `009_create_app_settings.sql` | App-Settings (WiFi-Credentials) |
 
 ## ⚙️ Supabase Edge Functions
 

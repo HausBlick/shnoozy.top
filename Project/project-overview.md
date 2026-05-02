@@ -50,6 +50,15 @@
 *   Eigene Notes editierbar und löschbar
 *   Realtime: Toast-Notification wenn Partner eine Note erstellt
 *   Dashboard-Widget: max. 2 Notes + "See all" Link zur Vollansicht
+*   Vollansicht via More-Tab → Sticky Notes Card
+
+### 3.9 Home Info (neu, Placeholder)
+*   **Geplant:** Zählernummern (Strom, Gas, Wasser), Vertragsdaten, Vermieter-Kontakte, Dokumente
+*   Erreichbar über More-Tab
+
+### 3.10 Car (neu, Placeholder)
+*   **Geplant:** Fahrzeugdaten, Versicherung, TÜV/HU-Datum, Service-Historie, Dokumente
+*   Erreichbar über More-Tab
 
 ### 3.6 Moodboard & Wishlist
 *   **Status:** Nicht gestartet
@@ -72,3 +81,4 @@
 *   **2026-05-01:** Phase 4 abgeschlossen: Smart Shopping List mit Realtime, Gemini-Kategorisierung, Google Tasks Sync für Google Home Nest Sprachsteuerung.
 *   **2026-05-01:** Deployment auf `shnoozy.top` via GitHub Pages + GoDaddy DNS + GitHub Actions CI/CD.
 *   **2026-05-01:** Post-it Board (3.5) implementiert: farbcodierte Sticky Notes, Realtime Notifications, Dashboard-Widget.
+*   **2026-05-02:** More-Tab mit Cards (Sticky Notes, Home, Car). WiFi-Modal mit QR-Code (qrcode.react) + editierbaren Credentials in `app_settings`. Events RLS geöffnet für beide User. Kalender-Bugfix (projected birthday update/delete). SVG-Icons statt Emojis.
