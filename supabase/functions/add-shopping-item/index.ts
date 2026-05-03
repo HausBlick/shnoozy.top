@@ -9,19 +9,30 @@ const CORS = {
 
 async function categorize(item: string, apiKey: string): Promise<string> {
   try {
-    const prompt = `Categorize this shopping item into exactly one of: ${CATEGORIES.join(', ')}.\nItem: "${item}"\nReply with only the category name.`;
+    const prompt = `Categorize this shopping item into exactly one of: ${CATEGORIES.join(', ')}.\nItem: "${item}"\nReply with only the category name, nothing else.`;
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
       }
     );
+    if (!res.ok) {
+      console.error(`Gemini API error: ${res.status} ${await res.text()}`);
+      return 'Misc';
+    }
     const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    return (CATEGORIES as readonly string[]).includes(text) ? text : 'Misc';
-  } catch {
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
+    const normalized = raw.toLowerCase();
+    const exact = (CATEGORIES as readonly string[]).find(c => c.toLowerCase() === normalized);
+    if (exact) return exact;
+    const partial = (CATEGORIES as readonly string[]).find(c => normalized.includes(c.toLowerCase()));
+    if (partial) { console.error(`Gemini fuzzy match: "${raw}" → "${partial}"`); return partial; }
+    console.error(`Gemini unrecognized: "${raw}"`);
+    return 'Misc';
+  } catch (e) {
+    console.error('Gemini categorize error:', e);
     return 'Misc';
   }
 }
