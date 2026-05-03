@@ -47,7 +47,7 @@ async function categorize(item: string, apiKey: string): Promise<string> {
   try {
     const prompt = `Categorize this shopping item into exactly one of: ${CATEGORIES.join(', ')}.\nItem: "${item}"\nReply with only the category name, nothing else.`;
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -64,7 +64,7 @@ async function categorize(item: string, apiKey: string): Promise<string> {
     const exact = (CATEGORIES as readonly string[]).find(c => c.toLowerCase() === normalized);
     if (exact) return exact;
     const partial = (CATEGORIES as readonly string[]).find(c => normalized.includes(c.toLowerCase()));
-    if (partial) { console.error(`Gemini fuzzy match: "${raw}" → "${partial}"`); return partial; }
+    if (partial) return partial;
     console.error(`Gemini unrecognized: "${raw}"`);
     return 'Misc';
   } catch (e) {
@@ -100,8 +100,8 @@ Deno.serve(async () => {
     if (!title) continue;
 
     const category = geminiKey ? await categorize(title, geminiKey) : 'Misc';
-    const { error } = await supabase.from('shopping_items').insert({ title, category });
 
+    const { error } = await supabase.from('shopping_items').insert({ title, category });
     if (!error) {
       await completeTask(accessToken, list.id, task.id);
       imported++;
