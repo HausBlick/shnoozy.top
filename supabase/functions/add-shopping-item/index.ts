@@ -52,8 +52,23 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   );
 
-  const geminiKey = Deno.env.get('GEMINI_API_KEY');
-  const category = geminiKey ? await categorize(title, geminiKey) : 'Misc';
+  // Reuse category from purchase history before calling Gemini
+  const { data: historyItem } = await supabase
+    .from('shopping_items')
+    .select('category')
+    .ilike('title', title)
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let category: string;
+  if (historyItem?.category) {
+    category = historyItem.category;
+  } else {
+    const geminiKey = Deno.env.get('GEMINI_API_KEY');
+    category = geminiKey ? await categorize(title, geminiKey) : 'Misc';
+  }
 
   const { error } = await supabase.from('shopping_items').insert({ title, category });
   if (error) {

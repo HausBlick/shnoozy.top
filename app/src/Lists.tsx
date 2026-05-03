@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from './lib/supabase';
 
 interface ShoppingItem {
@@ -52,9 +52,14 @@ export function Lists() {
   const [loading, setLoading] = useState(true);
   const [inputValue, setInputValue] = useState('');
   const [adding, setAdding] = useState(false);
+  const [history, setHistory] = useState<{ title: string; category: string }[]>([]);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [doneExpanded, setDoneExpanded] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchItems();
+    fetchHistory();
 
     const channel = supabase
       .channel('shopping_items_changes')
@@ -68,16 +73,52 @@ export function Lists() {
     const { data } = await supabase
       .from('shopping_items')
       .select('*')
+      .is('deleted_at', null)
       .order('created_at', { ascending: true });
     setItems(data || []);
     setLoading(false);
   }
 
-  async function addItem() {
-    const title = inputValue.trim();
+  async function fetchHistory() {
+    const { data } = await supabase
+      .from('shopping_items')
+      .select('title, category')
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false });
+
+    const seen = new Set<string>();
+    const result: { title: string; category: string }[] = [];
+    for (const item of (data || [])) {
+      const key = item.title.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push({ title: item.title, category: item.category });
+      }
+    }
+    setHistory(result);
+  }
+
+  function handleInputChange(value: string) {
+    setInputValue(value);
+    if (value.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    const lower = value.toLowerCase();
+    const activeTitles = new Set(items.map(i => i.title.toLowerCase()));
+    const matches = history
+      .filter(h => h.title.toLowerCase().includes(lower) && !activeTitles.has(h.title.toLowerCase()))
+      .map(h => h.title)
+      .slice(0, 5);
+    setSuggestions(matches);
+  }
+
+  async function addItem(titleOverride?: string) {
+    const title = (titleOverride ?? inputValue).trim();
     if (!title || adding) return;
     setAdding(true);
     setInputValue('');
+    setSuggestions([]);
     try {
       await supabase.functions.invoke('add-shopping-item', { body: { item: title } });
     } catch (err) {
@@ -98,57 +139,96 @@ export function Lists() {
   }
 
   async function clearChecked() {
+    const now = new Date().toISOString();
     setItems(prev => prev.filter(i => !i.is_checked));
-    await supabase.from('shopping_items').delete().eq('is_checked', true);
+    await supabase.from('shopping_items')
+      .update({ deleted_at: now })
+      .eq('is_checked', true)
+      .is('deleted_at', null);
+    fetchHistory();
   }
+
+  const activeItems = items.filter(i => !i.is_checked);
+  const checkedItems = items.filter(i => i.is_checked);
 
   const grouped: Record<string, ShoppingItem[]> = {};
   CATEGORY_ORDER.forEach(cat => { grouped[cat] = []; });
-  items.forEach(item => {
+  activeItems.forEach(item => {
     const cat = CATEGORY_ORDER.includes(item.category) ? item.category : 'Misc';
     grouped[cat].push(item);
   });
 
-  const uncheckedCount = items.filter(i => !i.is_checked).length;
-  const hasChecked = items.some(i => i.is_checked);
-
   return (
     <div style={{ paddingBottom: '120px' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
-        <div>
-          <h1 className="text-display-lg">Shopping</h1>
-          {uncheckedCount > 0 && (
-            <p className="text-body-sm text-muted">{uncheckedCount} item{uncheckedCount !== 1 ? 's' : ''} left</p>
-          )}
-        </div>
-        {hasChecked && (
-          <button
-            onClick={clearChecked}
-            style={{ background: 'none', border: '1px solid var(--color-hairline)', borderRadius: 'var(--rounded-full)', padding: '6px 14px', fontSize: '13px', cursor: 'pointer', color: 'var(--color-muted)' }}
-          >
-            Clear done
-          </button>
+      <div style={{ marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
+        <h1 className="text-display-lg">Shopping</h1>
+        {activeItems.length > 0 && (
+          <p className="text-body-sm text-muted">{activeItems.length} item{activeItems.length !== 1 ? 's' : ''} left</p>
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xl)' }}>
-        <input
-          type="text"
-          className="form-input"
-          placeholder="Add item..."
-          value={inputValue}
-          onChange={e => setInputValue(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && addItem()}
-          style={{ flex: 1 }}
-        />
-        <button
-          onClick={addItem}
-          className="btn-primary"
-          disabled={adding || !inputValue.trim()}
-          style={{ padding: '0 var(--spacing-lg)', width: '52px', flexShrink: 0, fontSize: '22px', fontWeight: 400 }}
-        >
-          {adding ? '…' : '+'}
-        </button>
+      <div style={{ position: 'relative', marginBottom: 'var(--spacing-xl)' }}>
+        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+          <input
+            ref={inputRef}
+            type="text"
+            className="form-input"
+            placeholder="Add item..."
+            value={inputValue}
+            onChange={e => handleInputChange(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') addItem();
+              if (e.key === 'Escape') setSuggestions([]);
+            }}
+            onBlur={() => setTimeout(() => setSuggestions([]), 150)}
+            style={{ flex: 1 }}
+          />
+          <button
+            onClick={() => addItem()}
+            className="btn-primary"
+            disabled={adding || !inputValue.trim()}
+            style={{ padding: '0 var(--spacing-lg)', width: '52px', flexShrink: 0, fontSize: '22px', fontWeight: 400 }}
+          >
+            {adding ? '…' : '+'}
+          </button>
+        </div>
+        {suggestions.length > 0 && (
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: '60px',
+            background: 'var(--color-surface)',
+            border: '1px solid var(--color-hairline)',
+            borderRadius: 'var(--rounded-lg)',
+            zIndex: 100,
+            overflow: 'hidden',
+            marginTop: '4px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+          }}>
+            {suggestions.map(s => (
+              <div
+                key={s}
+                onMouseDown={() => addItem(s)}
+                style={{
+                  padding: '10px 14px',
+                  fontSize: '15px',
+                  cursor: 'pointer',
+                  borderBottom: '1px solid var(--color-hairline-soft)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  color: 'var(--color-text)',
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.51"/>
+                </svg>
+                {s}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -156,15 +236,63 @@ export function Lists() {
       ) : items.length === 0 ? (
         <p className="text-body-sm text-muted">No items yet — add something or ask Google Home.</p>
       ) : (
-        CATEGORY_ORDER.map(cat => {
-          const catItems = grouped[cat];
-          if (catItems.length === 0) return null;
-          return (
-            <div key={cat} style={{ marginBottom: 'var(--spacing-lg)' }}>
-              <div className="schedule-month-divider" style={{ marginBottom: 'var(--spacing-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <CategoryIcon cat={cat} /> {cat}
+        <>
+          {CATEGORY_ORDER.map(cat => {
+            const catItems = grouped[cat];
+            if (catItems.length === 0) return null;
+            return (
+              <div key={cat} style={{ marginBottom: 'var(--spacing-lg)' }}>
+                <div className="schedule-month-divider" style={{ marginBottom: 'var(--spacing-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <CategoryIcon cat={cat} /> {cat}
+                </div>
+                {catItems.map(item => (
+                  <div
+                    key={item.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--spacing-sm)',
+                      padding: '10px 0',
+                      borderBottom: '1px solid var(--color-hairline-soft)',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={item.is_checked}
+                      onChange={() => toggleItem(item)}
+                      style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--color-primary)', flexShrink: 0 }}
+                    />
+                    <span style={{ flex: 1, fontSize: '16px' }}>{item.title}</span>
+                    <button
+                      onClick={() => deleteItem(item.id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: '20px', lineHeight: 1, padding: '0 4px' }}
+                    >×</button>
+                  </div>
+                ))}
               </div>
-              {catItems.map(item => (
+            );
+          })}
+
+          {checkedItems.length > 0 && (
+            <div style={{ marginTop: 'var(--spacing-md)', borderTop: '1px solid var(--color-hairline-soft)', paddingTop: 'var(--spacing-sm)' }}>
+              <div
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', padding: '8px 0' }}
+                onClick={() => setDoneExpanded(e => !e)}
+              >
+                <span style={{ fontSize: '13px', color: 'var(--color-muted)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points={doneExpanded ? '18 15 12 9 6 15' : '6 9 12 15 18 9'}/>
+                  </svg>
+                  Erledigt ({checkedItems.length})
+                </span>
+                <button
+                  onClick={e => { e.stopPropagation(); clearChecked(); }}
+                  style={{ background: 'none', border: '1px solid var(--color-hairline)', borderRadius: 'var(--rounded-full)', padding: '4px 12px', fontSize: '12px', cursor: 'pointer', color: 'var(--color-muted)' }}
+                >
+                  Löschen
+                </button>
+              </div>
+              {doneExpanded && checkedItems.map(item => (
                 <div
                   key={item.id}
                   style={{
@@ -173,30 +301,25 @@ export function Lists() {
                     gap: 'var(--spacing-sm)',
                     padding: '10px 0',
                     borderBottom: '1px solid var(--color-hairline-soft)',
-                    opacity: item.is_checked ? 0.38 : 1,
-                    transition: 'opacity 0.15s',
+                    opacity: 0.38,
                   }}
                 >
                   <input
                     type="checkbox"
-                    checked={item.is_checked}
+                    checked={true}
                     onChange={() => toggleItem(item)}
                     style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--color-primary)', flexShrink: 0 }}
                   />
-                  <span style={{ flex: 1, fontSize: '16px', textDecoration: item.is_checked ? 'line-through' : 'none' }}>
-                    {item.title}
-                  </span>
+                  <span style={{ flex: 1, fontSize: '16px', textDecoration: 'line-through' }}>{item.title}</span>
                   <button
                     onClick={() => deleteItem(item.id)}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: '20px', lineHeight: 1, padding: '0 4px' }}
-                  >
-                    ×
-                  </button>
+                  >×</button>
                 </div>
               ))}
             </div>
-          );
-        })
+          )}
+        </>
       )}
     </div>
   );
