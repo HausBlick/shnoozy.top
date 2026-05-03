@@ -16,6 +16,7 @@
 - [x] React + Vite + TypeScript Setup
 - [x] Design System (Airbnb Cereal VF, teal #14d8db)
 - [x] PWA-Struktur, Bottom Navigation (5 Tabs)
+- [ ] **Bugfix PWA-Struktur:** Das `manifest.webmanifest` (bzw. `manifest.json`) und die Verlinkung in der `index.html` fehlen komplett. Dadurch greift das "Add to Homescreen" Popup auf Smartphones nicht. *Aufgabe an Claude: Bitte das Web App Manifest inkl. Theme-Color und den benötigten Icon-Größen (z.B. 192x192, 512x512) generieren, in `app/public` ablegen und in der `index.html` einbinden.*
 - [x] Dashboard & Placeholder-Screens
 
 ### Phase 2: Infrastruktur & Auth ✅
