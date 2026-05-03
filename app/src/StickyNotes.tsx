@@ -22,8 +22,16 @@ function colorFor(email: string): 'primary' | 'luxe' {
 
 // Stack offsets for up to 3 visible cards (index 0 = top card)
 const STACK_ROT  = [-2.5,  2.0, -1.5];
-const STACK_OX   = [  0,   5,   -3 ];
-const STACK_OY   = [  0,   4,    7 ];
+const STACK_OX   = [  0,   8,   -5 ];
+const STACK_OY   = [  0,   6,   10 ];
+
+function getTextConfig(content: string): { fontSize: number; lineClamp: number; overflow: boolean } {
+  const len = content.length;
+  if (len <= 40) return { fontSize: 21, lineClamp: 6, overflow: false };
+  if (len <= 100) return { fontSize: 17, lineClamp: 7, overflow: false };
+  if (len <= 210) return { fontSize: 14, lineClamp: 9, overflow: false };
+  return { fontSize: 13, lineClamp: 8, overflow: true };
+}
 
 interface DeckProps {
   notes: StickyNote[];
@@ -84,14 +92,14 @@ function NoteDeck({ notes, topIndex, onSwipe, onSeeAll, onAdd }: DeckProps) {
     );
   }
 
-  const CARD = 156;
+  const CARD = 240;
   const visibleCount = Math.min(3, orderedDeck.length);
   const topDragRot = dragging ? dragX * 0.04 : 0;
   const topTX = leaving === 'right' ? 340 : leaving === 'left' ? -340 : dragX;
 
   return (
     <div style={{ marginBottom: 'var(--spacing-sm)' }}>
-      {/* Stack area */}
+      {/* Stack area — centered */}
       <div style={{ position: 'relative', height: `${CARD + 18}px`, marginBottom: 'var(--spacing-sm)' }}>
         {Array.from({ length: visibleCount }, (_, renderOrder) => {
           // render bottom-first so top card is last in DOM (correct paint order)
@@ -99,6 +107,7 @@ function NoteDeck({ notes, topIndex, onSwipe, onSeeAll, onAdd }: DeckProps) {
           const note = orderedDeck[stackPos];
           const isTop = stackPos === 0;
           const color = colorFor(note.creator_email);
+          const textConfig = getTextConfig(note.content);
 
           const baseRot = STACK_ROT[stackPos];
           const ox = STACK_OX[stackPos];
@@ -119,11 +128,11 @@ function NoteDeck({ notes, topIndex, onSwipe, onSeeAll, onAdd }: DeckProps) {
               style={{
                 position: 'absolute',
                 top: 0,
-                left: 0,
+                left: '50%',
                 width: `${CARD}px`,
                 height: `${CARD}px`,
                 zIndex: visibleCount - stackPos,
-                transform: `translate(${tx}px, ${ty}px) rotate(${rot}deg)`,
+                transform: `translate(calc(-50% + ${tx}px), ${ty}px) rotate(${rot}deg)`,
                 transition,
                 opacity,
                 cursor: isTop ? (notes.length > 1 ? (dragging ? 'grabbing' : 'grab') : 'default') : 'default',
@@ -131,6 +140,8 @@ function NoteDeck({ notes, topIndex, onSwipe, onSeeAll, onAdd }: DeckProps) {
                 userSelect: 'none',
                 boxSizing: 'border-box',
                 overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
               }}
               onPointerDown={isTop ? onPointerDown : undefined}
               onPointerMove={isTop ? onPointerMove : undefined}
@@ -138,9 +149,32 @@ function NoteDeck({ notes, topIndex, onSwipe, onSeeAll, onAdd }: DeckProps) {
               onPointerCancel={isTop ? onPointerUp : undefined}
             >
               <div className={`sticky-note-strip sticky-note-strip-${color}`} />
-              <p className="sticky-note-content" style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 6, WebkitBoxOrient: 'vertical' } as React.CSSProperties}>
+              <p
+                className="sticky-note-content"
+                style={{
+                  fontSize: `${textConfig.fontSize}px`,
+                  overflow: 'hidden',
+                  display: '-webkit-box',
+                  WebkitLineClamp: textConfig.lineClamp,
+                  WebkitBoxOrient: 'vertical',
+                  flex: 1,
+                } as React.CSSProperties}
+              >
                 {note.content}
               </p>
+              {textConfig.overflow && isTop && onSeeAll && (
+                <button
+                  onPointerDown={e => e.stopPropagation()}
+                  onClick={(e) => { e.stopPropagation(); onSeeAll(); }}
+                  style={{
+                    background: 'none', border: 'none', padding: '0 14px 10px',
+                    color: 'var(--color-primary)', fontSize: '12px', fontWeight: 600,
+                    cursor: 'pointer', textAlign: 'right', width: '100%',
+                  }}
+                >
+                  Show all →
+                </button>
+              )}
             </div>
           );
         })}

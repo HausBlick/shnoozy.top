@@ -514,11 +514,11 @@ body {
 }
 
 .sticky-note-primary {
-  background: rgba(20, 216, 219, 0.09);
+  background: #c8f9f9;
 }
 
 .sticky-note-luxe {
-  background: rgba(122, 4, 31, 0.07);
+  background: #fce4ea;
 }
 
 .sticky-note-strip {
