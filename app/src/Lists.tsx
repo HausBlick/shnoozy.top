@@ -5,6 +5,7 @@ interface ShoppingItem {
   id: string;
   title: string;
   category: string;
+  subcategory: string | null;
   is_checked: boolean;
   created_at: string;
 }
@@ -12,10 +13,17 @@ interface ShoppingItem {
 const CategoryIcon = ({ cat }: { cat: string }) => {
   const style = { flexShrink: 0 as const };
   switch (cat) {
-    case 'Groceries': return (
-      <svg {...style} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#43a047" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
-        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+    case 'Fruits & Veggies': return (
+      <svg {...style} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7cb342" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/>
+        <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>
+      </svg>
+    );
+    case 'Luna': return (
+      <svg {...style} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 13c-2.5 0-4.5 2-4.5 4.5S9.5 22 12 22s4.5-2 4.5-4.5S14.5 13 12 13z"/>
+        <circle cx="7" cy="10" r="2.5"/><circle cx="10.5" cy="7" r="2.5"/>
+        <circle cx="14.5" cy="7" r="2.5"/><circle cx="18" cy="10" r="2.5"/>
       </svg>
     );
     case 'Drogerie': return (
@@ -30,11 +38,10 @@ const CategoryIcon = ({ cat }: { cat: string }) => {
         <path d="m14 3 3 3"/><path d="m10 7-3 3"/>
       </svg>
     );
-    case 'Luna': return (
-      <svg {...style} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 13c-2.5 0-4.5 2-4.5 4.5S9.5 22 12 22s4.5-2 4.5-4.5S14.5 13 12 13z"/>
-        <circle cx="7" cy="10" r="2.5"/><circle cx="10.5" cy="7" r="2.5"/>
-        <circle cx="14.5" cy="7" r="2.5"/><circle cx="18" cy="10" r="2.5"/>
+    case 'Groceries': return (
+      <svg {...style} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#43a047" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
       </svg>
     );
     default: return (
@@ -45,7 +52,8 @@ const CategoryIcon = ({ cat }: { cat: string }) => {
   }
 };
 
-const CATEGORY_ORDER = ['Groceries', 'Drogerie', 'Cleaning', 'Luna', 'Misc'];
+const CATEGORY_ORDER = ['Fruits & Veggies', 'Luna', 'Drogerie', 'Cleaning', 'Groceries', 'Misc'] as const;
+const SUBCATEGORY_ORDER = ['Spices', 'Meat', 'Frozen', 'Coffee & Tea', 'Dairy', 'Cans & Boxes', 'Dry Food', 'Drinks', 'Snacks'] as const;
 
 export function Lists() {
   const [items, setItems] = useState<ShoppingItem[]>([]);
@@ -148,13 +156,74 @@ export function Lists() {
     fetchHistory();
   }
 
+  function renderItem(item: ShoppingItem, checked = false) {
+    return (
+      <div
+        key={item.id}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--spacing-sm)',
+          padding: '10px 0',
+          borderBottom: '1px solid var(--color-hairline-soft)',
+          ...(checked ? { opacity: 0.38 } : {}),
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={() => toggleItem(item)}
+          style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--color-primary)', flexShrink: 0 }}
+        />
+        <span style={{ flex: 1, fontSize: '16px', ...(checked ? { textDecoration: 'line-through' } : {}) }}>{item.title}</span>
+        <button
+          onClick={() => deleteItem(item.id)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: '20px', lineHeight: 1, padding: '0 4px' }}
+        >×</button>
+      </div>
+    );
+  }
+
+  function renderGroceries(catItems: ShoppingItem[]) {
+    const subGrouped: Record<string, ShoppingItem[]> = {};
+    (SUBCATEGORY_ORDER as readonly string[]).forEach(s => { subGrouped[s] = []; });
+    subGrouped[''] = [];
+    catItems.forEach(item => {
+      const sub = item.subcategory && (SUBCATEGORY_ORDER as readonly string[]).includes(item.subcategory)
+        ? item.subcategory : '';
+      subGrouped[sub].push(item);
+    });
+    return ([...SUBCATEGORY_ORDER, ''] as string[]).map(sub => {
+      const subItems = subGrouped[sub];
+      if (subItems.length === 0) return null;
+      return (
+        <div key={sub || 'other'}>
+          {sub && (
+            <div style={{
+              fontSize: '11px',
+              color: 'var(--color-muted)',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.07em',
+              padding: '8px 0 2px 0',
+              marginTop: '2px',
+            }}>
+              {sub}
+            </div>
+          )}
+          {subItems.map(item => renderItem(item))}
+        </div>
+      );
+    });
+  }
+
   const activeItems = items.filter(i => !i.is_checked);
   const checkedItems = items.filter(i => i.is_checked);
 
   const grouped: Record<string, ShoppingItem[]> = {};
-  CATEGORY_ORDER.forEach(cat => { grouped[cat] = []; });
+  (CATEGORY_ORDER as readonly string[]).forEach(cat => { grouped[cat] = []; });
   activeItems.forEach(item => {
-    const cat = CATEGORY_ORDER.includes(item.category) ? item.category : 'Misc';
+    const cat = (CATEGORY_ORDER as readonly string[]).includes(item.category) ? item.category : 'Misc';
     grouped[cat].push(item);
   });
 
@@ -245,30 +314,7 @@ export function Lists() {
                 <div className="schedule-month-divider" style={{ marginBottom: 'var(--spacing-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <CategoryIcon cat={cat} /> {cat}
                 </div>
-                {catItems.map(item => (
-                  <div
-                    key={item.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 'var(--spacing-sm)',
-                      padding: '10px 0',
-                      borderBottom: '1px solid var(--color-hairline-soft)',
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={item.is_checked}
-                      onChange={() => toggleItem(item)}
-                      style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--color-primary)', flexShrink: 0 }}
-                    />
-                    <span style={{ flex: 1, fontSize: '16px' }}>{item.title}</span>
-                    <button
-                      onClick={() => deleteItem(item.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: '20px', lineHeight: 1, padding: '0 4px' }}
-                    >×</button>
-                  </div>
-                ))}
+                {cat === 'Groceries' ? renderGroceries(catItems) : catItems.map(item => renderItem(item))}
               </div>
             );
           })}
@@ -292,31 +338,7 @@ export function Lists() {
                   Löschen
                 </button>
               </div>
-              {doneExpanded && checkedItems.map(item => (
-                <div
-                  key={item.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--spacing-sm)',
-                    padding: '10px 0',
-                    borderBottom: '1px solid var(--color-hairline-soft)',
-                    opacity: 0.38,
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={true}
-                    onChange={() => toggleItem(item)}
-                    style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--color-primary)', flexShrink: 0 }}
-                  />
-                  <span style={{ flex: 1, fontSize: '16px', textDecoration: 'line-through' }}>{item.title}</span>
-                  <button
-                    onClick={() => deleteItem(item.id)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: '20px', lineHeight: 1, padding: '0 4px' }}
-                  >×</button>
-                </div>
-              ))}
+              {doneExpanded && checkedItems.map(item => renderItem(item, true))}
             </div>
           )}
         </>

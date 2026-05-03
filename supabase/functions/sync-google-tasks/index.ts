@@ -1,6 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const CATEGORIES = ['Groceries', 'Drogerie', 'Cleaning', 'Luna', 'Misc'] as const;
+const CATEGORIES = ['Fruits & Veggies', 'Luna', 'Drogerie', 'Cleaning', 'Groceries', 'Misc'] as const;
+const GROCERIES_SUBCATEGORIES = ['Spices', 'Meat', 'Frozen', 'Coffee & Tea', 'Dairy', 'Cans & Boxes', 'Dry Food', 'Drinks', 'Snacks'] as const;
+
+interface Categorization {
+  category: string;
+  subcategory: string | null;
+}
 
 async function getAccessToken(clientId: string, clientSecret: string, refreshToken: string): Promise<string> {
   const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -43,33 +49,63 @@ async function completeTask(accessToken: string, listId: string, taskId: string)
   });
 }
 
-async function categorize(item: string, apiKey: string): Promise<string> {
+async function categorize(item: string, apiKey: string): Promise<Categorization> {
   try {
-    const prompt = `Categorize this shopping item into exactly one of: ${CATEGORIES.join(', ')}.\nItem: "${item}"\nReply with only the category name, nothing else.`;
+    const prompt = `Categorize this shopping item into a category and optionally a subcategory.
+
+Top-level categories: Fruits & Veggies, Luna, Drogerie, Cleaning, Groceries, Misc
+
+If the category is "Groceries", also choose a subcategory from: Spices, Meat, Frozen, Coffee & Tea, Dairy, Cans & Boxes, Dry Food, Drinks, Snacks
+
+Category guidelines:
+- Fruits & Veggies: fresh fruits and vegetables
+- Luna: dog food, treats, dental sticks, pet accessories
+- Drogerie: hygiene products, cosmetics, shampoo, soap, deodorant, toilet paper, tissues
+- Cleaning: cleaning products, trash bags, detergent, dishwasher tabs, sponges, mop
+- Groceries > Spices: spices, herbs, oil, vinegar, sauces, condiments, mustard, ketchup
+- Groceries > Meat: meat, fish, sausage, cold cuts, refrigerated convenience meals, Maultaschen
+- Groceries > Frozen: frozen pizza, fries, frozen vegetables, frozen fruits, ice cream, frozen meals
+- Groceries > Coffee & Tea: coffee, tea, bread, spreads, jam, rolls, pastries
+- Groceries > Dairy: butter, yogurt, cream, cheese, eggs, milk, quark
+- Groceries > Cans & Boxes: canned beans, chickpeas, corn, olives, passata, tomatoes, stock cubes
+- Groceries > Dry Food: pasta, rice, flour, sugar, oats, cereal, lentils, couscous
+- Groceries > Drinks: water, juice, soda, beer, wine, spirits, energy drinks
+- Groceries > Snacks: chips, chocolate, cookies, candy, nuts, popcorn
+- Misc: anything that does not fit the above categories
+
+Item: "${item}"
+
+Reply with ONLY a JSON object, no markdown, no explanation. Examples:
+{"category":"Groceries","subcategory":"Dairy"}
+{"category":"Fruits & Veggies"}
+{"category":"Drogerie"}`;
+
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json' },
+        }),
       }
     );
     if (!res.ok) {
       console.error(`Gemini API error: ${res.status} ${await res.text()}`);
-      return 'Misc';
+      return { category: 'Misc', subcategory: null };
     }
     const data = await res.json();
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
-    const normalized = raw.toLowerCase();
-    const exact = (CATEGORIES as readonly string[]).find(c => c.toLowerCase() === normalized);
-    if (exact) return exact;
-    const partial = (CATEGORIES as readonly string[]).find(c => normalized.includes(c.toLowerCase()));
-    if (partial) return partial;
-    console.error(`Gemini unrecognized: "${raw}"`);
-    return 'Misc';
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
+    const parsed = JSON.parse(text);
+    const category = (CATEGORIES as readonly string[]).includes(parsed.category) ? parsed.category : 'Misc';
+    const subcategory = category === 'Groceries' && (GROCERIES_SUBCATEGORIES as readonly string[]).includes(parsed.subcategory)
+      ? parsed.subcategory
+      : null;
+    return { category, subcategory };
   } catch (e) {
     console.error('Gemini categorize error:', e);
-    return 'Misc';
+    return { category: 'Misc', subcategory: null };
   }
 }
 
@@ -99,9 +135,11 @@ Deno.serve(async () => {
     const title = task.title?.trim();
     if (!title) continue;
 
-    const category = geminiKey ? await categorize(title, geminiKey) : 'Misc';
+    const { category, subcategory } = geminiKey
+      ? await categorize(title, geminiKey)
+      : { category: 'Misc', subcategory: null };
 
-    const { error } = await supabase.from('shopping_items').insert({ title, category });
+    const { error } = await supabase.from('shopping_items').insert({ title, category, subcategory });
     if (!error) {
       await completeTask(accessToken, list.id, task.id);
       imported++;
