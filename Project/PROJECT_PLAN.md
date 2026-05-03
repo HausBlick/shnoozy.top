@@ -58,7 +58,8 @@
 - [x] Sichtbarkeit-Toggle: "For both" / "For partner"
 - [x] Realtime Toast-Notification bei neuer Note vom Partner
 - [x] Dashboard-Widget (Alt): Top 2 Notes + "See all" Link
-- [ ] **UI-Refactoring Post-its:** Implementierung des quadratischen, wischbaren Post-it-Stapels (Deck/Carousel). *Frage an Claude: Welche Library (z.B. Framer Motion, Swiper.js) eignet sich hierfür am besten, um den "unordentlichen" Look und die Wisch-Geste (oberstes nach hinten) im React/Vite/PWA Kontext flüssig umzusetzen? Bitte Entscheidung hier eintragen und umsetzen.*
+- [x] **UI-Refactoring Post-its:** Dashboard-Widget als wischbarer Deck/Stapel mit zufälliger Rotation. Kein Library-Overhead — reines CSS + Pointer Events. Swipe links/rechts schiebt oberstes Note ans Ende des Stapels. "See all →" führt zur Vollansicht.
+- [ ] **Kaufhistorie-Funktion Shopping** erneut prüfen: Subkategorie-Wiederverwendung aus History verifizieren und ggf. optimieren.
 - [x] More-Tab: Cards für Sticky Notes, Home, Car
 - [x] Home & Car Placeholder-Seiten angelegt
 - [x] WiFi-Modal: QR-Code (qrcode.react), editierbare Credentials via `app_settings`
@@ -147,3 +148,5 @@
 *   **2026-05-02:** More-Tab mit Cards (Sticky Notes, Home, Car). WiFi-Modal mit QR-Code (qrcode.react) + editierbaren Credentials in `app_settings`. Events RLS geöffnet für beide User. Kalender-Bugfix (projected birthday update/delete). SVG-Icons statt Emojis.
 *   **2026-05-03:** Shopping List erweitert: Soft-Delete + Kaufhistorie (Migration 010), klappbare "Erledigt"-Sektion, Autocomplete-Dropdown aus History, Kategorie-Wiederverwendung in Edge Function.
 *   **2026-05-03:** Gemini-Kategorisierung gefixt: Modell `gemini-2.0-flash` war für neue API-User nicht verfügbar (HTTP 404), ersetzt durch `gemini-2.5-flash` in beiden Edge Functions.
+*   **2026-05-03:** Shopping-Kategorien erweitert: 6 Hauptkategorien + 9 Subkategorien unter Groceries (Supermarkt-Reihenfolge). DB Migration 011 (`subcategory`-Spalte). Gemini liefert JSON mit `responseMimeType`.
+*   **2026-05-03:** Post-it Dashboard-Widget als swipebarer Deck-Stapel umgebaut. Rotation, Swipe-Geste (Pointer Events), keine externe Library.
