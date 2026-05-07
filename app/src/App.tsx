@@ -115,7 +115,6 @@ function urlBase64ToUint8Array(base64: string): ArrayBuffer {
 function App() {
   const [session, setSession] = useState<any>(null);
   const [homeId, setHomeId] = useState<string | null>(null);
-  const [homeName, setHomeName] = useState('');
   const [homeLoading, setHomeLoading] = useState(true);
 
   const [activeTab, setActiveTab] = useState('home');
@@ -181,16 +180,13 @@ function App() {
       if (data) {
         const hId = data.home_id;
         setHomeId(hId);
-        setHomeName((data.homes as any)?.name ?? '');
         fetchUpcomingEvents(hId);
         fetchWifiSettings(hId);
       } else {
         setHomeId(null);
-        setHomeName('');
       }
     } catch {
       setHomeId(null);
-      setHomeName('');
     } finally {
       setHomeLoading(false);
     }
