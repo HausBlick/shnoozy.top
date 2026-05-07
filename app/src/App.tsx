@@ -148,7 +148,6 @@ function App() {
       setSession(session);
       if (!session) {
         setHomeId(null);
-        setHomeName('');
         setHomeLoading(false);
       }
     });
