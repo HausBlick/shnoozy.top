@@ -49,7 +49,7 @@ function escapeICS(str: string): string {
   return str.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
 }
 
-export function Calendar() {
+export function Calendar({ homeId }: { homeId: string }) {
   const [events, setEvents] = useState<Event[]>([]);
   const [rawEvents, setRawEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,7 +76,7 @@ export function Calendar() {
 
   useEffect(() => {
     fetchEvents();
-  }, []);
+  }, [homeId]);
 
   useEffect(() => {
     if (!loading && events.length > 0) {
@@ -100,7 +100,7 @@ export function Calendar() {
   async function fetchEvents() {
     try {
       setLoading(true);
-      const { data, error } = await supabase.from('events').select('*');
+      const { data, error } = await supabase.from('events').select('*').eq('home_id', homeId);
       if (error) throw error;
 
       setRawEvents(data || []);
@@ -256,6 +256,7 @@ export function Calendar() {
         category: category,
         recurrence_type: recurrence,
         user_id: user.id,
+        home_id: homeId,
       };
 
       if (editingEvent) {

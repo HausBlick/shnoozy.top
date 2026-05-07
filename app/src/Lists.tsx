@@ -3,7 +3,7 @@ import { supabase } from './lib/supabase';
 
 interface ShoppingItem {
   id: string;
-  title: string;
+  name: string;
   category: string;
   subcategory: string | null;
   is_checked: boolean;
@@ -55,12 +55,12 @@ const CategoryIcon = ({ cat }: { cat: string }) => {
 const CATEGORY_ORDER = ['Fruits & Veggies', 'Luna', 'Drogerie', 'Cleaning', 'Groceries', 'Misc'] as const;
 const SUBCATEGORY_ORDER = ['Spices', 'Meat', 'Frozen', 'Coffee & Tea', 'Dairy', 'Cans & Boxes', 'Dry Food', 'Drinks', 'Snacks'] as const;
 
-export function Lists() {
+export function Lists({ homeId }: { homeId: string }) {
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [inputValue, setInputValue] = useState('');
   const [adding, setAdding] = useState(false);
-  const [history, setHistory] = useState<{ title: string; category: string }[]>([]);
+  const [history, setHistory] = useState<{ name: string; category: string }[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [doneExpanded, setDoneExpanded] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -70,17 +70,23 @@ export function Lists() {
     fetchHistory();
 
     const channel = supabase
-      .channel('shopping_items_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_items' }, fetchItems)
+      .channel(`shopping_items_${homeId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'shopping_items',
+        filter: `home_id=eq.${homeId}`,
+      }, fetchItems)
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [homeId]);
 
   async function fetchItems() {
     const { data } = await supabase
       .from('shopping_items')
       .select('*')
+      .eq('home_id', homeId)
       .is('deleted_at', null)
       .order('created_at', { ascending: true });
     setItems(data || []);
@@ -90,17 +96,18 @@ export function Lists() {
   async function fetchHistory() {
     const { data } = await supabase
       .from('shopping_items')
-      .select('title, category')
+      .select('name, category')
+      .eq('home_id', homeId)
       .not('deleted_at', 'is', null)
       .order('deleted_at', { ascending: false });
 
     const seen = new Set<string>();
-    const result: { title: string; category: string }[] = [];
+    const result: { name: string; category: string }[] = [];
     for (const item of (data || [])) {
-      const key = item.title.toLowerCase();
+      const key = item.name.toLowerCase();
       if (!seen.has(key)) {
         seen.add(key);
-        result.push({ title: item.title, category: item.category });
+        result.push({ name: item.name, category: item.category });
       }
     }
     setHistory(result);
@@ -113,22 +120,22 @@ export function Lists() {
       return;
     }
     const lower = value.toLowerCase();
-    const activeTitles = new Set(items.map(i => i.title.toLowerCase()));
+    const activeNames = new Set(items.map(i => i.name.toLowerCase()));
     const matches = history
-      .filter(h => h.title.toLowerCase().includes(lower) && !activeTitles.has(h.title.toLowerCase()))
-      .map(h => h.title)
+      .filter(h => h.name.toLowerCase().includes(lower) && !activeNames.has(h.name.toLowerCase()))
+      .map(h => h.name)
       .slice(0, 5);
     setSuggestions(matches);
   }
 
-  async function addItem(titleOverride?: string) {
-    const title = (titleOverride ?? inputValue).trim();
-    if (!title || adding) return;
+  async function addItem(nameOverride?: string) {
+    const name = (nameOverride ?? inputValue).trim();
+    if (!name || adding) return;
     setAdding(true);
     setInputValue('');
     setSuggestions([]);
     try {
-      await supabase.functions.invoke('add-shopping-item', { body: { item: title } });
+      await supabase.functions.invoke('add-shopping-item', { body: { item: name, home_id: homeId } });
     } catch (err) {
       console.error('Failed to add item:', err);
     } finally {
@@ -151,6 +158,7 @@ export function Lists() {
     setItems(prev => prev.filter(i => !i.is_checked));
     await supabase.from('shopping_items')
       .update({ deleted_at: now })
+      .eq('home_id', homeId)
       .eq('is_checked', true)
       .is('deleted_at', null);
     fetchHistory();
@@ -175,7 +183,7 @@ export function Lists() {
           onChange={() => toggleItem(item)}
           style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--color-primary)', flexShrink: 0 }}
         />
-        <span style={{ flex: 1, fontSize: '16px', ...(checked ? { textDecoration: 'line-through' } : {}) }}>{item.title}</span>
+        <span style={{ flex: 1, fontSize: '16px', ...(checked ? { textDecoration: 'line-through' } : {}) }}>{item.name}</span>
         <button
           onClick={() => deleteItem(item.id)}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: '20px', lineHeight: 1, padding: '0 4px' }}
@@ -223,7 +231,7 @@ export function Lists() {
   const grouped: Record<string, ShoppingItem[]> = {};
   (CATEGORY_ORDER as readonly string[]).forEach(cat => { grouped[cat] = []; });
   activeItems.forEach(item => {
-    const cat = (CATEGORY_ORDER as readonly string[]).includes(item.category) ? item.category : 'Misc';
+    const cat = (CATEGORY_ORDER as readonly string[]).includes(item.category as any) ? item.category : 'Misc';
     grouped[cat].push(item);
   });
 
@@ -303,7 +311,7 @@ export function Lists() {
       {loading ? (
         <p className="text-body-sm text-muted">Loading...</p>
       ) : items.length === 0 ? (
-        <p className="text-body-sm text-muted">No items yet — add something or ask Google Home.</p>
+        <p className="text-body-sm text-muted">No items yet — add something above.</p>
       ) : (
         <>
           {CATEGORY_ORDER.map(cat => {

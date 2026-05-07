@@ -6,11 +6,53 @@
 
 ## Current Status
 **Live unter:** https://shnoozy.top
-**Phase:** Phase 5 — Weitere Module
+**Phase:** Phase 6 — Multi-Tenancy Implementierung (Datenbank-Reset)
 
 ---
 
 ## 🗺️ Roadmap
+
+### 🔴 Phase 6: Multi-Tenancy Implementierung (HOCHPRIO — Datenbank-Reset)
+> **Wichtig:** Für diesen Meilenstein wird die Datenbank **komplett zurückgesetzt**. Es werden **keine Migrationsskripte für bestehende Nutzerdaten** benötigt oder erstellt. Alle Tabellen werden neu aufgebaut.
+
+#### 6.1 Neue Kerntabellen anlegen
+- [ ] Tabelle `homes` erstellen (`id`, `name`, `icon`, `created_at`)
+- [ ] Tabelle `home_members` erstellen (`id`, `home_id`, `user_id`, `role` ['admin'|'member'], `joined_at`) + RLS: nur Mitglieder des Homes sehen Einträge
+- [ ] Tabelle `home_settings` erstellen (`id`, `home_id`, `key`, `value`) + RLS: nur Home-Mitglieder lesen, nur Admin schreibt
+- [ ] Tabelle `home_invitations` erstellen (`id`, `home_id`, `token` [unique, kryptografisch zufällig], `role`, `created_by`, `expires_at`, `used_at`) + RLS: Admin kann Token erstellen, anonyme Nutzer können Token per SELECT validieren
+
+#### 6.2 Bestehende Tabellen um `home_id` erweitern
+- [ ] `events` — Spalte `home_id` (NOT NULL, FK → `homes.id`) hinzufügen
+- [ ] `sticky_notes` — Spalte `home_id` (NOT NULL, FK → `homes.id`) hinzufügen
+- [ ] `shopping_items` — Spalte `home_id` (NOT NULL, FK → `homes.id`) hinzufügen
+- [ ] `push_subscriptions` — Spalte `home_id` hinzufügen (für home-spezifische Push-Notifications)
+- [ ] `app_settings` — durch `home_settings` ersetzen oder um `home_id` erweitern
+
+#### 6.3 RLS Policies neu implementieren
+- [ ] Alle alten RLS Policies auf den betroffenen Tabellen droppen
+- [ ] Neue Policy-Logik: `auth.uid()` muss in `home_members` für das jeweilige `home_id` des Datensatzes vorhanden sein (`EXISTS (SELECT 1 FROM home_members WHERE home_id = <table>.home_id AND user_id = auth.uid())`)
+- [ ] Schreib-Policies: Nur Mitglieder des Homes dürfen INSERT/UPDATE/DELETE in ihrem Home
+
+#### 6.4 Einladungssystem (Link-Generator)
+- [ ] Frontend: UI im Settings-Bereich für Admins — "Invite Member"-Button + generierter Link-Display
+- [ ] Edge Function `generate-invite` (POST): Erstellt Token in `home_invitations`, gibt signierten Link zurück. Token: 32 Byte crypto-random, URL-safe Base64.
+- [ ] Frontend: Invite-Landing-Page (`/join?token=...`) — validiert Token, zeigt Home-Name an, leitet nach Login/Register zur automatischen Mitgliedschaft weiter
+- [ ] Edge Function oder DB-Trigger: Token nach Nutzung `used_at` setzen + User in `home_members` eintragen
+- [ ] Automatisches Verfallsdatum: `expires_at = now() + interval '7 days'`
+
+#### 6.5 Google Tasks Integration auf optionales OAuth umbauen
+- [ ] Neue Tabelle `user_google_tokens` (`user_id`, `home_id`, `access_token`, `refresh_token`, `token_expiry`) — verschlüsselt in Supabase Vault oder als Secret pro User
+- [ ] Frontend: Settings-Seite "Google Verknüpfung" — Button "Mit Google verbinden" startet OAuth-Flow, Button "Verbindung trennen" löscht Tokens
+- [ ] Edge Function `sync-google-tasks` anpassen: Iteriert nur über User mit gespeicherten, gültigen Tokens; kein Sync für User ohne Verknüpfung
+- [ ] Edge Function `add-shopping-item`: Beim Hinzufügen eines Items via IFTTT/Sprachsteuerung nur dann in Google Tasks zurückschreiben, wenn der aufrufende User eine aktive Google-Verknüpfung hat
+
+#### 6.6 Frontend-Anpassungen (Home-Kontext)
+- [ ] Nach Login: Aktives Home aus `home_members` laden, in globalem State (`activeHomeId`) speichern
+- [ ] Alle Datenbankabfragen im Frontend mit `home_id = activeHomeId` filtern
+- [ ] `home_settings` beim Start laden → nur aktivierte Module rendern (Navigation + Dashboard-Widgets)
+- [ ] Onboarding-Flow für neue Nutzer ohne Home: "Home erstellen" oder "Per Einladungslink beitreten"
+
+---
 
 ### Phase 1: Core Setup ✅
 - [x] React + Vite + TypeScript Setup
@@ -151,3 +193,4 @@
 *   **2026-05-03:** Gemini-Kategorisierung gefixt: Modell `gemini-2.0-flash` war für neue API-User nicht verfügbar (HTTP 404), ersetzt durch `gemini-2.5-flash` in beiden Edge Functions.
 *   **2026-05-03:** Shopping-Kategorien erweitert: 6 Hauptkategorien + 9 Subkategorien unter Groceries (Supermarkt-Reihenfolge). DB Migration 011 (`subcategory`-Spalte). Gemini liefert JSON mit `responseMimeType`.
 *   **2026-05-03:** Post-it Dashboard-Widget als swipebarer Deck-Stapel umgebaut. Rotation, Swipe-Geste (Pointer Events), keine externe Library.
+*   **2026-05-06:** Architektur-Entscheidung: Vollständiger Umbau auf Multi-Tenancy. Datenbank-Reset geplant. Neue Kerntabellen (`homes`, `home_members`, `home_settings`, `home_invitations`), `home_id` auf allen Datentabellen, RLS-Neuimplementierung, Einladungssystem via Share-Links (7 Tage, kein E-Mail-Versand), Google Tasks Integration auf optionales Pro-Nutzer-OAuth umgebaut. Phase 6 in Roadmap verankert.

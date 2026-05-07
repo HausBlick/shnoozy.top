@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from './lib/supabase';
 import { Auth } from './Auth';
+import { HomeOnboarding } from './HomeOnboarding';
 import { Calendar } from './Calendar';
 import { Lists } from './Lists';
 import { StickyNotes } from './StickyNotes';
@@ -113,6 +114,10 @@ function urlBase64ToUint8Array(base64: string): ArrayBuffer {
 
 function App() {
   const [session, setSession] = useState<any>(null);
+  const [homeId, setHomeId] = useState<string | null>(null);
+  const [homeName, setHomeName] = useState('');
+  const [homeLoading, setHomeLoading] = useState(true);
+
   const [activeTab, setActiveTab] = useState('home');
   const [isWifiModalOpen, setIsWifiModalOpen] = useState(false);
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
@@ -137,10 +142,16 @@ function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      if (!session) setHomeLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (!session) {
+        setHomeId(null);
+        setHomeName('');
+        setHomeLoading(false);
+      }
     });
 
     if ('serviceWorker' in navigator && 'PushManager' in window) {
@@ -154,30 +165,60 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (session) {
-      fetchUpcomingEvents();
-      fetchWifiSettings();
-    }
+    if (session) fetchUserHome(session.user.id);
   }, [session]);
 
-  async function fetchWifiSettings() {
-    const { data } = await supabase.from('app_settings').select('key, value').in('key', ['wifi_ssid', 'wifi_password', 'wifi_security']);
+  async function fetchUserHome(userId: string) {
+    setHomeLoading(true);
+    try {
+      const { data } = await supabase
+        .from('home_members')
+        .select('home_id, role, homes(name)')
+        .eq('user_id', userId)
+        .limit(1)
+        .single();
+
+      if (data) {
+        const hId = data.home_id;
+        setHomeId(hId);
+        setHomeName((data.homes as any)?.name ?? '');
+        fetchUpcomingEvents(hId);
+        fetchWifiSettings(hId);
+      } else {
+        setHomeId(null);
+        setHomeName('');
+      }
+    } catch {
+      setHomeId(null);
+      setHomeName('');
+    } finally {
+      setHomeLoading(false);
+    }
+  }
+
+  async function fetchWifiSettings(hId: string) {
+    const { data } = await supabase
+      .from('home_settings')
+      .select('key, value')
+      .eq('home_id', hId)
+      .in('key', ['wifi_ssid', 'wifi_password', 'wifi_security']);
     if (data) {
       data.forEach(row => {
-        if (row.key === 'wifi_ssid') setWifiSsid(row.value);
-        if (row.key === 'wifi_password') setWifiPassword(row.value);
-        if (row.key === 'wifi_security') setWifiSecurity(row.value);
+        if (row.key === 'wifi_ssid') setWifiSsid(row.value ?? '');
+        if (row.key === 'wifi_password') setWifiPassword(row.value ?? '');
+        if (row.key === 'wifi_security') setWifiSecurity(row.value ?? 'WPA');
       });
     }
   }
 
   async function saveWifiSettings() {
+    if (!homeId) return;
     setWifiSaving(true);
     try {
-      await supabase.from('app_settings').upsert([
-        { key: 'wifi_ssid', value: wifiEditSsid, updated_at: new Date().toISOString() },
-        { key: 'wifi_password', value: wifiEditPassword, updated_at: new Date().toISOString() },
-      ]);
+      await supabase.from('home_settings').upsert([
+        { home_id: homeId, key: 'wifi_ssid', value: wifiEditSsid },
+        { home_id: homeId, key: 'wifi_password', value: wifiEditPassword },
+      ], { onConflict: 'home_id,key' });
       setWifiSsid(wifiEditSsid);
       setWifiPassword(wifiEditPassword);
       setWifiEditing(false);
@@ -186,13 +227,17 @@ function App() {
     }
   }
 
-  async function fetchUpcomingEvents() {
+  async function fetchUpcomingEvents(hId: string) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const rangeEnd = new Date(today);
     rangeEnd.setDate(today.getDate() + 14);
 
-    const { data, error } = await supabase.from('events').select('*');
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('home_id', hId);
+
     if (!error && data) {
       const processed: any[] = [];
       const currentYear = today.getFullYear();
@@ -214,7 +259,7 @@ function App() {
   }
 
   async function enableNotifications() {
-    if (!swReg.current || !import.meta.env.VITE_VAPID_PUBLIC_KEY) return;
+    if (!swReg.current || !import.meta.env.VITE_VAPID_PUBLIC_KEY || !homeId) return;
     const permission = await Notification.requestPermission();
     setNotifStatus(permission as 'default' | 'granted' | 'denied');
     if (permission !== 'granted') return;
@@ -225,8 +270,8 @@ function App() {
       });
       const { endpoint, keys } = sub.toJSON();
       await supabase.from('push_subscriptions').upsert(
-        { user_id: session.user.id, endpoint, p256dh: keys!.p256dh, auth: keys!.auth },
-        { onConflict: 'endpoint' }
+        { user_id: session.user.id, home_id: homeId, endpoint, p256dh: keys!.p256dh, auth_key: keys!.auth },
+        { onConflict: 'user_id,endpoint' }
       );
     } catch (err) {
       console.error('Push subscription failed:', err);
@@ -237,8 +282,20 @@ function App() {
     await supabase.auth.signOut();
   };
 
-  if (!session) {
-    return <Auth onSession={() => {}} />;
+  if (!session) return <Auth onSession={() => {}} />;
+
+  if (homeLoading) {
+    return (
+      <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p className="text-body-sm text-muted">Loading…</p>
+      </div>
+    );
+  }
+
+  if (!homeId) {
+    return (
+      <HomeOnboarding onHomeReady={() => fetchUserHome(session.user.id)} />
+    );
   }
 
   return (
@@ -253,16 +310,16 @@ function App() {
               </button>
             </div>
 
-            {/* Sticky Notes widget — always on top */}
             <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
               <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <NoteIcon color="var(--color-primary)" size={18} /> Notes
               </h2>
               <StickyNotes
                 session={session}
+                homeId={homeId}
                 compact
                 onSeeAll={() => setActiveTab('stickies')}
-                onNewNote={(note) => showToast(`📝 New note from ${note.creator_email.split('@')[0]}`)}
+                onNewNote={(note) => showToast(`New note from ${note.user_id.slice(0, 6)}`)}
               />
             </div>
 
@@ -331,16 +388,17 @@ function App() {
             </div>
             <StickyNotes
               session={session}
-              onNewNote={(note) => showToast(`📝 New note from ${note.creator_email.split('@')[0]}`)}
+              homeId={homeId}
+              onNewNote={(note) => showToast(`New note from ${note.user_id.slice(0, 6)}`)}
             />
           </div>
         )}
 
-        {activeTab === 'calendar' && <Calendar />}
+        {activeTab === 'calendar' && <Calendar homeId={homeId} />}
         {activeTab === 'luna' && (
           <div><h1 className="text-display-lg" style={{ marginTop: 'var(--spacing-md)' }}>Luna Portal</h1><p className="text-body-md text-muted">Coming soon...</p></div>
         )}
-        {activeTab === 'lists' && <Lists />}
+        {activeTab === 'lists' && <Lists homeId={homeId} />}
 
         {activeTab === 'more' && (
           <div style={{ paddingBottom: '120px' }}>
@@ -455,7 +513,7 @@ function App() {
                   <p className="text-body-sm text-muted">{wifiPassword || '—'}</p>
                 </div>
                 <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-                  <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsWifiModalOpen(false); }}>Done</button>
+                  <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setIsWifiModalOpen(false)}>Done</button>
                   <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setWifiEditSsid(wifiSsid); setWifiEditPassword(wifiPassword); setWifiEditing(true); }}>Edit</button>
                 </div>
               </>

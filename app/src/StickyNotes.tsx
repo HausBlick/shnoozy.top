@@ -4,23 +4,17 @@ import { supabase } from './lib/supabase';
 interface StickyNote {
   id: string;
   content: string;
-  created_by: string;
-  creator_email: string;
-  visible_to: 'me' | 'partner' | 'both';
+  home_id: string;
+  user_id: string;
+  visibility: 'both' | 'partner';
   created_at: string;
   updated_at: string;
 }
 
-const NOTE_COLOR: Record<string, 'primary' | 'luxe'> = {
-  'nikolakrnic2@gmail.com': 'primary',
-  'heromustafi@gmail.com': 'luxe',
-};
-
-function colorFor(email: string): 'primary' | 'luxe' {
-  return NOTE_COLOR[email] ?? 'primary';
+function colorFor(noteUserId: string, myId: string): 'primary' | 'luxe' {
+  return noteUserId === myId ? 'primary' : 'luxe';
 }
 
-// Stack offsets for up to 3 visible cards (index 0 = top card)
 const STACK_ROT  = [-2.5,  2.0, -1.5];
 const STACK_OX   = [  0,   8,   -5 ];
 const STACK_OY   = [  0,   6,   10 ];
@@ -35,13 +29,14 @@ function getTextConfig(content: string): { fontSize: number; lineClamp: number; 
 
 interface DeckProps {
   notes: StickyNote[];
+  myId: string;
   topIndex: number;
   onSwipe: () => void;
   onSeeAll?: () => void;
   onAdd: () => void;
 }
 
-function NoteDeck({ notes, topIndex, onSwipe, onSeeAll, onAdd }: DeckProps) {
+function NoteDeck({ notes, myId, topIndex, onSwipe, onSeeAll, onAdd }: DeckProps) {
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [leaving, setLeaving] = useState<'left' | 'right' | null>(null);
@@ -99,14 +94,12 @@ function NoteDeck({ notes, topIndex, onSwipe, onSeeAll, onAdd }: DeckProps) {
 
   return (
     <div style={{ marginBottom: 'var(--spacing-sm)' }}>
-      {/* Stack area — centered */}
       <div style={{ position: 'relative', height: `${CARD + 18}px`, marginBottom: 'var(--spacing-sm)' }}>
         {Array.from({ length: visibleCount }, (_, renderOrder) => {
-          // render bottom-first so top card is last in DOM (correct paint order)
           const stackPos = visibleCount - 1 - renderOrder;
           const note = orderedDeck[stackPos];
           const isTop = stackPos === 0;
-          const color = colorFor(note.creator_email);
+          const color = colorFor(note.user_id, myId);
           const textConfig = getTextConfig(note.content);
 
           const baseRot = STACK_ROT[stackPos];
@@ -180,7 +173,6 @@ function NoteDeck({ notes, topIndex, onSwipe, onSeeAll, onAdd }: DeckProps) {
         })}
       </div>
 
-      {/* Footer row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button
           onClick={onAdd}
@@ -210,12 +202,13 @@ function NoteDeck({ notes, topIndex, onSwipe, onSeeAll, onAdd }: DeckProps) {
 
 interface Props {
   session: any;
+  homeId: string;
   compact?: boolean;
   onSeeAll?: () => void;
   onNewNote?: (note: StickyNote) => void;
 }
 
-export function StickyNotes({ session, compact, onSeeAll, onNewNote }: Props) {
+export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote }: Props) {
   const [notes, setNotes] = useState<StickyNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -226,23 +219,24 @@ export function StickyNotes({ session, compact, onSeeAll, onNewNote }: Props) {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deckTopIndex, setDeckTopIndex] = useState(0);
 
-  const myEmail = session?.user?.email ?? '';
   const myId = session?.user?.id ?? '';
 
   useEffect(() => {
     fetchNotes();
 
     const channel = supabase
-      .channel('sticky_notes_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sticky_notes' }, (payload) => {
+      .channel(`sticky_notes_${homeId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'sticky_notes',
+        filter: `home_id=eq.${homeId}`,
+      }, (payload) => {
         if (payload.eventType === 'INSERT') {
           const note = payload.new as StickyNote;
-          const isOwn = note.created_by === myId;
-          const shouldSee = isOwn || note.visible_to !== 'me';
-          if (shouldSee) {
-            if (!isOwn) onNewNote?.(note);
-            setNotes(prev => [note, ...prev]);
-          }
+          const isOwn = note.user_id === myId;
+          if (!isOwn) onNewNote?.(note);
+          setNotes(prev => [note, ...prev]);
         } else if (payload.eventType === 'UPDATE') {
           setNotes(prev => prev.map(n => n.id === payload.new.id ? payload.new as StickyNote : n));
         } else if (payload.eventType === 'DELETE') {
@@ -252,9 +246,8 @@ export function StickyNotes({ session, compact, onSeeAll, onNewNote }: Props) {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [myId]);
+  }, [homeId, myId]);
 
-  // Keep topIndex in bounds when notes are deleted
   useEffect(() => {
     if (notes.length > 0) setDeckTopIndex(prev => prev % notes.length);
     else setDeckTopIndex(0);
@@ -264,6 +257,7 @@ export function StickyNotes({ session, compact, onSeeAll, onNewNote }: Props) {
     const { data } = await supabase
       .from('sticky_notes')
       .select('*')
+      .eq('home_id', homeId)
       .order('created_at', { ascending: false });
     setNotes(data || []);
     setLoading(false);
@@ -279,7 +273,7 @@ export function StickyNotes({ session, compact, onSeeAll, onNewNote }: Props) {
   function openEdit(note: StickyNote) {
     setEditNote(note);
     setContent(note.content);
-    setVisibleTo(note.visible_to === 'partner' ? 'partner' : 'both');
+    setVisibleTo(note.visibility === 'partner' ? 'partner' : 'both');
     setShowModal(true);
   }
 
@@ -290,19 +284,19 @@ export function StickyNotes({ session, compact, onSeeAll, onNewNote }: Props) {
       if (editNote) {
         await supabase.from('sticky_notes').update({
           content: content.trim(),
-          visible_to: visibleTo,
+          visibility: visibleTo,
           updated_at: new Date().toISOString(),
         }).eq('id', editNote.id);
         setNotes(prev => prev.map(n => n.id === editNote.id
-          ? { ...n, content: content.trim(), visible_to: visibleTo }
+          ? { ...n, content: content.trim(), visibility: visibleTo }
           : n
         ));
       } else {
         const { data } = await supabase.from('sticky_notes').insert({
           content: content.trim(),
-          created_by: myId,
-          creator_email: myEmail,
-          visible_to: visibleTo,
+          home_id: homeId,
+          user_id: myId,
+          visibility: visibleTo,
         }).select().single();
         if (data) setNotes(prev => [data, ...prev]);
       }
@@ -325,6 +319,7 @@ export function StickyNotes({ session, compact, onSeeAll, onNewNote }: Props) {
       {compact ? (
         <NoteDeck
           notes={notes}
+          myId={myId}
           topIndex={deckTopIndex}
           onSwipe={() => setDeckTopIndex(prev => notes.length > 0 ? (prev + 1) % notes.length : 0)}
           onSeeAll={onSeeAll}
@@ -338,15 +333,15 @@ export function StickyNotes({ session, compact, onSeeAll, onNewNote }: Props) {
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-sm)' }}>
             {notes.map(note => {
-              const color = colorFor(note.creator_email);
-              const isOwn = note.created_by === myId;
+              const color = colorFor(note.user_id, myId);
+              const isOwn = note.user_id === myId;
               return (
                 <div key={note.id} className={`sticky-note sticky-note-${color}`}>
                   <div className={`sticky-note-strip sticky-note-strip-${color}`} />
                   <p className="sticky-note-content">{note.content}</p>
                   <div className="sticky-note-footer">
                     <span className="sticky-note-meta">
-                      {note.visible_to === 'partner' ? '→ Partner' : '↔ Both'}
+                      {note.visibility === 'partner' ? '→ Partner' : '↔ Both'}
                     </span>
                     {isOwn && (
                       <div style={{ display: 'flex', gap: '2px' }}>

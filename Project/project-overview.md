@@ -12,16 +12,41 @@
 *   **Sprache:** UI ist auf Englisch (mit gelegentlichen deutschen Begriffen in den Kategorien).
 
 ## 2. Kerninfrastruktur
-*   **Authentifizierung:** Supabase Auth (E-Mail/Passwort) für 2 spezifische Nutzer. Row Level Security (RLS) schützt alle Tabellen.
+
+### 2.1 Multi-Tenancy Architektur (Mandantenfähigkeit)
+Die App ist grundlegend als Multi-Home-Plattform konzipiert. Mehrere unabhängige Haushalte ("Homes") können die App nutzen, vollständig voneinander isoliert.
+
+**Kerntabellen:**
+*   **`homes`** — Repräsentiert einen Haushalt (Name, Icon, Erstellungsdatum).
+*   **`home_members`** — Verknüpfungstabelle zwischen Nutzern und Homes. Enthält eine `role`-Spalte (`'admin'` oder `'member'`). Ein Nutzer kann theoretisch Mitglied mehrerer Homes sein; das Frontend beschränkt ihn vorerst auf ein einziges aktives Home.
+*   **`home_settings`** — Key-Value-Store pro Home. Steuert, welche Module (z. B. `luna_enabled`, `shopping_enabled`) für diesen Haushalt aktiviert sind.
+
+**Strikte Datentrennung via `home_id`:**
+Alle Datentabellen (`events`, `sticky_notes`, `shopping_items`, etc.) tragen eine `home_id`-Spalte als Foreign Key auf `homes`. Die Isolation der Haushalte wird **zwingend** über Supabase Row Level Security (RLS) Policies sichergestellt — kein Datensatz eines Homes ist jemals für Mitglieder eines anderen Homes lesbar oder schreibbar.
+
+### 2.2 Einladungssystem (Share-Links)
+Neue Mitglieder werden vom Home-Admin über **sichere, zeitlich begrenzte Share-Links** eingeladen. Es gibt keinen E-Mail-Versand durch das System.
+
+*   Der Admin generiert im UI einen Einladungslink; dieser enthält ein serverseitig erzeugtes, kryptographisch zufälliges Token.
+*   Das Token wird in einer `home_invitations`-Tabelle gespeichert (`token`, `home_id`, `role`, `expires_at`, `used_at`).
+*   Einladungslinks sind **7 Tage** gültig und verfallen nach einmaliger Nutzung.
+*   Ein neuer Nutzer, der dem Link folgt, registriert sich (oder loggt sich ein) und wird anschließend automatisch dem entsprechenden Home mit der definierten Rolle zugewiesen.
+
+### 2.3 Modulares Dashboard
+Das Frontend liest beim Start die `home_settings` des aktiven Homes und rendert **ausschließlich** die Module, die der Haushalt aktiviert hat. Module wie das Luna-Portal erscheinen im Dashboard und der Navigation nur dann, wenn `luna_enabled = true` in den Settings des Homes gesetzt ist. Dies vermeidet totes UI für Homes, die bestimmte Features nicht nutzen.
+
+### 2.4 Authentifizierung & Deployment
+*   **Authentifizierung:** Supabase Auth (E-Mail/Passwort). RLS auf allen Tabellen, ergänzt durch `home_id`-basierte Isolation.
 *   **PWA-Features:** Install-Popup ("Add to Homescreen") für schnelle Erreichbarkeit auf dem Smartphone. Service Worker für Offline-Caching und Push-Mitteilungen.
 *   **Deployment:** GitHub Actions → GitHub Pages → Custom Domain `shnoozy.top` (GoDaddy DNS). Auto-deploy bei jedem Push auf `main`.
-*   **Nutzer:** nikolakrnic2@gmail.com (Farbe: Primary #14d8db), heromustafi@gmail.com (Farbe: Luxe #7a041f)
-*   **Startseite (Dashboard):**
-    *   Widget: Sticky Notes (oben, max. 2, mit "See all" Link)
-    *   Widget: Letzte Aktivitäten (interaktive Echtzeit-Updates wie "[Name] hat Milch zur Einkaufsliste hinzugefügt" oder "Neues Post-it von [Name]", die direkt zum entsprechenden Modul verlinken)
-    *   Widget: Anstehende Termine (14 Tage)
-    *   Gast-WLAN Anzeige
-    *   Push-Notification Opt-in
+*   **Gründungsnutzer:** nikolakrnic2@gmail.com (Farbe: Primary #14d8db), heromustafi@gmail.com (Farbe: Luxe #7a041f)
+
+### 2.5 Startseite (Dashboard)
+*   Widget: Sticky Notes (oben, max. 2, mit "See all" Link)
+*   Widget: Letzte Aktivitäten (interaktive Echtzeit-Updates wie "[Name] hat Milch zur Einkaufsliste hinzugefügt" oder "Neues Post-it von [Name]", die direkt zum entsprechenden Modul verlinken)
+*   Widget: Anstehende Termine (14 Tage)
+*   Gast-WLAN Anzeige
+*   Push-Notification Opt-in
 
 ## 3. Funktionsmodule (Tools)
 
@@ -33,11 +58,13 @@
 *   Web-Push-Mitteilungen via Edge Function `send-daily-push` (pg_cron, 8:30 MESZ)
 *   74 Müllabfuhr-Termine importiert, Geburtstage importiert
 
-### 3.2 Smart Shopping List (Änderungen KI-Kategorisierung)
-*   Live-synchronisierte Checkliste via Supabase Realtime (`shopping_items` Tabelle)
+### 3.2 Smart Shopping List
+*   Live-synchronisierte Checkliste via Supabase Realtime (`shopping_items` Tabelle, mit `home_id`)
 *   **KI-Kategorisierung (Wichtig):** Jedes neu hinzugefügte Item muss zwingend automatisch über die Gemini API in eine der Kategorien (Groceries 🛒, Drogerie 💊, Cleaning 🧹, Luna 🐕, Misc 📦) einsortiert werden.
-*   Google Tasks Sync: Edge Function `sync-google-tasks` (OAuth2, alle 2 Min. via pg_cron). Auch hier muss die KI-Kategorisierung greifen.
-*   Google Home Nest: Items per Sprache zu "Shopping list" in Google Tasks → automatisch in App
+*   **Optionale Google Tasks Integration:** Die Synchronisation mit Google Tasks ist **optional** und wird pro Nutzer individuell über OAuth eingerichtet. Nutzer können wählen:
+    *   **Nur intern:** Die Einkaufsliste läuft vollständig über Supabase — keine externe Verknüpfung.
+    *   **Mit Google verknüpft:** Der Nutzer verbindet sein eigenes Google-Konto via OAuth. Die Edge Function `sync-google-tasks` synchronisiert dann nur für diesen Nutzer (seine gespeicherten OAuth-Tokens). Die KI-Kategorisierung greift auch hier.
+*   Google Home Nest: Items per Sprache zu "Shopping list" in Google Tasks → automatisch in App (nur bei aktivierter Google-Integration)
 *   IFTTT-Alternative: `add-shopping-item` auch per IFTTT-Secret aufrufbar
 
 ### 3.3 Luna Portal (Pet Management)
