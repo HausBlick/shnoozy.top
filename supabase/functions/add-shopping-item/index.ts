@@ -76,15 +76,8 @@ Reply with ONLY a JSON object, no markdown, no explanation. Examples:
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
-  // Auth: either IFTTT secret (query param) or Supabase JWT (Authorization header)
-  const url = new URL(req.url);
-  const iftttSecret = url.searchParams.get('secret');
   const authHeader = req.headers.get('Authorization');
-
-  const isIFTTT = iftttSecret && iftttSecret === Deno.env.get('IFTTT_SECRET');
-  const isAuthenticated = !!authHeader?.startsWith('Bearer ');
-
-  if (!isIFTTT && !isAuthenticated) {
+  if (!authHeader?.startsWith('Bearer ')) {
     return new Response('Unauthorized', { status: 401, headers: CORS });
   }
 
@@ -103,17 +96,14 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   );
 
-  // Extract user_id from JWT when called from the app
-  let userId: string | null = null;
-  if (isAuthenticated && authHeader) {
-    const userClient = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-    const { data: { user } } = await userClient.auth.getUser();
-    userId = user?.id ?? null;
-  }
+  // Extract user_id from JWT
+  const userClient = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_ANON_KEY')!,
+    { global: { headers: { Authorization: authHeader } } }
+  );
+  const { data: { user } } = await userClient.auth.getUser();
+  const userId = user?.id ?? null;
 
   // Reuse category from purchase history before calling Gemini
   const { data: historyItem } = await supabase
