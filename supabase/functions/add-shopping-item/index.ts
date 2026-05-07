@@ -103,6 +103,18 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   );
 
+  // Extract user_id from JWT when called from the app
+  let userId: string | null = null;
+  if (isAuthenticated && authHeader) {
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: { user } } = await userClient.auth.getUser();
+    userId = user?.id ?? null;
+  }
+
   // Reuse category from purchase history before calling Gemini
   const { data: historyItem } = await supabase
     .from('shopping_items')
@@ -130,7 +142,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  const { error } = await supabase.from('shopping_items').insert({ name, home_id: homeId, category, subcategory });
+  const { error } = await supabase.from('shopping_items').insert({ name, home_id: homeId, user_id: userId, category, subcategory });
   if (error) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS });
   }
