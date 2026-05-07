@@ -60,14 +60,14 @@ Deno.serve(async () => {
 
   const { data: subs } = await supabase
     .from('push_subscriptions')
-    .select('endpoint, p256dh, auth');
+    .select('endpoint, p256dh, auth_key');
 
   let sent = 0;
   for (const sub of subs ?? []) {
     for (const notif of notifications) {
       try {
         await webpush.sendNotification(
-          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth_key } },
           JSON.stringify(notif)
         );
         sent++;

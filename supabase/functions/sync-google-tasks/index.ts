@@ -116,6 +116,9 @@ Deno.serve(async () => {
   const listName     = Deno.env.get('GOOGLE_TASK_LIST_NAME') || 'Shopping list';
   const geminiKey    = Deno.env.get('GEMINI_API_KEY');
 
+  const homeId = Deno.env.get('DEFAULT_HOME_ID');
+  if (!homeId) return new Response(JSON.stringify({ error: 'DEFAULT_HOME_ID not set' }), { status: 500 });
+
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -132,14 +135,14 @@ Deno.serve(async () => {
   let imported = 0;
 
   for (const task of tasks) {
-    const title = task.title?.trim();
-    if (!title) continue;
+    const name = task.title?.trim();
+    if (!name) continue;
 
     const { category, subcategory } = geminiKey
-      ? await categorize(title, geminiKey)
+      ? await categorize(name, geminiKey)
       : { category: 'Misc', subcategory: null };
 
-    const { error } = await supabase.from('shopping_items').insert({ title, category, subcategory });
+    const { error } = await supabase.from('shopping_items').insert({ name, home_id: homeId, category, subcategory });
     if (!error) {
       await completeTask(accessToken, list.id, task.id);
       imported++;

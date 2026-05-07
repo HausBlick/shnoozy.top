@@ -89,9 +89,13 @@ Deno.serve(async (req) => {
   }
 
   const body = await req.json().catch(() => ({}));
-  const title = body.item?.trim();
-  if (!title) {
+  const name = body.item?.trim();
+  const homeId = body.home_id?.trim();
+  if (!name) {
     return new Response(JSON.stringify({ error: 'No item provided' }), { status: 400, headers: CORS });
+  }
+  if (!homeId) {
+    return new Response(JSON.stringify({ error: 'No home_id provided' }), { status: 400, headers: CORS });
   }
 
   const supabase = createClient(
@@ -103,7 +107,7 @@ Deno.serve(async (req) => {
   const { data: historyItem } = await supabase
     .from('shopping_items')
     .select('category, subcategory')
-    .ilike('title', title)
+    .ilike('name', name)
     .not('deleted_at', 'is', null)
     .order('deleted_at', { ascending: false })
     .limit(1)
@@ -118,7 +122,7 @@ Deno.serve(async (req) => {
   } else {
     const geminiKey = Deno.env.get('GEMINI_API_KEY');
     if (geminiKey) {
-      const result = await categorize(title, geminiKey);
+      const result = await categorize(name, geminiKey);
       category = result.category;
       subcategory = result.subcategory;
     } else {
@@ -126,7 +130,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  const { error } = await supabase.from('shopping_items').insert({ title, category, subcategory });
+  const { error } = await supabase.from('shopping_items').insert({ name, home_id: homeId, category, subcategory });
   if (error) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS });
   }
