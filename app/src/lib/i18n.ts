@@ -45,6 +45,9 @@ const en = {
   languageEn: 'English',
   languageDe: 'Deutsch',
   logout: 'Logout',
+  notificationsSection: 'Notifications',
+  reRegister: 'Re-register',
+  notifReRegisterHint: 'Having problems with notifications? Re-register here to fix them.',
 
   // General
   loading: 'Loading...',
@@ -256,6 +259,9 @@ const de: typeof en = {
   languageEn: 'English',
   languageDe: 'Deutsch',
   logout: 'Abmelden',
+  notificationsSection: 'Benachrichtigungen',
+  reRegister: 'Neu registrieren',
+  notifReRegisterHint: 'Probleme mit den Benachrichtigungen? Hier neu registrieren.',
 
   // General
   loading: 'Lädt...',

@@ -169,12 +169,14 @@ function getNavLabel(id: ModuleId, t: ReturnType<typeof getT>): string {
 // ─── User Settings page ───────────────────────────────────────────────────────
 
 function UserSettingsPage({
-  language, onLanguageChange, onBack, onLogout,
+  language, onLanguageChange, onBack, onLogout, notifStatus, onReRegister,
 }: {
   language: Lang;
   onLanguageChange: (lang: Lang) => void;
   onBack: () => void;
   onLogout: () => void;
+  notifStatus: 'unsupported' | 'default' | 'granted' | 'denied';
+  onReRegister: () => void;
 }) {
   const t = getT(language);
   return (
@@ -208,6 +210,18 @@ function UserSettingsPage({
           ))}
         </div>
       </div>
+
+      {notifStatus === 'granted' && (
+        <div className="card" style={{ marginBottom: 'var(--spacing-md)' }}>
+          <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <BellIcon color="var(--color-primary)" size={18} /> {t.notificationsSection}
+          </h2>
+          <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>
+            {t.notifReRegisterHint}
+          </p>
+          <button className="btn-secondary" onClick={onReRegister}>{t.reRegister}</button>
+        </div>
+      )}
 
       <button
         onClick={onLogout}
@@ -623,6 +637,8 @@ function App() {
         }}
         onBack={() => setActiveTab('more')}
         onLogout={handleLogout}
+        notifStatus={notifStatus}
+        onReRegister={enableNotifications}
       />
     );
 
@@ -714,17 +730,6 @@ function App() {
             <button className="btn-primary" onClick={enableNotifications}>{t.enable}</button>
           </div>
         )}
-        {notifStatus === 'granted' && (
-          <div style={{ marginTop: 'var(--spacing-md)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <p className="text-body-sm text-muted" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <BellIcon color="var(--color-primary)" size={14} /> {t.notificationsEnabled}
-            </p>
-            <button onClick={enableNotifications} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '12px', padding: 0, textDecoration: 'underline' }}>
-              {language === 'de' ? 'Neu registrieren' : 'Re-register'}
-            </button>
-          </div>
-        )}
-
         <button className="btn-primary" style={{ marginTop: 'var(--spacing-lg)' }} onClick={() => setIsWifiModalOpen(true)}>
           {t.shareWifi}
         </button>
