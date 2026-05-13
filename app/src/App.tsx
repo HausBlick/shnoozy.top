@@ -1,14 +1,25 @@
 import { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from './lib/supabase';
+import { getT, type Lang } from './lib/i18n';
 import { Auth } from './Auth';
 import { HomeOnboarding } from './HomeOnboarding';
 import { Calendar } from './Calendar';
 import { Lists } from './Lists';
 import { StickyNotes } from './StickyNotes';
+import {
+  HomeSettings,
+  type ModuleId,
+  MODULE_META,
+  DEFAULT_ACTIVE,
+  DEFAULT_NAV_SLOTS,
+  getModuleLabel,
+  getModuleDesc,
+} from './HomeSettings';
 import './index.css';
 
-// SVG Icons
+// ─── Icons ────────────────────────────────────────────────────────────────────
+
 const HomeIcon = ({ active }: { active: boolean }) => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? 'white' : 'none'} stroke="currentColor" strokeWidth={active ? '1' : '2'} strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
@@ -54,21 +65,6 @@ const PawIcon = ({ active }: { active?: boolean }) => (
   </svg>
 );
 
-const LogoutIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-    <polyline points="16 17 21 12 16 7"></polyline>
-    <line x1="21" y1="12" x2="9" y2="12"></line>
-  </svg>
-);
-
-const CloseIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-);
-
 const NoteIcon = ({ color = 'currentColor', size = 20 }: { color?: string; size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
@@ -105,6 +101,131 @@ const BellIcon = ({ color = 'currentColor', size = 20 }: { color?: string; size?
   </svg>
 );
 
+const LogoutIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+    <polyline points="16 17 21 12 16 7"></polyline>
+    <line x1="21" y1="12" x2="9" y2="12"></line>
+  </svg>
+);
+
+const CloseIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+);
+
+const SettingsIcon = ({ color = 'currentColor', size = 20 }: { color?: string; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+  </svg>
+);
+
+const UserIcon = ({ color = 'currentColor', size = 20 }: { color?: string; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+    <circle cx="12" cy="7" r="4"/>
+  </svg>
+);
+
+// ─── Nav icon mapper ──────────────────────────────────────────────────────────
+
+function NavModuleIcon({ id, active }: { id: ModuleId; active: boolean }) {
+  const c = active ? 'var(--color-primary)' : 'currentColor';
+  switch (id) {
+    case 'calendar':  return <CalendarIcon active={active} />;
+    case 'lists':     return <ListsIcon active={active} />;
+    case 'notes':     return <NoteIcon color={c} size={24} />;
+    case 'luna':      return <PawIcon active={active} />;
+    case 'home-info': return <HouseInfoIcon color={c} size={24} />;
+    case 'car':       return <CarIcon color={c} size={24} />;
+  }
+}
+
+// Nav label for each module (short, fits 10px label)
+function getNavLabel(id: ModuleId, t: ReturnType<typeof getT>): string {
+  switch (id) {
+    case 'calendar':  return t.navCalendar;
+    case 'lists':     return t.navLists;
+    case 'notes':     return t.moduleNotes;
+    case 'luna':      return t.navLuna;
+    case 'home-info': return t.moduleHomeInfo;
+    case 'car':       return t.moduleCar;
+  }
+}
+
+// ─── User Settings page ───────────────────────────────────────────────────────
+
+function UserSettingsPage({
+  language, onLanguageChange, onBack, onLogout,
+}: {
+  language: Lang;
+  onLanguageChange: (lang: Lang) => void;
+  onBack: () => void;
+  onLogout: () => void;
+}) {
+  const t = getT(language);
+  return (
+    <div style={{ paddingBottom: '120px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: 0 }}>←</button>
+        <h1 className="text-display-lg">{t.userSettings}</h1>
+      </div>
+
+      <div className="card" style={{ marginBottom: 'var(--spacing-md)' }}>
+        <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-md)' }}>{t.language}</h2>
+        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+          {(['en', 'de'] as Lang[]).map(lang => (
+            <button
+              key={lang}
+              onClick={() => onLanguageChange(lang)}
+              style={{
+                flex: 1,
+                padding: '10px',
+                borderRadius: 'var(--rounded-lg)',
+                border: `2px solid ${language === lang ? 'var(--color-primary)' : 'var(--color-hairline)'}`,
+                background: language === lang ? 'var(--color-primary)' : 'transparent',
+                color: language === lang ? 'white' : 'var(--color-text)',
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontSize: '15px',
+              }}
+            >
+              {lang === 'en' ? t.languageEn : t.languageDe}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <button
+        onClick={onLogout}
+        style={{
+          width: '100%',
+          padding: '14px',
+          borderRadius: 'var(--rounded-lg)',
+          border: '1px solid var(--color-hairline)',
+          background: 'transparent',
+          color: 'var(--color-muted)',
+          fontWeight: 500,
+          cursor: 'pointer',
+          fontSize: '15px',
+          marginTop: 'var(--spacing-lg)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 'var(--spacing-sm)',
+        }}
+      >
+        <LogoutIcon /> {t.logout}
+      </button>
+    </div>
+  );
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function urlBase64ToUint8Array(base64: string): ArrayBuffer {
   const padding = '='.repeat((4 - (base64.length % 4)) % 4);
   const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -112,12 +233,19 @@ function urlBase64ToUint8Array(base64: string): ArrayBuffer {
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0))).buffer;
 }
 
+// ─── App ──────────────────────────────────────────────────────────────────────
+
 function App() {
   const [session, setSession] = useState<any>(null);
   const [homeId, setHomeId] = useState<string | null>(null);
   const [homeLoading, setHomeLoading] = useState(true);
+  const [language, setLanguage] = useState<Lang>('en');
+  const [userRole, setUserRole] = useState<'admin' | 'member'>('member');
 
   const [activeTab, setActiveTab] = useState('home');
+  const [navSlots, setNavSlots] = useState<ModuleId[]>(DEFAULT_NAV_SLOTS);
+  const [activeModuleIds, setActiveModuleIds] = useState<ModuleId[]>(DEFAULT_ACTIVE);
+
   const [isWifiModalOpen, setIsWifiModalOpen] = useState(false);
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
   const [notifStatus, setNotifStatus] = useState<'unsupported' | 'default' | 'granted' | 'denied'>('unsupported');
@@ -131,6 +259,8 @@ function App() {
   const [wifiSaving, setWifiSaving] = useState(false);
   const swReg = useRef<ServiceWorkerRegistration | null>(null);
   const toastTimer = useRef<number | null>(null);
+
+  const t = getT(language);
 
   function showToast(message: string) {
     setToast(message);
@@ -163,8 +293,20 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (session) fetchUserHome(session.user.id);
+    if (session) {
+      fetchUserHome(session.user.id);
+      fetchUserProfile(session.user.id);
+    }
   }, [session]);
+
+  async function fetchUserProfile(userId: string) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('language')
+      .eq('id', userId)
+      .maybeSingle();
+    if (data?.language) setLanguage(data.language as Lang);
+  }
 
   async function fetchUserHome(userId: string) {
     setHomeLoading(true);
@@ -179,8 +321,10 @@ function App() {
       if (data) {
         const hId = data.home_id;
         setHomeId(hId);
+        setUserRole(data.role === 'admin' ? 'admin' : 'member');
         fetchUpcomingEvents(hId);
         fetchWifiSettings(hId);
+        fetchHomeConfig(hId);
       } else {
         setHomeId(null);
       }
@@ -188,6 +332,20 @@ function App() {
       setHomeId(null);
     } finally {
       setHomeLoading(false);
+    }
+  }
+
+  async function fetchHomeConfig(hId: string) {
+    const { data } = await supabase
+      .from('home_settings')
+      .select('key, value')
+      .eq('home_id', hId)
+      .in('key', ['nav_slots', 'modules_active']);
+    if (data) {
+      const nav = data.find(r => r.key === 'nav_slots');
+      const mods = data.find(r => r.key === 'modules_active');
+      if (nav?.value) try { setNavSlots(JSON.parse(nav.value)); } catch {}
+      if (mods?.value) try { setActiveModuleIds(JSON.parse(mods.value)); } catch {}
     }
   }
 
@@ -288,209 +446,342 @@ function App() {
   }
 
   if (!homeId) {
-    return (
-      <HomeOnboarding onHomeReady={() => fetchUserHome(session.user.id)} />
-    );
+    return <HomeOnboarding onHomeReady={() => fetchUserHome(session.user.id)} />;
   }
 
-  return (
-    <div className="app-container">
-      <main className="main-content">
-        {activeTab === 'home' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-lg)', marginTop: 'var(--spacing-md)' }}>
-              <h1 className="text-display-lg">Dashboard</h1>
-              <button onClick={handleLogout} className="icon-button-circle" title="Logout">
-                <LogoutIcon />
-              </button>
-            </div>
+  // Modules shown in the More tab = active but not in nav slots
+  const moreModules = activeModuleIds.filter(id => !navSlots.includes(id));
 
-            <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
-              <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <NoteIcon color="var(--color-primary)" size={18} /> Notes
-              </h2>
-              <StickyNotes
-                session={session}
-                homeId={homeId}
-                compact
-                onSeeAll={() => setActiveTab('stickies')}
-                onNewNote={(note) => showToast(`New note from ${note.user_id.slice(0, 6)}`)}
-              />
-            </div>
+  // ─── Tab content ───────────────────────────────────────────────────────────
+  const renderTab = () => {
+    // Module tabs
+    if (activeTab === 'calendar') return <Calendar homeId={homeId} language={language} />;
+    if (activeTab === 'lists') return <Lists homeId={homeId} language={language} />;
+    if (activeTab === 'luna') return (
+      <div>
+        <h1 className="text-display-lg" style={{ marginTop: 'var(--spacing-md)' }}>Luna Portal</h1>
+        <p className="text-body-md text-muted">{t.comingSoonLuna}</p>
+      </div>
+    );
+    if (activeTab === 'home-info') return (
+      <div style={{ paddingBottom: '120px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
+          <button onClick={() => setActiveTab('more')} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: 0 }}>←</button>
+          <HouseInfoIcon color="#f57c00" size={28} />
+          <h1 className="text-display-lg">Home</h1>
+        </div>
+        <p className="text-body-md text-muted">{t.comingSoonHome}</p>
+      </div>
+    );
+    if (activeTab === 'car') return (
+      <div style={{ paddingBottom: '120px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
+          <button onClick={() => setActiveTab('more')} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: 0 }}>←</button>
+          <CarIcon color="#1e88e5" size={28} />
+          <h1 className="text-display-lg">Car</h1>
+        </div>
+        <p className="text-body-md text-muted">{t.comingSoonCar}</p>
+      </div>
+    );
 
-            <div className="card">
-              <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)' }}>Upcoming 14 Days</h2>
-              {upcomingEvents.length === 0 ? (
-                <p className="text-body-sm text-muted">No upcoming events.</p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
-                  {upcomingEvents.map(e => (
-                    <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', borderBottom: '1px solid var(--color-hairline-soft)', paddingBottom: '4px' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        {e.category === 'birthday' && <CakeIcon color="var(--color-luxe)" size={13} />}
-                        {e.title}
-                      </span>
-                      <span className="text-muted">
-                        {e.display_time.toLocaleDateString([], { day: 'numeric', month: 'short' })}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <button
-                onClick={() => setActiveTab('calendar')}
-                style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontWeight: 600, marginTop: 'var(--spacing-sm)', cursor: 'pointer', padding: 0 }}
-              >
-                Go to Calendar →
-              </button>
-            </div>
+    // Notes full view
+    if (activeTab === 'notes') return (
+      <div style={{ paddingBottom: '120px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
+          <button
+            onClick={() => setActiveTab('home')}
+            style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: 0 }}
+          >←</button>
+          <h1 className="text-display-lg">{t.notes}</h1>
+        </div>
+        <StickyNotes
+          session={session}
+          homeId={homeId}
+          language={language}
+          onNewNote={(note) => showToast(`New note from ${note.user_id.slice(0, 6)}`)}
+        />
+      </div>
+    );
 
-            {notifStatus === 'default' && import.meta.env.VITE_VAPID_PUBLIC_KEY && (
-              <div className="card" style={{ marginTop: 'var(--spacing-lg)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xs)' }}>
-                  <BellIcon color="var(--color-primary)" size={20} />
-                  <h3 className="text-title-md">Enable Notifications</h3>
-                </div>
-                <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>
-                  Get daily reminders for upcoming events and birthdays.
-                </p>
-                <button className="btn-primary" onClick={enableNotifications}>Enable</button>
-              </div>
-            )}
-            {notifStatus === 'granted' && (
-              <p className="text-body-sm text-muted" style={{ marginTop: 'var(--spacing-md)', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <BellIcon color="var(--color-primary)" size={14} /> Notifications enabled
-              </p>
-            )}
+    // More tab
+    if (activeTab === 'more') return (
+      <div style={{ paddingBottom: '120px' }}>
+        <h1 className="text-display-lg" style={{ marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>{t.more}</h1>
 
-            <button className="btn-primary" style={{ marginTop: 'var(--spacing-lg)' }} onClick={() => setIsWifiModalOpen(true)}>
-              Share WiFi
-            </button>
+        {/* Active modules not in nav */}
+        {moreModules.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
+            {moreModules.map(id => {
+              const meta = MODULE_META.find(m => m.id === id)!;
+              return (
+                <button
+                  key={id}
+                  className="menu-card"
+                  style={{ width: '100%' }}
+                  onClick={() => setActiveTab(id)}
+                >
+                  <span style={{ marginBottom: 'var(--spacing-xs)', fontSize: '28px' }}>{meta.emoji}</span>
+                  <span className="text-title-md">{getModuleLabel(id, t)}</span>
+                  <span className="text-body-sm text-muted" style={{ marginTop: '2px' }}>{getModuleDesc(id, t)}</span>
+                </button>
+              );
+            })}
           </div>
         )}
 
-        {activeTab === 'stickies' && (
-          <div style={{ paddingBottom: '120px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
-              <button
-                onClick={() => setActiveTab('home')}
-                style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: 0 }}
-                aria-label="Back"
-              >
-                ←
-              </button>
-              <h1 className="text-display-lg">Notes</h1>
+        {/* Settings rows — always visible, separated */}
+        <div style={{
+          borderTop: moreModules.length > 0 ? '1px solid var(--color-hairline)' : 'none',
+          paddingTop: moreModules.length > 0 ? 'var(--spacing-lg)' : 0,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+        }}>
+          <button
+            onClick={() => setActiveTab('user-settings')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--spacing-md)',
+              padding: '14px var(--spacing-base)',
+              background: 'var(--color-canvas)',
+              border: 'none',
+              borderRadius: 'var(--rounded-md)',
+              cursor: 'pointer',
+              width: '100%',
+              textAlign: 'left',
+            }}
+          >
+            <div style={{ width: 40, height: 40, borderRadius: 'var(--rounded-sm)', background: 'var(--color-surface-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <UserIcon color="var(--color-muted)" size={20} />
             </div>
-            <StickyNotes
-              session={session}
-              homeId={homeId}
-              onNewNote={(note) => showToast(`New note from ${note.user_id.slice(0, 6)}`)}
-            />
-          </div>
-        )}
-
-        {activeTab === 'calendar' && <Calendar homeId={homeId} />}
-        {activeTab === 'luna' && (
-          <div><h1 className="text-display-lg" style={{ marginTop: 'var(--spacing-md)' }}>Luna Portal</h1><p className="text-body-md text-muted">Coming soon...</p></div>
-        )}
-        {activeTab === 'lists' && <Lists homeId={homeId} />}
-
-        {activeTab === 'more' && (
-          <div style={{ paddingBottom: '120px' }}>
-            <h1 className="text-display-lg" style={{ marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>More</h1>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-              <button className="menu-card" style={{ width: '100%' }} onClick={() => setActiveTab('stickies')}>
-                <span style={{ marginBottom: 'var(--spacing-xs)' }}><NoteIcon color="var(--color-primary)" size={28} /></span>
-                <span className="text-title-md">Sticky Notes</span>
-                <span className="text-body-sm text-muted" style={{ marginTop: '2px' }}>Leave notes for each other</span>
-              </button>
-              <button className="menu-card" style={{ width: '100%' }} onClick={() => setActiveTab('home-info')}>
-                <span style={{ marginBottom: 'var(--spacing-xs)' }}><HouseInfoIcon color="#f57c00" size={28} /></span>
-                <span className="text-title-md">Home</span>
-                <span className="text-body-sm text-muted" style={{ marginTop: '2px' }}>Meter readings, contracts & more</span>
-              </button>
-              <button className="menu-card" style={{ width: '100%' }} onClick={() => setActiveTab('car')}>
-                <span style={{ marginBottom: 'var(--spacing-xs)' }}><CarIcon color="#1e88e5" size={28} /></span>
-                <span className="text-title-md">Car</span>
-                <span className="text-body-sm text-muted" style={{ marginTop: '2px' }}>Insurance, service & documents</span>
-              </button>
+            <div>
+              <div className="text-title-md">{t.userSettings}</div>
+              <div className="text-body-sm text-muted">{t.userSettingsDesc}</div>
             </div>
-          </div>
-        )}
-
-        {activeTab === 'home-info' && (
-          <div style={{ paddingBottom: '120px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
-              <button onClick={() => setActiveTab('more')} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: 0 }}>←</button>
-              <HouseInfoIcon color="#f57c00" size={28} />
-              <h1 className="text-display-lg">Home</h1>
-            </div>
-            <p className="text-body-md text-muted">Coming soon — meter readings, contracts, landlord contacts and more.</p>
-          </div>
-        )}
-
-        {activeTab === 'car' && (
-          <div style={{ paddingBottom: '120px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
-              <button onClick={() => setActiveTab('more')} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: 0 }}>←</button>
-              <CarIcon color="#1e88e5" size={28} />
-              <h1 className="text-display-lg">Car</h1>
-            </div>
-            <p className="text-body-md text-muted">Coming soon — insurance, service history, TÜV dates and documents.</p>
-          </div>
-        )}
-      </main>
-
-      <nav className="bottom-nav">
-        <div className="bottom-nav-group">
-          <button className={`bottom-nav-item ${activeTab === 'calendar' ? 'active' : ''}`} onClick={() => setActiveTab('calendar')}>
-            <div className="bottom-nav-icon"><CalendarIcon active={activeTab === 'calendar'} /></div>
-            <span className="bottom-nav-label">Calendar</span>
+            <span style={{ marginLeft: 'auto', color: 'var(--color-muted)', fontSize: '18px' }}>›</span>
           </button>
-          <button className={`bottom-nav-item ${activeTab === 'luna' ? 'active' : ''}`} onClick={() => setActiveTab('luna')}>
-            <div className="bottom-nav-icon"><PawIcon active={activeTab === 'luna'} /></div>
-            <span className="bottom-nav-label">Luna</span>
+
+          {userRole === 'admin' && (
+            <button
+              onClick={() => setActiveTab('home-settings')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--spacing-md)',
+                padding: '14px var(--spacing-base)',
+                background: 'var(--color-canvas)',
+                border: 'none',
+                borderRadius: 'var(--rounded-md)',
+                cursor: 'pointer',
+                width: '100%',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ width: 40, height: 40, borderRadius: 'var(--rounded-sm)', background: 'var(--color-surface-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <SettingsIcon color="var(--color-muted)" size={20} />
+              </div>
+              <div>
+                <div className="text-title-md">{t.homeSettingsMenu}</div>
+                <div className="text-body-sm text-muted">{t.homeSettingsMenuDesc}</div>
+              </div>
+              <span style={{ marginLeft: 'auto', color: 'var(--color-muted)', fontSize: '18px' }}>›</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+
+    // User Settings
+    if (activeTab === 'user-settings') return (
+      <UserSettingsPage
+        language={language}
+        onLanguageChange={async (lang) => {
+          setLanguage(lang);
+          await supabase.from('profiles').update({ language: lang }).eq('id', session.user.id);
+        }}
+        onBack={() => setActiveTab('more')}
+        onLogout={handleLogout}
+      />
+    );
+
+    // Home Settings (admin only)
+    if (activeTab === 'home-settings') return (
+      <HomeSettings
+        homeId={homeId}
+        language={language}
+        isAdmin={userRole === 'admin'}
+        onBack={() => {
+          // Reload nav config after changes
+          fetchHomeConfig(homeId);
+          setActiveTab('more');
+        }}
+        onModuleSettings={(moduleId) => {
+          if (moduleId === 'lists') setActiveTab('lists');
+        }}
+      />
+    );
+
+    // Home dashboard
+    return (
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-lg)', marginTop: 'var(--spacing-md)' }}>
+          <h1 className="text-display-lg">{t.dashboard}</h1>
+          <button onClick={handleLogout} className="icon-button-circle" title="Logout">
+            <LogoutIcon />
           </button>
         </div>
 
-        <button className={`bottom-nav-item-home ${activeTab === 'home' ? 'active' : ''}`} onClick={() => setActiveTab('home')}>
-          <div className="bottom-nav-icon-home"><HomeIcon active={activeTab === 'home'} /></div>
+        <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
+          <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <NoteIcon color="var(--color-primary)" size={18} /> {t.notes}
+          </h2>
+          <StickyNotes
+            session={session}
+            homeId={homeId}
+            compact
+            language={language}
+            onSeeAll={() => setActiveTab('notes')}
+            onNewNote={(note) => showToast(`New note from ${note.user_id.slice(0, 6)}`)}
+          />
+        </div>
+
+        <div className="card">
+          <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)' }}>{t.upcoming14Days}</h2>
+          {upcomingEvents.length === 0 ? (
+            <p className="text-body-sm text-muted">{t.noUpcomingEvents}</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
+              {upcomingEvents.map(e => (
+                <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', borderBottom: '1px solid var(--color-hairline-soft)', paddingBottom: '4px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    {e.category === 'birthday' && <CakeIcon color="var(--color-luxe)" size={13} />}
+                    {e.title}
+                  </span>
+                  <span className="text-muted">
+                    {e.display_time.toLocaleDateString([], { day: 'numeric', month: 'short' })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={() => setActiveTab('calendar')}
+            style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontWeight: 600, marginTop: 'var(--spacing-sm)', cursor: 'pointer', padding: 0 }}
+          >
+            {t.goToCalendar}
+          </button>
+        </div>
+
+        {notifStatus === 'default' && import.meta.env.VITE_VAPID_PUBLIC_KEY && (
+          <div className="card" style={{ marginTop: 'var(--spacing-lg)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xs)' }}>
+              <BellIcon color="var(--color-primary)" size={20} />
+              <h3 className="text-title-md">{t.enableNotifications}</h3>
+            </div>
+            <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>
+              {t.enableNotificationsDesc}
+            </p>
+            <button className="btn-primary" onClick={enableNotifications}>{t.enable}</button>
+          </div>
+        )}
+        {notifStatus === 'granted' && (
+          <p className="text-body-sm text-muted" style={{ marginTop: 'var(--spacing-md)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <BellIcon color="var(--color-primary)" size={14} /> {t.notificationsEnabled}
+          </p>
+        )}
+
+        <button className="btn-primary" style={{ marginTop: 'var(--spacing-lg)' }} onClick={() => setIsWifiModalOpen(true)}>
+          {t.shareWifi}
+        </button>
+      </div>
+    );
+  };
+
+  // ─── Render ────────────────────────────────────────────────────────────────
+  return (
+    <div className="app-container">
+      <main className="main-content">
+        {renderTab()}
+      </main>
+
+      {/* Dynamic Bottom Navigation */}
+      <nav className="bottom-nav">
+        <div className="bottom-nav-group">
+          {[navSlots[0], navSlots[1]].map((slotId, i) =>
+            slotId ? (
+              <button
+                key={slotId}
+                className={`bottom-nav-item ${activeTab === slotId ? 'active' : ''}`}
+                onClick={() => setActiveTab(slotId)}
+              >
+                <div className="bottom-nav-icon">
+                  <NavModuleIcon id={slotId} active={activeTab === slotId} />
+                </div>
+                <span className="bottom-nav-label">{getNavLabel(slotId, t)}</span>
+              </button>
+            ) : (
+              <div key={i} style={{ flex: 1 }} />
+            )
+          )}
+        </div>
+
+        <button
+          className={`bottom-nav-item-home ${activeTab === 'home' ? 'active' : ''}`}
+          onClick={() => setActiveTab('home')}
+        >
+          <div className="bottom-nav-icon-home">
+            <HomeIcon active={activeTab === 'home'} />
+          </div>
         </button>
 
         <div className="bottom-nav-group">
-          <button className={`bottom-nav-item ${activeTab === 'lists' ? 'active' : ''}`} onClick={() => setActiveTab('lists')}>
-            <div className="bottom-nav-icon"><ListsIcon active={activeTab === 'lists'} /></div>
-            <span className="bottom-nav-label">Lists</span>
-          </button>
-          <button className={`bottom-nav-item ${activeTab === 'more' ? 'active' : ''}`} onClick={() => setActiveTab('more')}>
+          {navSlots[2] ? (
+            <button
+              className={`bottom-nav-item ${activeTab === navSlots[2] ? 'active' : ''}`}
+              onClick={() => setActiveTab(navSlots[2])}
+            >
+              <div className="bottom-nav-icon">
+                <NavModuleIcon id={navSlots[2]} active={activeTab === navSlots[2]} />
+              </div>
+              <span className="bottom-nav-label">{getNavLabel(navSlots[2], t)}</span>
+            </button>
+          ) : (
+            <div style={{ flex: 1 }} />
+          )}
+          <button
+            className={`bottom-nav-item ${activeTab === 'more' ? 'active' : ''}`}
+            onClick={() => setActiveTab('more')}
+          >
             <div className="bottom-nav-icon"><MoreIcon active={activeTab === 'more'} /></div>
-            <span className="bottom-nav-label">More</span>
+            <span className="bottom-nav-label">{t.navMore}</span>
           </button>
         </div>
       </nav>
 
+      {/* WiFi Modal */}
       {isWifiModalOpen && (
         <div className="modal-overlay" onClick={() => { setIsWifiModalOpen(false); setWifiEditing(false); }}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 className="text-title-md">Guest WiFi</h2>
+              <h2 className="text-title-md">{t.guestWifi}</h2>
               <button className="icon-button-circle" onClick={() => { setIsWifiModalOpen(false); setWifiEditing(false); }}><CloseIcon /></button>
             </div>
 
             {wifiEditing ? (
               <>
                 <div style={{ marginBottom: 'var(--spacing-md)' }}>
-                  <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: '4px' }}>Network name (SSID)</label>
+                  <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: '4px' }}>{t.networkName}</label>
                   <input className="form-input" value={wifiEditSsid} onChange={e => setWifiEditSsid(e.target.value)} placeholder="Network name" />
                 </div>
                 <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-                  <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: '4px' }}>Password</label>
+                  <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: '4px' }}>{t.password}</label>
                   <input className="form-input" value={wifiEditPassword} onChange={e => setWifiEditPassword(e.target.value)} placeholder="Password" />
                 </div>
                 <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-                  <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setWifiEditing(false)}>Cancel</button>
+                  <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setWifiEditing(false)}>{t.cancel}</button>
                   <button className="btn-primary" style={{ flex: 1 }} onClick={saveWifiSettings} disabled={wifiSaving}>
-                    {wifiSaving ? '…' : 'Save'}
+                    {wifiSaving ? '…' : t.save}
                   </button>
                 </div>
               </>
@@ -508,8 +799,8 @@ function App() {
                   <p className="text-body-sm text-muted">{wifiPassword || '—'}</p>
                 </div>
                 <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-                  <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setIsWifiModalOpen(false)}>Done</button>
-                  <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setWifiEditSsid(wifiSsid); setWifiEditPassword(wifiPassword); setWifiEditing(true); }}>Edit</button>
+                  <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setIsWifiModalOpen(false)}>{t.done}</button>
+                  <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setWifiEditSsid(wifiSsid); setWifiEditPassword(wifiPassword); setWifiEditing(true); }}>{t.edit}</button>
                 </div>
               </>
             )}

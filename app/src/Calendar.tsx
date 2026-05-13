@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from './lib/supabase';
+import { getT, type Lang } from './lib/i18n';
 
 interface Event {
   id: string;
@@ -49,7 +50,8 @@ function escapeICS(str: string): string {
   return str.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
 }
 
-export function Calendar({ homeId }: { homeId: string }) {
+export function Calendar({ homeId, language }: { homeId: string; language: Lang }) {
+  const t = getT(language);
   const [events, setEvents] = useState<Event[]>([]);
   const [rawEvents, setRawEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
@@ -302,8 +304,8 @@ export function Calendar({ homeId }: { homeId: string }) {
     groupedEvents[key].push(event);
   });
 
-  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-  const dayNames = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+  const monthNames = t.monthNames;
+  const dayNames = t.dayNames;
 
   const renderSchedule = () => {
     const sortedKeys = Object.keys(groupedEvents).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
@@ -355,7 +357,7 @@ export function Calendar({ homeId }: { homeId: string }) {
                             )}
                           </div>
                           <div className="text-body-sm text-muted">
-                            {event.is_all_day ? 'All day' : new Date(event.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {event.is_all_day ? t.allDay : new Date(event.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             {event.description && <div style={{ fontSize: '12px', marginTop: '2px', fontStyle: 'italic' }}>{event.description}</div>}
                           </div>
                         </div>
@@ -374,10 +376,10 @@ export function Calendar({ homeId }: { homeId: string }) {
   return (
     <div style={{ paddingBottom: '120px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
-        <h1 className="text-display-lg">Schedule</h1>
+        <h1 className="text-display-lg">{t.schedule}</h1>
         <button className="icon-button-circle" onClick={exportICS} title="Export as .ics"><ExportIcon /></button>
       </div>
-      {loading ? <p className="text-body-sm text-muted">Loading...</p> : renderSchedule()}
+      {loading ? <p className="text-body-sm text-muted">{t.loading}</p> : renderSchedule()}
 
       <button className="fab" onClick={() => setIsModalOpen(true)}><PlusIcon /></button>
 
@@ -385,7 +387,7 @@ export function Calendar({ homeId }: { homeId: string }) {
         <div className="modal-overlay" onClick={closePortal}>
           <div className="modal-content" onClick={e => e.stopPropagation()} style={{ padding: 'var(--spacing-lg)' }}>
             <div className="modal-header">
-              <h2 className="text-title-md" style={{ fontSize: '20px' }}>{editingEvent ? 'Edit Entry' : 'New Entry'}</h2>
+              <h2 className="text-title-md" style={{ fontSize: '20px' }}>{editingEvent ? t.editEntry : t.newEntry}</h2>
               <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
                 {editingEvent && !confirmDelete && (
                   <button onClick={() => setConfirmDelete(true)} className="icon-button-circle" style={{ color: '#c13515' }} title="Delete"><TrashIcon /></button>
@@ -396,34 +398,34 @@ export function Calendar({ homeId }: { homeId: string }) {
             
             <form onSubmit={handleSubmit}>
               <div className="form-group">
-                <label className="form-label">Title</label>
-                <input type="text" placeholder="What's happening?" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} className="form-input" required />
+                <label className="form-label">{t.title}</label>
+                <input type="text" placeholder={t.titlePlaceholder} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} className="form-input" required />
               </div>
 
               <div className="form-group">
-                <label className="form-label">Notes (Phone, Address...)</label>
-                <textarea value={newNotes} onChange={(e) => setNewNotes(e.target.value)} className="form-input" style={{ minHeight: '80px', resize: 'vertical' }} placeholder="Add details..." />
+                <label className="form-label">{t.notesLabel}</label>
+                <textarea value={newNotes} onChange={(e) => setNewNotes(e.target.value)} className="form-input" style={{ minHeight: '80px', resize: 'vertical' }} placeholder={t.notesPlaceholder} />
               </div>
               
               <div className="form-group" style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
                 <div style={{ flex: 1 }}>
-                  <label className="form-label">Category</label>
+                  <label className="form-label">{t.category}</label>
                   <select className="form-input" value={category} onChange={(e) => {
                     setCategory(e.target.value);
                     if (e.target.value === 'birthday') setRecurrence('yearly');
                   }}>
-                    <option value="event">Event</option>
-                    <option value="birthday">Birthday 🎂</option>
-                    <option value="reminder">Reminder</option>
-                    <option value="trash">Trash 🗑️</option>
+                    <option value="event">{t.catEvent}</option>
+                    <option value="birthday">{t.catBirthday}</option>
+                    <option value="reminder">{t.catReminder}</option>
+                    <option value="trash">{t.catTrash}</option>
                   </select>
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label className="form-label">Recurrence</label>
+                  <label className="form-label">{t.recurrence}</label>
                   <select className="form-input" value={recurrence} onChange={(e) => setRecurrence(e.target.value)}>
-                    <option value="none">None</option>
-                    <option value="yearly">Yearly</option>
-                    <option value="weekly">Weekly (Soon)</option>
+                    <option value="none">{t.recNone}</option>
+                    <option value="yearly">{t.recYearly}</option>
+                    <option value="weekly">{t.recWeekly}</option>
                   </select>
                 </div>
               </div>
@@ -431,18 +433,18 @@ export function Calendar({ homeId }: { homeId: string }) {
               <div style={{ marginBottom: 'var(--spacing-base)' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', fontSize: '14px', cursor: 'pointer' }}>
                   <input type="checkbox" checked={isAllDay} onChange={(e) => setIsAllDay(e.target.checked)} />
-                  All Day Event
+                  {t.allDayEvent}
                 </label>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xl)' }}>
                 <div className="form-group">
-                  <label className="form-label">Start</label>
+                  <label className="form-label">{t.start}</label>
                   <input type={isAllDay ? "date" : "datetime-local"} value={newStart} onChange={(e) => setNewStart(e.target.value)} className="form-input" required />
                 </div>
                 {!isAllDay && (
                   <div className="form-group">
-                    <label className="form-label">End</label>
+                    <label className="form-label">{t.end}</label>
                     <input type="datetime-local" value={newEnd} onChange={(e) => setNewEnd(e.target.value)} className="form-input" />
                   </div>
                 )}
@@ -454,13 +456,13 @@ export function Calendar({ homeId }: { homeId: string }) {
 
               {confirmDelete ? (
                 <div style={{ display: 'flex', gap: 'var(--spacing-sm)', alignItems: 'center', marginBottom: 'var(--spacing-sm)' }}>
-                  <span style={{ fontSize: '14px', flex: 1 }}>Really delete this entry?</span>
-                  <button type="button" onClick={deleteEvent} className="btn-primary" style={{ background: '#c13515', fontSize: '14px', padding: '8px 16px' }}>Delete</button>
+                  <span style={{ fontSize: '14px', flex: 1 }}>{t.confirmDeleteEntry}</span>
+                  <button type="button" onClick={deleteEvent} className="btn-primary" style={{ background: '#c13515', fontSize: '14px', padding: '8px 16px' }}>{t.delete}</button>
                   <button type="button" onClick={() => setConfirmDelete(false)} className="icon-button-circle"><CloseIcon /></button>
                 </div>
               ) : (
                 <button type="submit" className="btn-primary" style={{ fontSize: '18px', fontWeight: 600 }}>
-                  {editingEvent ? 'Update Entry' : 'Save to Schedule'}
+                  {editingEvent ? t.updateEntry : t.saveToSchedule}
                 </button>
               )}
             </form>

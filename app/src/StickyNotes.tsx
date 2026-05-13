@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from './lib/supabase';
+import { getT, type Lang } from './lib/i18n';
 
 interface StickyNote {
   id: string;
@@ -34,9 +35,10 @@ interface DeckProps {
   onSwipe: () => void;
   onSeeAll?: () => void;
   onAdd: () => void;
+  labels: { noNotesYet: string; addNote: string; seeAll: string; showAll: string; notesCount: (n: number) => string };
 }
 
-function NoteDeck({ notes, myId, topIndex, onSwipe, onSeeAll, onAdd }: DeckProps) {
+function NoteDeck({ notes, myId, topIndex, onSwipe, onSeeAll, onAdd, labels }: DeckProps) {
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [leaving, setLeaving] = useState<'left' | 'right' | null>(null);
@@ -78,10 +80,10 @@ function NoteDeck({ notes, myId, topIndex, onSwipe, onSeeAll, onAdd }: DeckProps
     return (
       <div style={{ marginBottom: 'var(--spacing-sm)' }}>
         <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-sm)' }}>
-          No notes yet — add the first one!
+          {labels.noNotesYet}
         </p>
         <button onClick={onAdd} style={{ background: 'none', border: '1px dashed var(--color-hairline)', borderRadius: 'var(--rounded-full)', padding: '5px 14px', fontSize: '13px', cursor: 'pointer', color: 'var(--color-muted)' }}>
-          + Add note
+          {labels.addNote}
         </button>
       </div>
     );
@@ -165,7 +167,7 @@ function NoteDeck({ notes, myId, topIndex, onSwipe, onSeeAll, onAdd }: DeckProps
                     cursor: 'pointer', textAlign: 'right', width: '100%',
                   }}
                 >
-                  Show all →
+                  {labels.showAll}
                 </button>
               )}
             </div>
@@ -178,12 +180,12 @@ function NoteDeck({ notes, myId, topIndex, onSwipe, onSeeAll, onAdd }: DeckProps
           onClick={onAdd}
           style={{ background: 'none', border: '1px dashed var(--color-hairline)', borderRadius: 'var(--rounded-full)', padding: '5px 14px', fontSize: '13px', cursor: 'pointer', color: 'var(--color-muted)' }}
         >
-          + Add note
+          {labels.addNote}
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {notes.length > 1 && (
             <span style={{ fontSize: '12px', color: 'var(--color-muted)' }}>
-              {notes.length} notes
+              {labels.notesCount(notes.length)}
             </span>
           )}
           {onSeeAll && (
@@ -191,7 +193,7 @@ function NoteDeck({ notes, myId, topIndex, onSwipe, onSeeAll, onAdd }: DeckProps
               onClick={onSeeAll}
               style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer', fontSize: '13px', padding: 0 }}
             >
-              See all →
+              {labels.seeAll}
             </button>
           )}
         </div>
@@ -206,9 +208,11 @@ interface Props {
   compact?: boolean;
   onSeeAll?: () => void;
   onNewNote?: (note: StickyNote) => void;
+  language: Lang;
 }
 
-export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote }: Props) {
+export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote, language }: Props) {
+  const t = getT(language);
   const [notes, setNotes] = useState<StickyNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -312,7 +316,7 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote }: P
     setConfirmDelete(null);
   }
 
-  if (loading) return <p className="text-body-sm text-muted">Loading...</p>;
+  if (loading) return <p className="text-body-sm text-muted">{t.loading}</p>;
 
   return (
     <>
@@ -324,11 +328,12 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote }: P
           onSwipe={() => setDeckTopIndex(prev => notes.length > 0 ? (prev + 1) % notes.length : 0)}
           onSeeAll={onSeeAll}
           onAdd={openAdd}
+          labels={{ noNotesYet: t.noNotesYet, addNote: t.addNote, seeAll: t.seeAll, showAll: t.showAll, notesCount: t.notesCount }}
         />
       ) : (
         <>
           {notes.length === 0 && (
-            <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>No notes yet — add the first one!</p>
+            <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>{t.noNotesYet}</p>
           )}
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-sm)' }}>
@@ -341,7 +346,7 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote }: P
                   <p className="sticky-note-content">{note.content}</p>
                   <div className="sticky-note-footer">
                     <span className="sticky-note-meta">
-                      {note.visibility === 'partner' ? '→ Partner' : '↔ Both'}
+                      {note.visibility === 'partner' ? t.visibilityPartner : t.visibilityBoth}
                     </span>
                     {isOwn && (
                       <div style={{ display: 'flex', gap: '2px' }}>
@@ -370,7 +375,7 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote }: P
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <button onClick={openAdd} style={{ background: 'none', border: '1px dashed var(--color-hairline)', borderRadius: 'var(--rounded-full)', padding: '5px 14px', fontSize: '13px', cursor: 'pointer', color: 'var(--color-muted)' }}>
-              + Add note
+              {t.addNote}
             </button>
           </div>
         </>
@@ -380,14 +385,14 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote }: P
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 className="text-title-md">{editNote ? 'Edit note' : 'New note'}</h2>
+              <h2 className="text-title-md">{editNote ? t.editNote : t.newNote}</h2>
               <button className="icon-button-circle" onClick={() => setShowModal(false)}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
             <textarea
               className="form-input"
-              placeholder="Write something..."
+              placeholder={t.writePlaceholder}
               value={content}
               onChange={e => setContent(e.target.value)}
               rows={4}
@@ -400,14 +405,14 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote }: P
                 className={visibleTo === 'both' ? 'btn-primary' : 'btn-secondary'}
                 style={{ flex: 1, fontSize: '13px' }}
               >
-                ↔ For both
+                {t.forBoth}
               </button>
               <button
                 onClick={() => setVisibleTo('partner')}
                 className={visibleTo === 'partner' ? 'btn-primary' : 'btn-secondary'}
                 style={{ flex: 1, fontSize: '13px' }}
               >
-                → For partner
+                {t.forPartner}
               </button>
             </div>
             <button
@@ -416,7 +421,7 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote }: P
               disabled={saving || !content.trim()}
               style={{ width: '100%' }}
             >
-              {saving ? '…' : editNote ? 'Save changes' : 'Add note'}
+              {saving ? '…' : editNote ? t.saveChanges : t.addNoteAction}
             </button>
           </div>
         </div>
