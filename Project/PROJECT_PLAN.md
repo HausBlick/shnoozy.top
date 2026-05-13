@@ -12,45 +12,44 @@
 
 ## 🗺️ Roadmap
 
-### 🔴 Phase 6: Multi-Tenancy Implementierung (HOCHPRIO — Datenbank-Reset)
-> **Wichtig:** Für diesen Meilenstein wird die Datenbank **komplett zurückgesetzt**. Es werden **keine Migrationsskripte für bestehende Nutzerdaten** benötigt oder erstellt. Alle Tabellen werden neu aufgebaut.
+### 🟡 Phase 6: Multi-Tenancy Implementierung (in Arbeit)
+> **Wichtig:** Datenbank wurde komplett zurückgesetzt (2026-05-07). Alle Tabellen neu aufgebaut. 142 Events (50 Geburtstage + 92 Müllabfuhr-Termine 2026) wurden wiederhergestellt.
 
-#### 6.1 Neue Kerntabellen anlegen
-- [ ] Tabelle `homes` erstellen (`id`, `name`, `icon`, `created_at`)
-- [ ] Tabelle `home_members` erstellen (`id`, `home_id`, `user_id`, `role` ['admin'|'member'], `joined_at`) + RLS: nur Mitglieder des Homes sehen Einträge
-- [ ] Tabelle `home_settings` erstellen (`id`, `home_id`, `key`, `value`) + RLS: nur Home-Mitglieder lesen, nur Admin schreibt
-- [ ] Tabelle `home_invitations` erstellen (`id`, `home_id`, `token` [unique, kryptografisch zufällig], `role`, `created_by`, `expires_at`, `used_at`) + RLS: Admin kann Token erstellen, anonyme Nutzer können Token per SELECT validieren
+#### 6.1 Neue Kerntabellen anlegen ✅
+- [x] Tabelle `homes` erstellt
+- [x] Tabelle `home_members` erstellt (mit Trigger: Ersteller wird automatisch als Admin eingetragen)
+- [x] Tabelle `home_settings` erstellt
+- [x] Tabelle `home_invitations` erstellt
 
-#### 6.2 Bestehende Tabellen um `home_id` erweitern
-- [ ] `events` — Spalte `home_id` (NOT NULL, FK → `homes.id`) hinzufügen
-- [ ] `sticky_notes` — Spalte `home_id` (NOT NULL, FK → `homes.id`) hinzufügen
-- [ ] `shopping_items` — Spalte `home_id` (NOT NULL, FK → `homes.id`) hinzufügen
-- [ ] `push_subscriptions` — Spalte `home_id` hinzufügen (für home-spezifische Push-Notifications)
-- [ ] `app_settings` — durch `home_settings` ersetzen oder um `home_id` erweitern
+#### 6.2 Bestehende Tabellen um `home_id` erweitern ✅
+- [x] `events`, `sticky_notes`, `shopping_items`, `push_subscriptions` — alle mit `home_id` (NOT NULL, FK → `homes.id`)
+- [x] `app_settings` → ersetzt durch `home_settings`
+- [x] `shopping_items`: Spaltenrename `title` → `name`, `user_id` nullable (für Google Tasks Sync ohne User-Kontext)
 
-#### 6.3 RLS Policies neu implementieren
-- [ ] Alle alten RLS Policies auf den betroffenen Tabellen droppen
-- [ ] Neue Policy-Logik: `auth.uid()` muss in `home_members` für das jeweilige `home_id` des Datensatzes vorhanden sein (`EXISTS (SELECT 1 FROM home_members WHERE home_id = <table>.home_id AND user_id = auth.uid())`)
-- [ ] Schreib-Policies: Nur Mitglieder des Homes dürfen INSERT/UPDATE/DELETE in ihrem Home
+#### 6.3 RLS Policies neu implementieren ✅
+- [x] Alle Tabellen mit neuer Policy-Logik via `is_home_member(home_id)` Helper-Funktion (SECURITY DEFINER)
+- [x] Realtime-Publication für `shopping_items`, `sticky_notes`, `events` neu aktiviert (ging beim Reset verloren)
 
-#### 6.4 Einladungssystem (Link-Generator)
-- [ ] Frontend: UI im Settings-Bereich für Admins — "Invite Member"-Button + generierter Link-Display
-- [ ] Edge Function `generate-invite` (POST): Erstellt Token in `home_invitations`, gibt signierten Link zurück. Token: 32 Byte crypto-random, URL-safe Base64.
-- [ ] Frontend: Invite-Landing-Page (`/join?token=...`) — validiert Token, zeigt Home-Name an, leitet nach Login/Register zur automatischen Mitgliedschaft weiter
-- [ ] Edge Function oder DB-Trigger: Token nach Nutzung `used_at` setzen + User in `home_members` eintragen
-- [ ] Automatisches Verfallsdatum: `expires_at = now() + interval '7 days'`
+#### 6.4 Einladungssystem (Link-Generator) ⬜ OFFEN
+- [x] Tabelle `home_invitations` angelegt (Schema bereit)
+- [x] Frontend `HomeOnboarding.tsx`: "Join Home"-Tab vorhanden, ruft `accept-invite` auf
+- [ ] **Edge Function `accept-invite`**: Noch nicht gebaut — "Join Home"-Button in der App führt aktuell ins Leere
+- [ ] **Edge Function `generate-invite`**: Noch nicht gebaut — kein UI zum Erstellen von Einladungslinks
 
-#### 6.5 Google Tasks Integration auf optionales OAuth umbauen
-- [ ] Neue Tabelle `user_google_tokens` (`user_id`, `home_id`, `access_token`, `refresh_token`, `token_expiry`) — verschlüsselt in Supabase Vault oder als Secret pro User
-- [ ] Frontend: Settings-Seite "Google Verknüpfung" — Button "Mit Google verbinden" startet OAuth-Flow, Button "Verbindung trennen" löscht Tokens
-- [ ] Edge Function `sync-google-tasks` anpassen: Iteriert nur über User mit gespeicherten, gültigen Tokens; kein Sync für User ohne Verknüpfung
-- [ ] Edge Function `add-shopping-item`: Beim Hinzufügen eines Items via IFTTT/Sprachsteuerung nur dann in Google Tasks zurückschreiben, wenn der aufrufende User eine aktive Google-Verknüpfung hat
+#### 6.5 Google Tasks Integration ✅ (vereinfacht)
+- [x] `sync-google-tasks` angepasst: `title` → `name`, `home_id` aus Env-Var `DEFAULT_HOME_ID`
+- [x] `add-shopping-item` bereinigt: IFTTT-Pfad entfernt, nur noch JWT-Auth, `user_id` aus JWT
+- [ ] `DEFAULT_HOME_ID` Secret in Supabase setzen: `89cd774f-b26e-40ce-9362-7589ded42c8d` (**manueller Schritt**)
 
-#### 6.6 Frontend-Anpassungen (Home-Kontext)
-- [ ] Nach Login: Aktives Home aus `home_members` laden, in globalem State (`activeHomeId`) speichern
-- [ ] Alle Datenbankabfragen im Frontend mit `home_id = activeHomeId` filtern
-- [ ] `home_settings` beim Start laden → nur aktivierte Module rendern (Navigation + Dashboard-Widgets)
-- [ ] Onboarding-Flow für neue Nutzer ohne Home: "Home erstellen" oder "Per Einladungslink beitreten"
+#### 6.6 Frontend-Anpassungen (Home-Kontext) ✅
+- [x] `App.tsx`: Home aus `home_members` laden, Onboarding-Guard, `homeId` an alle Komponenten
+- [x] `Calendar.tsx`, `Lists.tsx`, `StickyNotes.tsx`: alle Queries mit `home_id` gefiltert
+- [x] `home_settings` für WiFi-Credentials statt `app_settings`
+
+#### 6.7 Manuelle Nacharbeiten nach DB-Reset ⬜ OFFEN
+- [ ] **WiFi-Credentials** neu eintragen (SSID + Passwort) — App-Einstellungen
+- [ ] **Push Notifications** neu aktivieren — für beide Nutzer in der App (alte Subscriptions gelöscht)
+- [ ] **`DEFAULT_HOME_ID`** Supabase Secret setzen (siehe 6.5)
 
 ---
 
@@ -170,14 +169,20 @@
 | 008 | `008_create_sticky_notes.sql` | Sticky Notes |
 | 009 | `009_create_app_settings.sql` | App-Settings (WiFi-Credentials) |
 | 010 | `010_shopping_soft_delete.sql` | `deleted_at` Spalte + Index für Shopping-Kaufhistorie |
+| — | `phase6_multi_tenancy_reset` | DB-Reset: alle App-Tabellen neu, `homes`/`home_members`/`home_settings`/`home_invitations`, RLS via `is_home_member()` |
+| — | `import_events_backup` | 142 Events (50 Geburtstage + 92 Müllabfuhr 2026) in Home `89cd774f` importiert |
+| — | `make_shopping_items_user_id_nullable` | `shopping_items.user_id` auf nullable gesetzt (Google Tasks Sync ohne User-Kontext) |
+| — | `enable_realtime_on_tables` | Realtime-Publication für `shopping_items`, `sticky_notes`, `events` aktiviert |
 
 ## ⚙️ Supabase Edge Functions
 
-| Function | Trigger | Zweck |
-|----------|---------|-------|
-| `add-shopping-item` | HTTP (Frontend + IFTTT) | Item hinzufügen + Gemini-Kategorisierung |
-| `sync-google-tasks` | pg_cron alle 2 Min | Google Tasks → Shopping List |
-| `send-daily-push` | pg_cron täglich 8:30 MESZ | Push-Notifications für Kalender-Termine |
+| Function | Trigger | Zweck | Status |
+|----------|---------|-------|--------|
+| `add-shopping-item` | HTTP (Frontend, JWT-Auth) | Item hinzufügen + Gemini-Kategorisierung | ✅ aktiv |
+| `sync-google-tasks` | pg_cron alle 2 Min | Google Tasks → Shopping List | ✅ aktiv (braucht `DEFAULT_HOME_ID` Secret) |
+| `send-daily-push` | pg_cron täglich 8:30 MESZ | Push-Notifications für Kalender-Termine | ✅ aktiv |
+| `accept-invite` | HTTP | Einladungslink einlösen → `home_members` eintragen | ⬜ noch nicht gebaut |
+| `generate-invite` | HTTP | Einladungstoken erstellen (Admin) | ⬜ noch nicht gebaut |
 
 ---
 
@@ -194,3 +199,6 @@
 *   **2026-05-03:** Shopping-Kategorien erweitert: 6 Hauptkategorien + 9 Subkategorien unter Groceries (Supermarkt-Reihenfolge). DB Migration 011 (`subcategory`-Spalte). Gemini liefert JSON mit `responseMimeType`.
 *   **2026-05-03:** Post-it Dashboard-Widget als swipebarer Deck-Stapel umgebaut. Rotation, Swipe-Geste (Pointer Events), keine externe Library.
 *   **2026-05-06:** Architektur-Entscheidung: Vollständiger Umbau auf Multi-Tenancy. Datenbank-Reset geplant. Neue Kerntabellen (`homes`, `home_members`, `home_settings`, `home_invitations`), `home_id` auf allen Datentabellen, RLS-Neuimplementierung, Einladungssystem via Share-Links (7 Tage, kein E-Mail-Versand), Google Tasks Integration auf optionales Pro-Nutzer-OAuth umgebaut. Phase 6 in Roadmap verankert.
+*   **2026-05-07:** Datenbank-Reset durchgeführt (Migration `phase6_multi_tenancy_reset`). Tabellen `plantcare_page_views` und `plantcare_chats` unberührt. 142 Events (50 Geburtstage + 92 Müllabfuhr-Termine 2026) aus Backup wiederhergestellt (Migration `import_events_backup`). Home "Home" angelegt (ID: `89cd774f-b26e-40ce-9362-7589ded42c8d`), beide Nutzer als Admin eingetragen.
+*   **2026-05-07:** Frontend Multi-Tenancy: `HomeOnboarding.tsx` neu, `App.tsx` mit Home-Lade-Logik und Onboarding-Guard, `Calendar.tsx`/`Lists.tsx`/`StickyNotes.tsx` mit `home_id`-Filterung. 2 TypeScript Build-Fehler behoben (unused `homeName` state).
+*   **2026-05-07:** Edge Functions auf neues Schema aktualisiert: `title`→`name`, `home_id` ergänzt, `auth`→`auth_key` in `send-daily-push`. IFTTT-Pfad aus `add-shopping-item` entfernt (nur JWT-Auth). Realtime-Publication für `shopping_items`, `sticky_notes`, `events` neu aktiviert (ging beim Reset verloren). `shopping_items.user_id` nullable gemacht (Google Tasks Sync hat keinen User-Kontext).
