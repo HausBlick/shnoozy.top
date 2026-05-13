@@ -309,6 +309,14 @@ function App() {
     }
   }, [session]);
 
+  useEffect(() => {
+    if (!homeId) return;
+    if (window.location.hash === '#todos') {
+      setActiveTab('todos');
+      history.replaceState(null, '', window.location.pathname);
+    }
+  }, [homeId]);
+
   async function fetchUserProfile(userId: string) {
     const { data } = await supabase
       .from('profiles')
