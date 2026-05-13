@@ -7,6 +7,7 @@ import { HomeOnboarding } from './HomeOnboarding';
 import { Calendar } from './Calendar';
 import { Lists } from './Lists';
 import { StickyNotes } from './StickyNotes';
+import { Todos, TodosDashboardWidget } from './Todos';
 import {
   HomeSettings,
   type ModuleId,
@@ -62,6 +63,13 @@ const PawIcon = ({ active }: { active?: boolean }) => (
     <circle cx="10.5" cy="7" r="2.5" fill={active ? 'var(--color-primary)' : 'none'} />
     <circle cx="14.5" cy="7" r="2.5" fill={active ? 'var(--color-primary)' : 'none'} />
     <circle cx="18" cy="10" r="2.5" fill={active ? 'var(--color-primary)' : 'none'} />
+  </svg>
+);
+
+const TodosIcon = ({ color = 'currentColor', size = 20 }: { color?: string; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9 11 12 14 22 4" />
+    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
   </svg>
 );
 
@@ -138,6 +146,7 @@ function NavModuleIcon({ id, active }: { id: ModuleId; active: boolean }) {
     case 'calendar':  return <CalendarIcon active={active} />;
     case 'lists':     return <ListsIcon active={active} />;
     case 'notes':     return <NoteIcon color={c} size={24} />;
+    case 'todos':     return <TodosIcon color={c} size={24} />;
     case 'luna':      return <PawIcon active={active} />;
     case 'home-info': return <HouseInfoIcon color={c} size={24} />;
     case 'car':       return <CarIcon color={c} size={24} />;
@@ -150,6 +159,7 @@ function getNavLabel(id: ModuleId, t: ReturnType<typeof getT>): string {
     case 'calendar':  return t.navCalendar;
     case 'lists':     return t.navLists;
     case 'notes':     return t.moduleNotes;
+    case 'todos':     return t.navTodos;
     case 'luna':      return t.navLuna;
     case 'home-info': return t.moduleHomeInfo;
     case 'car':       return t.moduleCar;
@@ -457,6 +467,7 @@ function App() {
     // Module tabs
     if (activeTab === 'calendar') return <Calendar homeId={homeId} language={language} />;
     if (activeTab === 'lists') return <Lists homeId={homeId} language={language} />;
+    if (activeTab === 'todos') return <Todos homeId={homeId} userId={session.user.id} language={language} />;
     if (activeTab === 'luna') return (
       <div>
         <h1 className="text-display-lg" style={{ marginTop: 'var(--spacing-md)' }}>Luna Portal</h1>
@@ -645,6 +656,14 @@ function App() {
             onNewNote={(note) => showToast(`New note from ${note.user_id.slice(0, 6)}`)}
           />
         </div>
+
+        {activeModuleIds.includes('todos') && (
+          <TodosDashboardWidget
+            homeId={homeId}
+            language={language}
+            onNavigate={() => setActiveTab('todos')}
+          />
+        )}
 
         <div className="card">
           <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)' }}>{t.upcoming14Days}</h2>

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from './lib/supabase';
 import { getT, type Lang } from './lib/i18n';
 
-export type ModuleId = 'calendar' | 'lists' | 'notes' | 'luna' | 'home-info' | 'car';
+export type ModuleId = 'calendar' | 'lists' | 'notes' | 'todos' | 'luna' | 'home-info' | 'car';
 
 interface ModuleMeta {
   id: ModuleId;
@@ -15,6 +15,7 @@ export const MODULE_META: ModuleMeta[] = [
   { id: 'calendar', emoji: '📅', color: 'var(--color-primary)', hasSettings: false },
   { id: 'lists',    emoji: '🛒', color: 'var(--color-primary)', hasSettings: true  },
   { id: 'notes',    emoji: '📝', color: '#ff9500',              hasSettings: false },
+  { id: 'todos',    emoji: '✅', color: '#6366f1',              hasSettings: false },
   { id: 'luna',     emoji: '🐾', color: 'var(--color-luxe)',    hasSettings: false },
   { id: 'home-info',emoji: '🏠', color: '#f57c00',              hasSettings: false },
   { id: 'car',      emoji: '🚗', color: '#1e88e5',              hasSettings: false },
@@ -37,6 +38,7 @@ export function getModuleLabel(id: ModuleId, t: ReturnType<typeof getT>): string
     case 'calendar':  return t.moduleCalendar;
     case 'lists':     return t.moduleLists;
     case 'notes':     return t.moduleNotes;
+    case 'todos':     return t.moduleTodos;
     case 'luna':      return t.moduleLuna;
     case 'home-info': return t.moduleHomeInfo;
     case 'car':       return t.moduleCar;
@@ -48,6 +50,7 @@ export function getModuleDesc(id: ModuleId, t: ReturnType<typeof getT>): string 
     case 'calendar':  return t.moduleCalendarDesc;
     case 'lists':     return t.moduleListsDesc;
     case 'notes':     return t.moduleNotesDesc;
+    case 'todos':     return t.moduleTodosDesc;
     case 'luna':      return t.moduleLunaDesc;
     case 'home-info': return t.moduleHomeInfoDesc;
     case 'car':       return t.moduleCarDesc;
