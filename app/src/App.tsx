@@ -427,6 +427,8 @@ function App() {
     setNotifStatus(permission as 'default' | 'granted' | 'denied');
     if (permission !== 'granted') return;
     try {
+      const existing = await swReg.current.pushManager.getSubscription();
+      if (existing) await existing.unsubscribe();
       const sub = await swReg.current.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(import.meta.env.VITE_VAPID_PUBLIC_KEY),
@@ -705,9 +707,14 @@ function App() {
           </div>
         )}
         {notifStatus === 'granted' && (
-          <p className="text-body-sm text-muted" style={{ marginTop: 'var(--spacing-md)', display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <BellIcon color="var(--color-primary)" size={14} /> {t.notificationsEnabled}
-          </p>
+          <div style={{ marginTop: 'var(--spacing-md)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <p className="text-body-sm text-muted" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <BellIcon color="var(--color-primary)" size={14} /> {t.notificationsEnabled}
+            </p>
+            <button onClick={enableNotifications} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '12px', padding: 0, textDecoration: 'underline' }}>
+              {language === 'de' ? 'Neu registrieren' : 'Re-register'}
+            </button>
+          </div>
         )}
 
         <button className="btn-primary" style={{ marginTop: 'var(--spacing-lg)' }} onClick={() => setIsWifiModalOpen(true)}>
