@@ -434,9 +434,9 @@ function App() {
         applicationServerKey: urlBase64ToUint8Array(import.meta.env.VITE_VAPID_PUBLIC_KEY),
       });
       const { endpoint, keys } = sub.toJSON();
-      await supabase.from('push_subscriptions').upsert(
-        { user_id: session.user.id, home_id: homeId, endpoint, p256dh: keys!.p256dh, auth_key: keys!.auth },
-        { onConflict: 'user_id,endpoint' }
+      await supabase.from('push_subscriptions').delete().eq('user_id', session.user.id);
+      await supabase.from('push_subscriptions').insert(
+        { user_id: session.user.id, home_id: homeId, endpoint, p256dh: keys!.p256dh, auth_key: keys!.auth }
       );
     } catch (err) {
       console.error('Push subscription failed:', err);
