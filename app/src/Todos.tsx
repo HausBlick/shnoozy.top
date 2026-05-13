@@ -673,11 +673,11 @@ export function Todos({ homeId, userId, language }: Props) {
   }
 
   async function sendAssignmentPush(itemId: string, assignedTo: string, title: string) {
-    try {
-      await supabase.functions.invoke('send-todo-push', {
-        body: { item_id: itemId, assigned_to: assignedTo, title, home_id: homeId },
-      });
-    } catch {}
+    const { data, error } = await supabase.functions.invoke('send-todo-push', {
+      body: { item_id: itemId, assigned_to: assignedTo, title, home_id: homeId },
+    });
+    if (error) console.error('[push] error:', error);
+    else console.log('[push] result:', data);
   }
 
   // "Recent" section: tasks with nearest due_date first; tasks without due_date sorted by created_at desc
