@@ -91,7 +91,6 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const todayRef = useRef<HTMLDivElement>(null);
   const stickyHeaderRef = useRef<HTMLDivElement>(null);
 
   // View state
@@ -136,25 +135,6 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
     fetchEvents();
   }, [homeId]);
 
-  useEffect(() => {
-    if (!loading && events.length > 0 && view === 'agenda') {
-      const timer = setTimeout(() => {
-        const headerHeight = (stickyHeaderRef.current?.offsetHeight ?? 80) + 8;
-        if (todayRef.current) {
-          todayRef.current.scrollIntoView({ behavior: 'auto', block: 'start' });
-          window.scrollBy(0, -headerHeight);
-        } else {
-          const firstUpcoming = events.find(e => new Date(e.start_time) >= today);
-          if (firstUpcoming) {
-            const el = document.getElementById(`event-${firstUpcoming.id}`);
-            el?.scrollIntoView({ behavior: 'auto', block: 'start' });
-            window.scrollBy(0, -headerHeight);
-          }
-        }
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [loading, events, view]);
 
   async function fetchEvents() {
     try {
@@ -398,6 +378,7 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
     const groupedEvents: Record<string, Event[]> = {};
     events.forEach(event => {
       const d = new Date(event.start_time);
+      if (d < today) return; // only today + future
       const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
       if (!groupedEvents[key]) groupedEvents[key] = [];
       groupedEvents[key].push(event);
@@ -425,7 +406,7 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
           return (
             <div key={key} style={{ display: 'contents' }}>
               {monthDivider}
-              <div className="schedule-day-group" ref={isToday ? todayRef : null}>
+              <div className="schedule-day-group">
                 <div className="schedule-date-sidebar">
                   <span className="schedule-day-name">{t.dayNames[date.getDay()]}</span>
                   <span className={`schedule-day-number ${isToday ? 'today' : ''}`}>{d}</span>
