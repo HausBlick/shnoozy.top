@@ -77,6 +77,7 @@ const en = {
   // General
   loading: 'Loading...',
   save: 'Save',
+  saved: 'Saved',
   cancel: 'Cancel',
   delete: 'Delete',
   back: '←',
@@ -322,6 +323,7 @@ const de: typeof en = {
   // General
   loading: 'Lädt...',
   save: 'Speichern',
+  saved: 'Gespeichert',
   cancel: 'Abbrechen',
   delete: 'Löschen',
   back: '←',

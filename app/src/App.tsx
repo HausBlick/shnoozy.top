@@ -227,6 +227,7 @@ function UserSettingsPage({
 }) {
   const t = getT(language);
   const [localName, setLocalName] = useState(myDisplayName);
+  const [nameSaved, setNameSaved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { setLocalName(myDisplayName); }, [myDisplayName]);
 
@@ -329,17 +330,17 @@ function UserSettingsPage({
               className="form-input"
               style={{ flex: 1, width: 'auto' }}
               value={localName}
-              onChange={e => setLocalName(e.target.value)}
+              onChange={e => { setLocalName(e.target.value); setNameSaved(false); }}
               placeholder={t.displayNamePlaceholder}
-              onKeyDown={e => { if (e.key === 'Enter') onDisplayNameSave(localName); }}
+              onKeyDown={e => { if (e.key === 'Enter') { onDisplayNameSave(localName); setNameSaved(true); } }}
             />
             <button
               className="btn-secondary"
-              onClick={() => onDisplayNameSave(localName)}
-              disabled={!localName.trim()}
-              style={{ flexShrink: 0, width: 'auto', padding: '13px 20px', background: 'var(--color-primary)', color: 'white', border: 'none' }}
+              onClick={() => { onDisplayNameSave(localName); setNameSaved(true); }}
+              disabled={!localName.trim() || nameSaved}
+              style={{ flexShrink: 0, width: 'auto', padding: '13px 20px', background: nameSaved ? 'var(--color-surface-strong)' : 'var(--color-primary)', color: nameSaved ? 'var(--color-muted)' : 'white', border: 'none', transition: 'background 0.2s, color 0.2s' }}
             >
-              {t.save}
+              {nameSaved ? t.saved : t.save}
             </button>
           </div>
         </div>
@@ -426,7 +427,13 @@ function UserSettingsPage({
           <p className="text-body-sm text-muted" style={{ marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-md)' }}>
             {t.notifReRegisterHint}
           </p>
-          <button className="btn-secondary" onClick={onReRegister}>{t.reRegister}</button>
+          <button
+            className="btn-secondary"
+            onClick={onReRegister}
+            style={{ background: 'var(--color-primary)', color: 'white', border: 'none' }}
+          >
+            {t.reRegister}
+          </button>
         </div>
       )}
 
