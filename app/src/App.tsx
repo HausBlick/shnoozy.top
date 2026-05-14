@@ -437,44 +437,83 @@ function UserSettingsPage({
         </div>
       </div>
 
-      {/* Dashboard widget order */}
+      {/* Dashboard widget order + visibility */}
       {(() => {
-        const middleIds = ['todos', 'budget', 'weather'];
-        const visibleWidgets = dashboardWidgets.filter(w => {
-          if (w === 'weather') return true;
-          return activeModuleIds.includes(w) && middleIds.includes(w);
-        });
-        if (visibleWidgets.length < 2) return null;
+        const ALL_MIDDLE = ['todos', 'budget', 'weather'] as const;
+        const labels: Record<string, string> = { todos: t.moduleTodos, budget: t.moduleBudget, weather: t.weatherWidget };
+        const emojis: Record<string, string> = { todos: '✅', budget: '💰', weather: '🌤️' };
+        // enabled = in dashboardWidgets AND (weather OR module active)
+        const enabledWidgets = dashboardWidgets.filter(w =>
+          ALL_MIDDLE.includes(w as typeof ALL_MIDDLE[number]) &&
+          (w === 'weather' || activeModuleIds.includes(w))
+        );
+        function toggleWidget(id: string) {
+          const isEnabled = enabledWidgets.includes(id);
+          if (isEnabled) {
+            onDashboardWidgetsChange(dashboardWidgets.filter(w => w !== id));
+          } else {
+            onDashboardWidgetsChange([...dashboardWidgets.filter(w => w !== id), id]);
+          }
+        }
         function moveWidget(from: number, to: number) {
-          const reordered = [...visibleWidgets];
+          const reordered = [...enabledWidgets];
           const [moved] = reordered.splice(from, 1);
           reordered.splice(to, 0, moved);
-          const inactive = dashboardWidgets.filter(w => !visibleWidgets.includes(w));
-          onDashboardWidgetsChange([...reordered, ...inactive]);
+          const rest = dashboardWidgets.filter(w => !enabledWidgets.includes(w));
+          onDashboardWidgetsChange([...reordered, ...rest]);
         }
-        const labels: Record<string, string> = { todos: t.moduleTodos, budget: t.moduleBudget, weather: t.weatherWidget };
         return (
           <div className="card" style={{ marginBottom: 'var(--spacing-md)' }}>
             <h2 className="text-title-md" style={{ marginBottom: '4px' }}>{t.dashboardWidgetsSection}</h2>
             <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>{t.dashboardWidgetsDesc}</p>
-            {visibleWidgets.map((w, i) => (
-              <div key={w} style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', padding: '10px 0', borderBottom: '1px solid var(--color-hairline-soft)' }}>
-                <span style={{ fontSize: '18px' }}>{w === 'weather' ? '🌤️' : MODULE_META.find(m => m.id === w)?.emoji ?? '📦'}</span>
-                <span className="text-body-md" style={{ flex: 1, fontWeight: 500 }}>{labels[w] ?? w}</span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            {ALL_MIDDLE.map(w => {
+              const moduleActive = w === 'weather' || activeModuleIds.includes(w);
+              const isOn = enabledWidgets.includes(w);
+              const idx = enabledWidgets.indexOf(w);
+              return (
+                <div key={w} style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', padding: '10px 0', borderBottom: '1px solid var(--color-hairline-soft)', opacity: moduleActive ? 1 : 0.4 }}>
+                  <span style={{ fontSize: '18px' }}>{emojis[w]}</span>
+                  <span className="text-body-md" style={{ flex: 1, fontWeight: 500 }}>{labels[w] ?? w}</span>
+                  {/* toggle */}
                   <button
-                    onClick={() => i > 0 && moveWidget(i, i - 1)}
-                    disabled={i === 0}
-                    style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', color: i === 0 ? 'var(--color-hairline)' : 'var(--color-muted)', padding: '2px 6px', fontSize: '14px', lineHeight: 1 }}
-                  >▲</button>
-                  <button
-                    onClick={() => i < visibleWidgets.length - 1 && moveWidget(i, i + 1)}
-                    disabled={i === visibleWidgets.length - 1}
-                    style={{ background: 'none', border: 'none', cursor: i === visibleWidgets.length - 1 ? 'default' : 'pointer', color: i === visibleWidgets.length - 1 ? 'var(--color-hairline)' : 'var(--color-muted)', padding: '2px 6px', fontSize: '14px', lineHeight: 1 }}
-                  >▼</button>
+                    onClick={() => moduleActive && toggleWidget(w)}
+                    disabled={!moduleActive}
+                    title={moduleActive ? undefined : (language === 'de' ? 'Modul deaktiviert' : 'Module disabled')}
+                    style={{
+                      position: 'relative', width: '40px', height: '22px',
+                      borderRadius: '11px', border: 'none', cursor: moduleActive ? 'pointer' : 'default',
+                      background: isOn ? 'var(--color-primary)' : 'var(--color-hairline)',
+                      transition: 'background 0.2s', flexShrink: 0,
+                    }}
+                  >
+                    <span style={{
+                      position: 'absolute', top: '3px',
+                      left: isOn ? '21px' : '3px',
+                      width: '16px', height: '16px',
+                      borderRadius: '50%', background: '#fff',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                      transition: 'left 0.2s',
+                    }} />
+                  </button>
+                  {/* reorder arrows — only for enabled widgets */}
+                  {isOn && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <button
+                        onClick={() => idx > 0 && moveWidget(idx, idx - 1)}
+                        disabled={idx === 0}
+                        style={{ background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', color: idx === 0 ? 'var(--color-hairline)' : 'var(--color-muted)', padding: '2px 6px', fontSize: '14px', lineHeight: 1 }}
+                      >▲</button>
+                      <button
+                        onClick={() => idx < enabledWidgets.length - 1 && moveWidget(idx, idx + 1)}
+                        disabled={idx === enabledWidgets.length - 1}
+                        style={{ background: 'none', border: 'none', cursor: idx === enabledWidgets.length - 1 ? 'default' : 'pointer', color: idx === enabledWidgets.length - 1 ? 'var(--color-hairline)' : 'var(--color-muted)', padding: '2px 6px', fontSize: '14px', lineHeight: 1 }}
+                      >▼</button>
+                    </div>
+                  )}
+                  {!isOn && <div style={{ width: '32px' }} />}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         );
       })()}

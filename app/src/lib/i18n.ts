@@ -237,7 +237,7 @@ const en = {
 
   // Calendar settings modal
   calSettingsTitle: 'Calendar Settings',
-  calDefaultView: 'Default View',
+  calDefaultView: 'Calendar: Default View',
 
   // Calendar subscriptions (ICS import)
   calSubSection: 'Subscribed Calendars',
@@ -293,7 +293,7 @@ const en = {
 
   // Dashboard widgets
   dashboardWidgetsSection: 'Dashboard Widgets',
-  dashboardWidgetsDesc: 'Order of widgets in the middle section',
+  dashboardWidgetsDesc: 'Toggle and reorder dashboard widgets',
   upcomingEvents: (n: number) => `Next ${n} events`,
 
   // Weather
@@ -540,7 +540,7 @@ const de: typeof en = {
 
   // Calendar settings modal
   calSettingsTitle: 'Kalender-Einstellungen',
-  calDefaultView: 'Standard-Ansicht',
+  calDefaultView: 'Kalender: Standard-Ansicht',
 
   // Calendar subscriptions (ICS import)
   calSubSection: 'Abonnierte Kalender',
@@ -596,7 +596,7 @@ const de: typeof en = {
 
   // Dashboard widgets
   dashboardWidgetsSection: 'Dashboard-Widgets',
-  dashboardWidgetsDesc: 'Reihenfolge der Widgets im mittleren Bereich',
+  dashboardWidgetsDesc: 'Widgets ein-/ausschalten und sortieren',
   upcomingEvents: (n: number) => `Nächste ${n} Termine`,
 
   // Weather
