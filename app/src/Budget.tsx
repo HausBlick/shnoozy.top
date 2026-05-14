@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from './lib/supabase';
 import { getT, type Lang } from './lib/i18n';
+import { logActivity } from './lib/activityLog';
 
 interface BudgetCategory {
   id: string;
@@ -127,10 +128,13 @@ export function Budget({ homeId, language, userId }: { homeId: string; language:
         date: formDate,
         is_shared: formShared,
       };
+      const label = `${amount.toFixed(2)} € ${formDescription.trim() ? '· ' + formDescription.trim().slice(0, 40) : ''}`.trim();
       if (editingEntry) {
         await supabase.from('budget_entries').update(payload).eq('id', editingEntry.id);
+        logActivity(homeId, userId, 'edited', 'budget_entry', label);
       } else {
         await supabase.from('budget_entries').insert(payload);
+        logActivity(homeId, userId, 'added', 'budget_entry', label);
       }
       setModalOpen(false);
       fetchData();
@@ -140,7 +144,9 @@ export function Budget({ homeId, language, userId }: { homeId: string; language:
   }
 
   async function handleDelete(id: string) {
+    const entry = entries.find(e => e.id === id);
     await supabase.from('budget_entries').delete().eq('id', id);
+    if (entry) logActivity(homeId, userId, 'deleted', 'budget_entry', `${Number(entry.amount).toFixed(2)} €`);
     setConfirmDeleteId(null);
     setModalOpen(false);
     fetchData();

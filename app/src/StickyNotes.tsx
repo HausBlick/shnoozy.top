@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from './lib/supabase';
 import { getT, type Lang } from './lib/i18n';
+import { logActivity } from './lib/activityLog';
 
 interface StickyNote {
   id: string;
@@ -324,6 +325,7 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote, lan
         }).select().single();
         if (data) {
           setNotes(prev => [data, ...prev]);
+          logActivity(homeId, myId, 'added', 'note', content.trim().slice(0, 60));
           if (visibleTo !== 'private') {
             supabase.functions.invoke('send-note-push', {
               body: { home_id: homeId, author_id: myId },

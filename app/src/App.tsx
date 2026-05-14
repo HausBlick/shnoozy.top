@@ -218,7 +218,7 @@ function UserSettingsPage({
   language, onLanguageChange, onBack, onLogout, notifStatus, onReRegister,
   notifPrefs, onNotifPrefChange, myDisplayName, myAvatarColor, onDisplayNameSave, onAvatarColorChange,
   myAvatarUrl, theme, onThemeChange, onAvatarUpload, onAvatarRemove,
-  defaultCalView, onDefaultCalViewChange,
+  defaultCalView, onDefaultCalViewChange, dashboardWidgets, activeModuleIds, onDashboardWidgetsChange,
 }: {
   language: Lang;
   onLanguageChange: (lang: Lang) => void;
@@ -239,6 +239,9 @@ function UserSettingsPage({
   onAvatarRemove: () => void;
   defaultCalView: 'agenda' | 'month' | 'week';
   onDefaultCalViewChange: (v: 'agenda' | 'month' | 'week') => void;
+  dashboardWidgets: string[];
+  activeModuleIds: string[];
+  onDashboardWidgetsChange: (w: string[]) => void;
 }) {
   const t = getT(language);
   const [localName, setLocalName] = useState(myDisplayName);
@@ -434,6 +437,48 @@ function UserSettingsPage({
         </div>
       </div>
 
+      {/* Dashboard widget order */}
+      {(() => {
+        const middleIds = ['todos', 'budget', 'weather'];
+        const visibleWidgets = dashboardWidgets.filter(w => {
+          if (w === 'weather') return true;
+          return activeModuleIds.includes(w) && middleIds.includes(w);
+        });
+        if (visibleWidgets.length < 2) return null;
+        function moveWidget(from: number, to: number) {
+          const reordered = [...visibleWidgets];
+          const [moved] = reordered.splice(from, 1);
+          reordered.splice(to, 0, moved);
+          const inactive = dashboardWidgets.filter(w => !visibleWidgets.includes(w));
+          onDashboardWidgetsChange([...reordered, ...inactive]);
+        }
+        const labels: Record<string, string> = { todos: t.moduleTodos, budget: t.moduleBudget, weather: t.weatherWidget };
+        return (
+          <div className="card" style={{ marginBottom: 'var(--spacing-md)' }}>
+            <h2 className="text-title-md" style={{ marginBottom: '4px' }}>{t.dashboardWidgetsSection}</h2>
+            <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>{t.dashboardWidgetsDesc}</p>
+            {visibleWidgets.map((w, i) => (
+              <div key={w} style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', padding: '10px 0', borderBottom: '1px solid var(--color-hairline-soft)' }}>
+                <span style={{ fontSize: '18px' }}>{w === 'weather' ? '🌤️' : MODULE_META.find(m => m.id === w)?.emoji ?? '📦'}</span>
+                <span className="text-body-md" style={{ flex: 1, fontWeight: 500 }}>{labels[w] ?? w}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <button
+                    onClick={() => i > 0 && moveWidget(i, i - 1)}
+                    disabled={i === 0}
+                    style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', color: i === 0 ? 'var(--color-hairline)' : 'var(--color-muted)', padding: '2px 6px', fontSize: '14px', lineHeight: 1 }}
+                  >▲</button>
+                  <button
+                    onClick={() => i < visibleWidgets.length - 1 && moveWidget(i, i + 1)}
+                    disabled={i === visibleWidgets.length - 1}
+                    style={{ background: 'none', border: 'none', cursor: i === visibleWidgets.length - 1 ? 'default' : 'pointer', color: i === visibleWidgets.length - 1 ? 'var(--color-hairline)' : 'var(--color-muted)', padding: '2px 6px', fontSize: '14px', lineHeight: 1 }}
+                  >▼</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       {notifStatus === 'granted' && (
         <div className="card" style={{ marginBottom: 'var(--spacing-md)' }}>
           <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-md)', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -502,6 +547,215 @@ function UserSettingsPage({
   );
 }
 
+// ─── Activity Log helpers ─────────────────────────────────────────────────────
+
+function formatRelTime(dateStr: string, t: ReturnType<typeof getT>, lang: Lang): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return t.actTimeJustNow;
+  if (mins < 60) return t.actTimeMinAgo(mins);
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return t.actTimeHoursAgo(hours);
+  const d = new Date(dateStr);
+  return lang === 'de'
+    ? `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}.`
+    : `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function formatActivityText(
+  entry: { action_type: string; entity_type: string; entity_title: string },
+  t: ReturnType<typeof getT>,
+): string {
+  const action: Record<string, string> = { added: t.actActionAdded, edited: t.actActionEdited, completed: t.actActionCompleted, deleted: t.actActionDeleted };
+  const entity: Record<string, string> = { todo: t.actEntityTodo, shopping_item: t.actEntityShoppingItem, note: t.actEntityNote, budget_entry: t.actEntityBudgetEntry };
+  return `${entity[entry.entity_type] ?? entry.entity_type} ${action[entry.action_type] ?? entry.action_type}: ${entry.entity_title}`;
+}
+
+function ActivityLogRow({ entry, memberColors, memberDisplayNames, t, language }: {
+  entry: any; memberColors: Record<string, string>; memberDisplayNames: Record<string, string>;
+  t: ReturnType<typeof getT>; language: Lang;
+}) {
+  const color = memberColors[entry.user_id] || '#14d8db';
+  const name = memberDisplayNames[entry.user_id] || entry.user_id.slice(0, 6);
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--color-hairline-soft)' }}>
+      <div style={{ width: 28, height: 28, borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'white', flexShrink: 0 }}>
+        {name.charAt(0).toUpperCase()}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span className="text-body-sm" style={{ fontWeight: 600 }}>{name} </span>
+        <span className="text-body-sm text-muted" style={{ wordBreak: 'break-word' }}>{formatActivityText(entry, t)}</span>
+      </div>
+      <div className="text-body-sm text-muted" style={{ flexShrink: 0, fontSize: '11px', paddingTop: '2px' }}>
+        {formatRelTime(entry.created_at, t, language)}
+      </div>
+    </div>
+  );
+}
+
+// ─── BudgetDashboardWidget ────────────────────────────────────────────────────
+
+function BudgetDashboardWidget({ homeId, language, onNavigate }: { homeId: string; language: Lang; onNavigate: () => void }) {
+  const t = getT(language);
+  const [total, setTotal] = useState<number | null>(null);
+  useEffect(() => {
+    const now = new Date();
+    const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const to = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    supabase.from('budget_entries').select('amount').eq('home_id', homeId).gte('date', from).lte('date', to)
+      .then(({ data }) => { if (data) setTotal(data.reduce((s, e) => s + Number(e.amount), 0)); });
+  }, [homeId]);
+  return (
+    <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
+      <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-xs)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <BudgetIcon color="#10b981" size={18} /> {t.moduleBudget}
+      </h2>
+      <p className="text-body-sm text-muted" style={{ marginBottom: '4px' }}>{t.budgetTotal}</p>
+      <p style={{ fontSize: '22px', fontWeight: 700, marginBottom: 'var(--spacing-sm)' }}>
+        {total === null ? '…' : `${total.toFixed(2)} €`}
+      </p>
+      <button onClick={onNavigate} style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer', padding: 0 }}>
+        {t.budgetTitle} →
+      </button>
+    </div>
+  );
+}
+
+// ─── WeatherWidget ────────────────────────────────────────────────────────────
+
+const WEATHER_CACHE_KEY = 'shnoozy_weather_cache';
+const WEATHER_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+interface WeatherData {
+  temp: number;
+  feelsLike: number;
+  description: string;
+  city: string;
+  iconEmoji: string;
+  humidity: number;
+  windSpeed: number;
+  recommendation: string;
+}
+
+function WeatherWidget({ language }: { language: Lang }) {
+  const t = getT(language);
+  const [data, setData] = useState<WeatherData | null>(null);
+  const [status, setStatus] = useState<'loading' | 'denied' | 'error' | 'ok'>('loading');
+
+  useEffect(() => {
+    const cached = (() => {
+      try {
+        const raw = localStorage.getItem(WEATHER_CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (Date.now() - parsed.cachedAt < WEATHER_CACHE_TTL) return parsed.data as WeatherData;
+      } catch { /* ignore */ }
+      return null;
+    })();
+
+    if (cached) { setData(cached); setStatus('ok'); return; }
+
+    if (!navigator.geolocation) { setStatus('error'); return; }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { data: res, error } = await supabase.functions.invoke('get-weather', {
+            body: { lat: pos.coords.latitude, lon: pos.coords.longitude },
+          });
+          if (error || res?.error) { setStatus('error'); return; }
+          localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ data: res, cachedAt: Date.now() }));
+          setData(res as WeatherData);
+          setStatus('ok');
+        } catch { setStatus('error'); }
+      },
+      () => setStatus('denied'),
+      { timeout: 8000 }
+    );
+  }, []);
+
+  if (status === 'denied') return (
+    <div className="card" style={{ marginBottom: 'var(--spacing-lg)', opacity: 0.6 }}>
+      <p className="text-body-sm text-muted">{t.weatherLocationDenied}</p>
+    </div>
+  );
+
+  if (status === 'error') return (
+    <div className="card" style={{ marginBottom: 'var(--spacing-lg)', opacity: 0.6 }}>
+      <p className="text-body-sm text-muted">{t.weatherUnavailable}</p>
+    </div>
+  );
+
+  if (!data) return (
+    <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
+      <p className="text-body-sm text-muted">{t.weatherLoading}</p>
+    </div>
+  );
+
+  return (
+    <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 'var(--spacing-xs)' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+            <span style={{ fontSize: '36px', lineHeight: 1 }}>{data.iconEmoji}</span>
+            <span style={{ fontSize: '32px', fontWeight: 700, lineHeight: 1 }}>{data.temp}°</span>
+          </div>
+          <div className="text-body-sm text-muted" style={{ marginTop: '4px', textTransform: 'capitalize' }}>{data.description}</div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div className="text-body-sm" style={{ fontWeight: 600 }}>{data.city}</div>
+          <div className="text-body-sm text-muted">💧 {data.humidity}% · 💨 {data.windSpeed} m/s</div>
+        </div>
+      </div>
+      {data.recommendation && (
+        <div style={{
+          marginTop: 'var(--spacing-sm)', padding: '8px 10px',
+          background: 'var(--color-surface)', borderRadius: 'var(--rounded-sm)',
+          fontSize: '13px', color: 'var(--color-ink)', fontStyle: 'italic',
+        }}>
+          {data.recommendation}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── ActivityLogModal ─────────────────────────────────────────────────────────
+
+function ActivityLogModal({ homeId, language, memberColors, memberDisplayNames, onClose }: {
+  homeId: string; language: Lang;
+  memberColors: Record<string, string>; memberDisplayNames: Record<string, string>;
+  onClose: () => void;
+}) {
+  const t = getT(language);
+  const [entries, setEntries] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    supabase.from('activity_log').select('*').eq('home_id', homeId)
+      .order('created_at', { ascending: false }).limit(100)
+      .then(({ data }) => { setEntries(data || []); setLoading(false); });
+  }, [homeId]);
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxHeight: '82dvh', display: 'flex', flexDirection: 'column' }}>
+        <div className="modal-header" style={{ flexShrink: 0 }}>
+          <h2 className="text-title-md">{t.activityLogTitle}</h2>
+          <button className="icon-button-circle" onClick={onClose}><CloseIcon /></button>
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {loading ? (
+            <p className="text-body-sm text-muted">{t.loading}</p>
+          ) : entries.length === 0 ? (
+            <p className="text-body-sm text-muted">{t.activityLogEmpty}</p>
+          ) : entries.map(e => (
+            <ActivityLogRow key={e.id} entry={e} memberColors={memberColors} memberDisplayNames={memberDisplayNames} t={t} language={language} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function urlBase64ToUint8Array(base64: string): ArrayBuffer {
@@ -541,6 +795,10 @@ function App() {
   const [myAvatarUrl, setMyAvatarUrl] = useState('');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [defaultCalView, setDefaultCalView] = useState<'agenda' | 'month' | 'week'>('agenda');
+  const [dashboardWidgets, setDashboardWidgets] = useState<string[]>(['todos', 'budget']);
+  const [activityEntries, setActivityEntries] = useState<any[]>([]);
+  const [showActivityModal, setShowActivityModal] = useState(false);
+  const [memberDisplayNames, setMemberDisplayNames] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<string | null>(null);
   const [wifiSsid, setWifiSsid] = useState('');
   const [wifiPassword, setWifiPassword] = useState('');
@@ -606,10 +864,21 @@ function App() {
     }
   }, [homeId]);
 
+  useEffect(() => {
+    if (!homeId) return;
+    const channel = supabase
+      .channel(`activity_log_${homeId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_log', filter: `home_id=eq.${homeId}` }, (payload) => {
+        setActivityEntries(prev => [payload.new as any, ...prev].slice(0, 20));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [homeId]);
+
   async function fetchUserProfile(userId: string) {
     const { data } = await supabase
       .from('profiles')
-      .select('language, notification_preferences, display_name, avatar_color, avatar_url, theme, default_calendar_view')
+      .select('language, notification_preferences, display_name, avatar_color, avatar_url, theme, default_calendar_view, dashboard_widgets')
       .eq('id', userId)
       .maybeSingle();
     if (data?.language) setLanguage(data.language as Lang);
@@ -625,6 +894,7 @@ function App() {
     }
     if (data?.theme === 'dark') setTheme('dark');
     if (data?.default_calendar_view) setDefaultCalView(data.default_calendar_view as 'agenda' | 'month' | 'week');
+    if (Array.isArray(data?.dashboard_widgets)) setDashboardWidgets(data.dashboard_widgets as string[]);
   }
 
   async function fetchMemberColors(hId: string) {
@@ -636,13 +906,16 @@ function App() {
     const userIds = members.map((m: any) => m.user_id);
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, avatar_color')
+      .select('id, avatar_color, display_name')
       .in('id', userIds);
     const colors: Record<string, string> = {};
+    const names: Record<string, string> = {};
     for (const p of profiles ?? []) {
       colors[p.id] = p.avatar_color || '#14d8db';
+      if (p.display_name) names[p.id] = p.display_name;
     }
     setMemberColors(colors);
+    setMemberDisplayNames(names);
   }
 
   async function fetchUserHome(userId: string) {
@@ -663,6 +936,7 @@ function App() {
         fetchWifiSettings(hId);
         fetchHomeConfig(hId);
         fetchMemberColors(hId);
+        fetchActivityLog(hId);
       } else {
         setHomeId(null);
       }
@@ -722,7 +996,7 @@ function App() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const rangeEnd = new Date(today);
-    rangeEnd.setDate(today.getDate() + 14);
+    rangeEnd.setDate(today.getDate() + 30);
 
     const { data, error } = await supabase
       .from('events')
@@ -747,6 +1021,21 @@ function App() {
       processed.sort((a, b) => a.display_time.getTime() - b.display_time.getTime());
       setUpcomingEvents(processed);
     }
+  }
+
+  async function fetchActivityLog(hId: string) {
+    const { data } = await supabase
+      .from('activity_log')
+      .select('*')
+      .eq('home_id', hId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    setActivityEntries(data || []);
+  }
+
+  async function handleDashboardWidgetsChange(widgets: string[]) {
+    setDashboardWidgets(widgets);
+    await supabase.from('profiles').update({ dashboard_widgets: widgets }).eq('id', session.user.id);
   }
 
   async function enableNotifications() {
@@ -841,7 +1130,7 @@ function App() {
   const renderTab = () => {
     // Module tabs
     if (activeTab === 'calendar') return <Calendar homeId={homeId} language={language} defaultView={defaultCalView} />;
-    if (activeTab === 'lists') return <Lists homeId={homeId} language={language} />;
+    if (activeTab === 'lists') return <Lists homeId={homeId} language={language} userId={session.user.id} />;
     if (activeTab === 'budget') return <Budget homeId={homeId} language={language} userId={session.user.id} />;
     if (activeTab === 'todos') return <Todos homeId={homeId} userId={session.user.id} language={language} />;
     if (activeTab === 'luna') return (
@@ -1005,6 +1294,9 @@ function App() {
         onAvatarRemove={handleAvatarRemove}
         defaultCalView={defaultCalView}
         onDefaultCalViewChange={handleDefaultCalViewChange}
+        dashboardWidgets={dashboardWidgets}
+        activeModuleIds={activeModuleIds}
+        onDashboardWidgetsChange={handleDashboardWidgetsChange}
       />
     );
 
@@ -1026,12 +1318,18 @@ function App() {
     );
 
     // Home dashboard
+    const middleWidgetIds = ['todos', 'budget', 'weather'];
+    const orderedMiddleWidgets = dashboardWidgets.filter(w => {
+      if (w === 'weather') return true;
+      return activeModuleIds.includes(w as ModuleId) && middleWidgetIds.includes(w);
+    });
     return (
-      <div>
+      <div style={{ paddingBottom: '120px' }}>
         <div style={{ marginBottom: 'var(--spacing-lg)', marginTop: 'var(--spacing-md)' }}>
           <h1 className="text-display-lg">{t.dashboard}</h1>
         </div>
 
+        {/* FIXED 1: Sticky Notes */}
         <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
           <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <NoteIcon color="var(--color-primary)" size={18} /> {t.notes}
@@ -1047,21 +1345,16 @@ function App() {
           />
         </div>
 
-        {activeModuleIds.includes('todos') && (
-          <TodosDashboardWidget
-            homeId={homeId}
-            language={language}
-            onNavigate={() => setActiveTab('todos')}
-          />
-        )}
-
-        <div className="card">
-          <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)' }}>{t.upcoming14Days}</h2>
+        {/* FIXED 2: Calendar — next 7 events */}
+        <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
+          <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <CalendarIcon active={false} /> {t.upcomingEvents(7)}
+          </h2>
           {upcomingEvents.length === 0 ? (
             <p className="text-body-sm text-muted">{t.noUpcomingEvents}</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
-              {upcomingEvents.map(e => (
+              {upcomingEvents.slice(0, 7).map(e => (
                 <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', borderBottom: '1px solid var(--color-hairline-soft)', paddingBottom: '4px' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                     {e.category === 'birthday' && <CakeIcon color="var(--color-luxe)" size={13} />}
@@ -1082,8 +1375,17 @@ function App() {
           </button>
         </div>
 
+        {/* REORDERABLE MIDDLE */}
+        {orderedMiddleWidgets.map(w => {
+          if (w === 'todos') return <TodosDashboardWidget key="todos" homeId={homeId} language={language} onNavigate={() => setActiveTab('todos')} />;
+          if (w === 'budget') return <BudgetDashboardWidget key="budget" homeId={homeId} language={language} onNavigate={() => setActiveTab('budget')} />;
+          if (w === 'weather') return <WeatherWidget key="weather" language={language} />;
+          return null;
+        })}
+
+        {/* Notification enable banner */}
         {notifStatus === 'default' && import.meta.env.VITE_VAPID_PUBLIC_KEY && (
-          <div className="card" style={{ marginTop: 'var(--spacing-lg)' }}>
+          <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xs)' }}>
               <BellIcon color="var(--color-primary)" size={20} />
               <h3 className="text-title-md">{t.enableNotifications}</h3>
@@ -1094,9 +1396,46 @@ function App() {
             <button className="btn-primary" onClick={enableNotifications}>{t.enable}</button>
           </div>
         )}
-        <button className="btn-primary" style={{ marginTop: 'var(--spacing-lg)' }} onClick={() => setIsWifiModalOpen(true)}>
+
+        {/* FIXED BOTTOM -1: WiFi button */}
+        <button className="btn-primary" style={{ marginBottom: 'var(--spacing-lg)' }} onClick={() => setIsWifiModalOpen(true)}>
           {t.shareWifi}
         </button>
+
+        {/* FIXED BOTTOM: Activity Log */}
+        <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
+          <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)' }}>{t.activityLog}</h2>
+          {activityEntries.length === 0 ? (
+            <p className="text-body-sm text-muted">{t.activityLogEmpty}</p>
+          ) : (
+            activityEntries.slice(0, 8).map(e => (
+              <ActivityLogRow
+                key={e.id} entry={e}
+                memberColors={memberColors}
+                memberDisplayNames={memberDisplayNames}
+                t={t} language={language}
+              />
+            ))
+          )}
+          {activityEntries.length > 0 && (
+            <button
+              onClick={() => setShowActivityModal(true)}
+              style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontWeight: 600, marginTop: 'var(--spacing-sm)', cursor: 'pointer', padding: 0 }}
+            >
+              {t.activityLogSeeAll}
+            </button>
+          )}
+        </div>
+
+        {showActivityModal && (
+          <ActivityLogModal
+            homeId={homeId}
+            language={language}
+            memberColors={memberColors}
+            memberDisplayNames={memberDisplayNames}
+            onClose={() => setShowActivityModal(false)}
+          />
+        )}
       </div>
     );
   };

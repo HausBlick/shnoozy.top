@@ -272,6 +272,35 @@ const en = {
   budgetNew: 'New Entry',
   budgetNoEntries: 'No entries this month',
   budgetBalance: 'Who Paid',
+
+  // Activity Log
+  activityLog: 'Activity',
+  activityLogSeeAll: 'See all →',
+  activityLogEmpty: 'No activity yet.',
+  activityLogTitle: 'Activity Log',
+  activityLogClose: 'Close',
+  actActionAdded: 'added',
+  actActionEdited: 'edited',
+  actActionCompleted: 'completed',
+  actActionDeleted: 'deleted',
+  actEntityTodo: 'task',
+  actEntityShoppingItem: 'item',
+  actEntityNote: 'note',
+  actEntityBudgetEntry: 'expense',
+  actTimeJustNow: 'just now',
+  actTimeMinAgo: (n: number) => `${n} min ago`,
+  actTimeHoursAgo: (n: number) => `${n} h ago`,
+
+  // Dashboard widgets
+  dashboardWidgetsSection: 'Dashboard Widgets',
+  dashboardWidgetsDesc: 'Order of widgets in the middle section',
+  upcomingEvents: (n: number) => `Next ${n} events`,
+
+  // Weather
+  weatherWidget: 'Weather',
+  weatherLoading: 'Loading weather…',
+  weatherUnavailable: 'Weather unavailable',
+  weatherLocationDenied: 'Location access denied',
 };
 
 const de: typeof en = {
@@ -546,6 +575,35 @@ const de: typeof en = {
   budgetNew: 'Neuer Eintrag',
   budgetNoEntries: 'Keine Einträge diesen Monat',
   budgetBalance: 'Wer hat gezahlt',
+
+  // Activity Log
+  activityLog: 'Aktivitäten',
+  activityLogSeeAll: 'Alle anzeigen →',
+  activityLogEmpty: 'Noch keine Aktivitäten.',
+  activityLogTitle: 'Aktivitäts-Log',
+  activityLogClose: 'Schließen',
+  actActionAdded: 'hinzugefügt',
+  actActionEdited: 'bearbeitet',
+  actActionCompleted: 'erledigt',
+  actActionDeleted: 'gelöscht',
+  actEntityTodo: 'Aufgabe',
+  actEntityShoppingItem: 'Artikel',
+  actEntityNote: 'Notiz',
+  actEntityBudgetEntry: 'Ausgabe',
+  actTimeJustNow: 'gerade eben',
+  actTimeMinAgo: (n: number) => `vor ${n} Min.`,
+  actTimeHoursAgo: (n: number) => `vor ${n} Std.`,
+
+  // Dashboard widgets
+  dashboardWidgetsSection: 'Dashboard-Widgets',
+  dashboardWidgetsDesc: 'Reihenfolge der Widgets im mittleren Bereich',
+  upcomingEvents: (n: number) => `Nächste ${n} Termine`,
+
+  // Weather
+  weatherWidget: 'Wetter',
+  weatherLoading: 'Wetter wird geladen…',
+  weatherUnavailable: 'Wetter nicht verfügbar',
+  weatherLocationDenied: 'Standortzugriff verweigert',
 };
 
 const translations: Record<Lang, typeof en> = { en, de };

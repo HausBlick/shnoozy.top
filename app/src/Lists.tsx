@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './lib/supabase';
 import { getT, type Lang } from './lib/i18n';
+import { logActivity } from './lib/activityLog';
 
 interface ShoppingItem {
   id: string;
@@ -286,7 +287,7 @@ function CategoryListView({ categories, onEdit, onAdd, onReorder, onBack, langua
 
 type ListView = 'list' | 'categories' | 'edit-category' | 'new-category';
 
-export function Lists({ homeId, language }: { homeId: string; language: Lang }) {
+export function Lists({ homeId, language, userId }: { homeId: string; language: Lang; userId: string }) {
   const t = getT(language);
   const [view, setView] = useState<ListView>('list');
   const [editingCat, setEditingCat] = useState<ShoppingCategory | null>(null);
@@ -437,6 +438,7 @@ export function Lists({ homeId, language }: { homeId: string; language: Lang }) 
     setSuggestions([]);
     try {
       await supabase.functions.invoke('add-shopping-item', { body: { item: name, home_id: homeId } });
+      logActivity(homeId, userId, 'added', 'shopping_item', name);
     } catch (err) {
       console.error('Failed to add item:', err);
     } finally {

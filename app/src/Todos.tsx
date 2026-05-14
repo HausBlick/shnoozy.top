@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './lib/supabase';
 import { getT, type Lang } from './lib/i18n';
+import { logActivity } from './lib/activityLog';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -179,11 +180,13 @@ function TaskSheet({ item, listId, listColor, homeId, userId, members, lang, onC
       if (item) {
         const prevAssigned = item.assigned_to;
         await supabase.from('todo_items').update(payload).eq('id', item.id);
+        logActivity(homeId, userId, 'edited', 'todo', title.trim());
         if (assignedTo && assignedTo !== userId && assignedTo !== prevAssigned) {
           onPushAssignment(item.id, assignedTo, title.trim());
         }
       } else {
         const { data } = await supabase.from('todo_items').insert(payload).select().single();
+        logActivity(homeId, userId, 'added', 'todo', title.trim());
         if (data && assignedTo && assignedTo !== userId) {
           onPushAssignment(data.id, assignedTo, title.trim());
         }
@@ -198,6 +201,7 @@ function TaskSheet({ item, listId, listColor, homeId, userId, members, lang, onC
     if (!item || !confirm(t.todoConfirmDeleteTask)) return;
     setDeleting(true);
     await supabase.from('todo_items').delete().eq('id', item.id);
+    logActivity(homeId, userId, 'deleted', 'todo', item.title);
     onDeleted?.();
   }
 
@@ -474,6 +478,7 @@ function ListDetail({ list, homeId, userId, members, lang, onBack, onListUpdated
     const newStatus = item.status === 'done' ? 'open' : 'done';
     setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: newStatus } : i));
     await supabase.from('todo_items').update({ status: newStatus }).eq('id', item.id);
+    if (newStatus === 'done') logActivity(homeId, userId, 'completed', 'todo', item.title);
   }
 
   async function handleInlineAdd() {
@@ -482,8 +487,10 @@ function ListDetail({ list, homeId, userId, members, lang, onBack, onListUpdated
       list_id: list.id, home_id: homeId, title: inlineTitle.trim(),
       created_by: userId, status: 'open' as const,
     };
+    const titleForLog = inlineTitle.trim();
     setInlineTitle('');
     await supabase.from('todo_items').insert(payload);
+    logActivity(homeId, userId, 'added', 'todo', titleForLog);
     loadItems();
   }
 

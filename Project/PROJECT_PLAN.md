@@ -6,8 +6,8 @@
 
 ## Current Status
 **Live unter:** https://shnoozy.top
-**Phase:** Phase 10 ✅ — Budgeting Tool MVP abgeschlossen (Session 5, 2026-05-14)
-**Nächste Phase:** Phase 11 — Dashboard-Redesign
+**Phase:** Phase 11 ✅ — Dashboard-Redesign abgeschlossen (Session 6, 2026-05-14)
+**Nächste Phase:** Phase 11.4 — Tages-Quote Widget / Phase 12 (TBD)
 
 ---
 
@@ -237,25 +237,28 @@
 
 ---
 
-### 🟡 Phase 11: Dashboard-Redesign (MITTELPRIO, offen)
+### ✅ Phase 11: Dashboard-Redesign (abgeschlossen Session 6, 2026-05-14)
 
-#### 11.1 Neues Dashboard-Layout ⬜ OFFEN
-- [ ] Sticky Notes fix an oberster Stelle (großes Widget)
-- [ ] Kalender-Widget mit 4–7 kommenden Terminen (statt aktuell unlimitierter 14-Tage-Liste)
-- [ ] Per-User anpassbarer Widget-Block: `dashboard_widgets`-JSON-Spalte in `profiles` (Array von Widget-IDs + Reihenfolge)
-- [ ] Widget-Registry im Frontend: add/remove/reorder via Drag & Drop (analog zum bestehenden Modul-Manager)
-- [ ] WLAN-Sharing Button fix unten
-- [ ] Aktivitäts-Log fix ganz unten
+#### 11.1 Neues Dashboard-Layout ✅ FERTIG
+- [x] Sticky Notes fix an oberster Stelle
+- [x] Kalender-Widget: nächste 7 Events (statt unlimitierter 14-Tage-Liste), 30-Tage-Range
+- [x] Per-User anpassbarer Widget-Block: `dashboard_widgets`-JSON-Spalte in `profiles`; ▲/▼-Buttons in User-Settings
+- [x] WLAN-Sharing Button fix vorletzte Position
+- [x] Aktivitäts-Log fix als letztes Widget
 
-#### 11.2 Aktivitäts-Log Widget ⬜ OFFEN
-- [ ] SQL-Migration: `activity_log`-Tabelle (`home_id`, `user_id`, `action_type`, `entity_type`, `entity_title`, `created_at`) + RLS
-- [ ] Frontend schreibt Einträge beim Speichern/Erledigen/Löschen (Shopping, ToDo, Notizen)
-- [ ] Widget zeigt letzte 5–10 Einträge mit Realtime-Subscription
+#### 11.2 Aktivitäts-Log Widget ✅ FERTIG
+- [x] SQL-Migration: `activity_log`-Tabelle (home_id, user_id, action_type, entity_type, entity_title, created_at) + RLS + Realtime
+- [x] Instrumentation: Todos.tsx (add/edit/complete/delete), StickyNotes.tsx (add), Lists.tsx (add item), Budget.tsx (add/edit/delete)
+- [x] Dashboard-Widget: letzte 8 Einträge, Realtime-Subscription, Avatar-Farbkreis + Display Name + Relativ-Zeit
+- [x] "Alle anzeigen →" öffnet ActivityLogModal mit vollständiger Historie (bis 100 Einträge)
+- [x] `lib/activityLog.ts` fire-and-forget Helper
 
-#### 11.3 Wetter + Luftqualität + KI-Empfehlung Widget ⬜ OFFEN
-- [ ] Edge Function `get-weather`: OpenWeatherMap API (kostenlos: 1.000 Calls/Tag) für Wetter + Luftqualität + Pollendaten
-- [ ] Live-Location via Browser Geolocation API; Fallback: gespeicherte Stadt/PLZ in `profiles`
-- [ ] Gemini generiert aus Wetterdaten kurze Tagesempfehlung ("Schirm mitnehmen", "Sonnencreme nicht vergessen" etc.)
+#### 11.3 Wetter + KI-Empfehlung Widget ✅ FERTIG
+- [x] Edge Function `get-weather` (OpenWeatherMap API, Gemini-Empfehlung, Emoji-Mapping, CORS)
+- [x] `OPENWEATHER_API_KEY` als Supabase Secret erforderlich (manuell setzen)
+- [x] WeatherWidget: Geolocation API → Edge Function → localStorage-Cache (1h TTL)
+- [x] Anzeige: Emoji + Temp, Beschreibung, Stadt, Luftfeuchtigkeit, Wind, Gemini-Empfehlung
+- [x] Reorderable: 'weather' in dashboardWidgets, ▲/▼-Reorder in User-Settings
 
 #### 11.4 Tages-Quote / Inspiration Widget ⬜ OFFEN
 - [ ] Gemini-Prompt mit täglichem Caching (1x pro Tag generieren, in `home_settings` zwischenspeichern)
@@ -341,6 +344,7 @@
 | — | `enable_realtime_on_tables` | Realtime-Publication für `shopping_items`, `sticky_notes`, `events` aktiviert |
 | — | `012_shopping_categories.sql` | `shopping_categories`, `shopping_subcategories`, `profiles.language`; Default-Kategorien für Home `89cd774f` |
 | — | `nav_slots_modules_active` | `home_settings`: `nav_slots` + `modules_active` Default-Werte für Home `89cd774f` per SQL eingefügt |
+| — | `phase11_activity_log_dashboard_widgets` | `activity_log`-Tabelle + RLS + Realtime; `profiles.dashboard_widgets` JSONB-Spalte (Default `["todos","budget","weather"]`) |
 
 ## ⚙️ Supabase Edge Functions
 
@@ -354,6 +358,8 @@
 | `generate-invite` | HTTP (Frontend, JWT-Auth) | Einladungstoken erstellen (Admin) | ✅ aktiv |
 | `ics-feed` | HTTP (public, Token-Auth) | ICS-Kalender-Feed für externe Abonnements | ✅ aktiv |
 | `sync-ical-subscriptions` | HTTP (pg_cron alle 6h + Frontend) | Externe ICS-Feeds fetchen, parsen, in `external_events` speichern | ✅ aktiv |
+| `send-todo-push` | HTTP (Frontend, JWT-Auth) | Push-Notification bei Task-Zuweisung (prüft `todo_assigned`-Präferenz) | ✅ aktiv |
+| `get-weather` | HTTP (Frontend, JWT-Auth) | OpenWeatherMap + Gemini-Tagesempfehlung | ✅ aktiv (braucht `OPENWEATHER_API_KEY` Secret) |
 
 ---
 
