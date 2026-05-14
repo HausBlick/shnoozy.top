@@ -22,7 +22,7 @@ export const MODULE_META: ModuleMeta[] = [
 ];
 
 export const ALL_MODULE_IDS: ModuleId[] = MODULE_META.map(m => m.id);
-export const DEFAULT_ACTIVE: ModuleId[] = ['calendar', 'lists', 'notes', 'luna'];
+export const DEFAULT_ACTIVE: ModuleId[] = ['calendar', 'lists', 'notes'];
 export const DEFAULT_NAV_SLOTS: ModuleId[] = ['calendar', 'lists', 'notes'];
 
 interface Props {
