@@ -64,36 +64,38 @@ Die Bottom-Navigation hat **3 frei belegbare Slots** (2 links, 1 rechts des Home
 *   Wetter + Luftqualität + Pollen mit KI-Tagesempfehlung (OpenWeatherMap API + Gemini; Live-Location via Geolocation API)
 *   Tages-Quote/Inspiration (Gemini oder quotable.io, tägliches Caching)
 
-### 2.6 User-Settings (geplant — Phase 8.3)
-*   **Notification Preferences:** Toggles pro Modul — für welche Tools soll der User Push-Benachrichtigungen erhalten? (Shopping, ToDo, Kalender, Dokumente). Gespeichert als JSON in `profiles.notification_preferences`.
-*   **Profil bearbeiten:** Display-Name (bereits in DB), Avatar-Foto (Supabase Storage Bucket `avatars`, `avatar_url` in `profiles`). Platzhalter-Avatar aus Initialien wenn kein Foto.
-*   **Benachrichtigungszeit:** Individuell pro User einstellbar (erfordert Umbau von `send-daily-push` auf stündlichen Cron + Preference-Check — höherer Aufwand, spätere Phase).
-*   **Weitere Kandidaten:** Dark/Light Mode, Standard-Kalenderansicht, Wochenstartag (Mo/So).
+### 2.6 User-Settings ✅ (Phase 8.3 abgeschlossen)
+*   **Notification Preferences ✅:** 5 Toggles (`calendar_daily`, `todo_assigned`, `todo_due_today`, `shopping_item_added`, `notes_new`) — gespeichert in `profiles.notification_preferences` JSONB. Alle Edge Functions prüfen Preference vor dem Senden.
+*   **Profil bearbeiten ✅:** Display-Name (Textfeld + Save), Avatar-Farbe (8 Swatches), Avatar-Upload (Supabase Storage Bucket `avatars`, `avatar_url` in `profiles`, Kamera-Badge), Foto entfernen.
+*   **Dark/Light Mode ✅:** `theme`-Feld in `profiles`, Toggle in User-Settings, CSS `[data-theme="dark"]` mit 13 Variablen.
+*   **Standard-Kalenderansicht ✅:** `default_calendar_view`-Feld in `profiles`, Segmented Control (Agenda/Monat/Woche) in User-Settings, wird als `defaultView`-Prop an `Calendar.tsx` übergeben.
+*   **Benachrichtigungszeit individuell:** On Hold — erfordert Umbau von `send-daily-push` auf stündlichen Cron, hoher Aufwand.
+*   **Wochenstartag:** Nicht benötigt — Woche ist immer Montag–Sonntag.
 
 ## 3. Funktionsmodule (Tools)
 
-### 3.1 Kalender & Erinnerungen ✅ + Erweiterungen geplant
+### 3.1 Kalender & Erinnerungen ✅ (vollständig implementiert)
 *   Supabase-Tabelle `events` (Geburtstage, Trash, Sonstiges)
 *   Kategorien: birthday (Luxe), event (Primary), reminder, trash (#bf7300)
 *   Wiederkehrende Events: `recurrence_type = 'yearly'`
-*   ICS-Export (RFC 5545, RRULE für Geburtstage)
 *   Web-Push-Mitteilungen via Edge Function `send-daily-push` (pg_cron, 8:30 MESZ)
-*   74 Müllabfuhr-Termine importiert, Geburtstage importiert
+*   74 Müllabfuhr-Termine + Geburtstage importiert
 
-**Geplante Erweiterung A — Kalender-Abonnements (ICS-URL Import):**
-Nutzer können externe Kalender (Google Calendar, iCloud, Outlook) per ICS-URL abonnieren. Alle Mitglieder des Homes sehen die importierten Einträge.
-*   Neue Tabelle `calendar_subscriptions` (`id`, `home_id`, `name`, `ics_url`, `color` [Hex], `show_on_dashboard` [bool], `last_synced_at`).
-*   Eine Edge Function `sync-calendar-subscriptions` (pg_cron, z. B. alle 6h) fetcht die ICS-URLs und schreibt die Events in eine separate Tabelle `external_events` (mit `subscription_id`).
-*   Im UI: Kalender-Einstellungen → "Subscribe" → URL eingeben, Farbe wählen, Toggle "Auf Dashboard anzeigen".
-*   Die Events werden in der eigenen Farbe der Subscription dargestellt und sind schreibgeschützt (kein Edit/Delete möglich).
-*   **Anwendungsfall:** Private Google-Kalender-Termine (Urlaub, Arzttermine) für alle sichtbar machen, ohne sie manuell doppelt einzutragen.
+**Kalenderansichten ✅ (Phase 9.1):**
+*   Segmented Control im Kalender-Header: Agenda | Monat | Woche
+*   Sticky Header mit Gear-Button (⚙️) für Kalender-Einstellungen
+*   Farbige Category-Chips (getCatChipStyle, rgba-Fill + linker Accent-Border)
+*   Standard-Ansicht pro User konfigurierbar (User-Settings → Standard-Ansicht)
 
-**Geplante Erweiterung B — Mehrere Kalenderansichten:**
-Neben der bestehenden Schedule-Ansicht (vertikale Listenansicht) werden Monats-, Wochen- und Tagesansicht ergänzt. Toggle oben im Kalender-Header (Segmented Control: Schedule | Monat | Woche | Tag).
-*   **Monatsansicht:** Klassisches Grid (7 Spalten × 5–6 Reihen). Tage mit Events erhalten farbige Dots (nach Kategorie). Tap auf einen Tag → öffnet die Tagesansicht oder klappt die Events darunter auf.
-*   **Wochenansicht:** Zeitstrahl (0–24 Uhr) mit 7 Spalten. Events als farbige Blöcke mit Dauer. Ganztägige Events als Banner oben.
-*   **Tagesansicht:** Zeitstrahl für einen einzelnen Tag, mit allen Events als Blöcke.
-*   Design-Referenz: Fantastical / Google Calendar — kompakt, farbkodiert, keine überladene Chrome.
+**ICS-Export ✅ (Phase 9.1b):**
+*   Edge Function `ics-feed` (Token-Auth via `home_settings.ical_token`, verify_jwt: false)
+*   Token-Generierung, Copy-URL, Web Share API — alles im Kalender-Settings-Modal (⚙️-Button)
+
+**Kalender-Abonnements ✅ (Phase 9.2):**
+*   Tabellen `calendar_subscriptions` + `external_events` mit RLS
+*   Edge Function `sync-ical-subscriptions` (RFC 5545 Parser, pg_cron 6h, max 2000 Events/Feed)
+*   Verwaltung im Kalender-Settings-Modal (⚙️): URL + Name + 8 Farben, sofortiger Erstsync
+*   Externe Events in allen 3 Ansichten, schreibgeschützt, in Subscription-Farbe dargestellt
 
 ### 3.2 Smart Shopping List
 *   Live-synchronisierte Checkliste via Supabase Realtime (`shopping_items` Tabelle, mit `home_id`)
@@ -136,30 +138,25 @@ Neben der bestehenden Schedule-Ansicht (vertikale Listenansicht) werden Monats-,
 *   **Status:** Nicht gestartet
 *   **Geplant:** Leaflet oder Google Maps API, eigene Pins mit Kategorien, Google Maps Import
 
-### 3.12 ToDo-Listen & Aufgaben (geplant)
-Gemeinsame, aufgabenbasierte Listen mit Projektkategorien und Zuweisung an Home-Mitglieder.
+### 3.12 ToDo-Listen & Aufgaben ✅ (Phase 8.2, abgeschlossen)
+*   Tabellen `todo_lists` + `todo_items` mit RLS + Realtime-Publication
+*   Multi-Listen pro Home (Name, Icon, Farbe), Tasks mit Titel, Beschreibung, Fälligkeitsdatum, Zuweisung
+*   Avatar-Farbindikator für zugewiesene Aufgaben; Push-Notification bei neuer Zuweisung (`send-todo-push`)
+*   Dashboard-Widget `TodosDashboardWidget` (bedingt aktiv wenn Modul `todos` aktiviert)
+*   Abgehakte Tasks ans Ende (Soft-Done), Realtime Live-Sync
 
-*   **Multi-Listen:** Pro Home können mehrere benannte Listen (Projekte) angelegt werden — z. B. "Wohnung renovieren", "Urlaub planen", "Einkäufe erledigen". Jede Liste hat Name, Icon und Farbe.
-*   **Tasks:** Jede Aufgabe hat: Titel, optionale Beschreibung, Fälligkeitsdatum, Status (`open` | `in_progress` | `done`), optionale Zuweisung an ein Home-Mitglied.
-*   **Zuweisung:** Beim Erstellen/Bearbeiten kann eine Aufgabe einem bestimmten Mitglied zugeteilt werden. Zugewiesene Aufgaben erscheinen mit Avatar/Farbindikator. Optional: Push-Notification bei neuer Zuweisung.
-*   **Dashboard-Widget:** "Meine offenen Aufgaben" — zeigt die dem eingeloggten User zugewiesenen Tasks mit höchster Priorität.
-*   **Realtime:** Supabase Realtime für Live-Sync. Abgehakte Tasks verschieben sich ans Ende (Soft-Done, analog zur Shopping-Liste).
-*   **Backend:** Tabellen `todo_lists` (`id`, `home_id`, `name`, `icon`, `color`, `sort_order`) + `todo_items` (`id`, `list_id`, `home_id`, `title`, `description`, `due_date`, `status`, `assigned_to` [user_id], `created_by`, `sort_order`).
+### 3.13 Haushaltsbuch / Budgeting-Tool
 
-### 3.13 Haushaltsbuch / Budgeting-Tool (geplant)
-Gemeinsames Tracking von Ausgaben und Einnahmen mit Kostensplitting und Übersicht.
+**Ausbaustufe 1 — Manuelle Eingabe (MVP) ✅ (Phase 10, abgeschlossen):**
+*   Tabellen `budget_categories` (per Home, mit Default-Kategorien) + `budget_entries` (amount, category_id, description, date, is_shared, user_id), RLS
+*   `Budget.tsx`: Overview-Tab (Gesamtsumme, Kategorie-Balken, Mitglieder-Bilanz), Entries-Tab (chronologische Liste), Monat-Navigation
+*   Add/Edit-Modal: Betrag-Eingabe, Kategorie-Chips, Beschreibung, Datum, Shared/Personal-Toggle, Löschen mit 2-Tap
+*   Modul `budget` (💶) in HomeSettings + MODULE_META + App.tsx routing, i18n en/de
 
-**Ausbaustufe 1 — Manuelle Eingabe (MVP):**
-*   Nutzer gibt Ausgaben manuell ein: Betrag, Kategorie (Lebensmittel, Miete, Freizeit, etc.), Bezahlt von (welcher User), Datum, Notiz.
-*   **Kostensplitting:** Jede Ausgabe kann als "geteilt" (50/50 oder konfigurierbarer Split) oder "persönlich" (nur einer trägt es) markiert werden.
-*   **Übersicht:** Monatliche/jährliche Auswertung nach Kategorie (Balken-/Kreisdiagramm). Bilanz: Wer hat wie viel beigetragen? Was wird noch ausgeglichen?
-*   **Backend:** Tabellen `budget_categories` (per Home, ähnlich Shopping-Kategorien) + `budget_entries` (`id`, `home_id`, `user_id`, `amount`, `category_id`, `description`, `date`, `split_mode` [`shared`|`personal`], `split_ratio`).
-
-**Ausbaustufe 2 — Foto-Scan (KI-gestützt):**
-*   Nutzer fotografiert einen Kassenbon oder eine Rechnung.
-*   Gemini Vision API analysiert das Bild und extrahiert: Gesamtbetrag, Händler/Name, Datum, einzelne Positionen (optional).
-*   Vorausgefülltes Formular öffnet sich — Nutzer korrigiert ggf. und speichert mit einem Tap.
-*   Einsatzbereich: Supermarktbons, Restaurantrechnungen, Online-Rechnungen (PDF-Upload).
+**Ausbaustufe 2 — Foto-Scan (KI-gestützt) ⬜ (Konzept ausstehend):**
+*   Nutzer fotografiert einen Kassenbon → Gemini Vision API extrahiert Betrag, Händler, Datum
+*   Vorausgefülltes Formular → 1-Tap-Speichern
+*   Einsatzbereich: Supermarktbons, Restaurantrechnungen, Online-Rechnungen (PDF-Upload)
 
 ### 3.14 Foto-Notizen (neu — bestätigt 2026-05-14)
 *   **Konzept:** Couple-Feature — ein Partner nimmt ein Foto auf (oder wählt aus der Galerie) und fügt optional eine kurze Caption hinzu. Der andere Partner sieht es sofort in der App via Realtime-Notification (Toast, analog Sticky Notes).

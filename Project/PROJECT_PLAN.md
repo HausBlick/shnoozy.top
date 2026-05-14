@@ -6,7 +6,8 @@
 
 ## Current Status
 **Live unter:** https://shnoozy.top
-**Phase:** Phase 8 — Konfigurierbare Navigation & Modul-Manager
+**Phase:** Phase 10 ✅ — Budgeting Tool MVP abgeschlossen (Session 5, 2026-05-14)
+**Nächste Phase:** Phase 11 — Dashboard-Redesign
 
 ---
 
