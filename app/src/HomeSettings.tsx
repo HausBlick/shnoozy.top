@@ -93,6 +93,10 @@ export function HomeSettings({ homeId, language, isAdmin, onBack, onModuleSettin
   const [inviteCopied, setInviteCopied] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
 
+  const [icalToken, setIcalToken] = useState<string | null>(null);
+  const [icalCopied, setIcalCopied] = useState(false);
+  const [icalLoading, setIcalLoading] = useState(false);
+
   // Drag-and-drop state
   const [draggingId, setDraggingId] = useState<ModuleId | null>(null);
   const [ghostY, setGhostY] = useState(0);
@@ -185,20 +189,35 @@ export function HomeSettings({ homeId, language, isAdmin, onBack, onModuleSettin
         .from('home_settings')
         .select('key, value')
         .eq('home_id', homeId)
-        .in('key', ['nav_slots', 'modules_active']);
+        .in('key', ['nav_slots', 'modules_active', 'ical_token']);
       if (data) {
         const nav = data.find(r => r.key === 'nav_slots');
         const mods = data.find(r => r.key === 'modules_active');
-        if (nav?.value) {
-          try { setNavSlots(JSON.parse(nav.value)); } catch {}
-        }
-        if (mods?.value) {
-          try { setActiveIds(JSON.parse(mods.value)); } catch {}
-        }
+        const ical = data.find(r => r.key === 'ical_token');
+        if (nav?.value) { try { setNavSlots(JSON.parse(nav.value)); } catch {} }
+        if (mods?.value) { try { setActiveIds(JSON.parse(mods.value)); } catch {} }
+        if (ical?.value) setIcalToken(ical.value);
       }
     } finally {
       setLoading(false);
     }
+  }
+
+  async function generateIcalToken() {
+    setIcalLoading(true);
+    const token = crypto.randomUUID();
+    await supabase.from('home_settings').upsert(
+      { home_id: homeId, key: 'ical_token', value: token },
+      { onConflict: 'home_id,key' },
+    );
+    setIcalToken(token);
+    setIcalCopied(false);
+    setIcalLoading(false);
+  }
+
+  function getIcalUrl(token: string): string {
+    const base = import.meta.env.VITE_SUPABASE_URL as string;
+    return `${base}/functions/v1/ics-feed?token=${token}`;
   }
 
   async function saveSettings() {
@@ -544,6 +563,63 @@ export function HomeSettings({ homeId, language, isAdmin, onBack, onModuleSettin
           )}
         </div>
       )}
+
+      {/* ICS subscription — visible to all members */}
+      <div className="card" style={{ marginTop: 'var(--spacing-md)' }}>
+        <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)' }}>{t.icalSection}</h2>
+        <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>{t.icalDesc}</p>
+
+        {!icalToken ? (
+          <button className="btn-primary" disabled={icalLoading} onClick={generateIcalToken}>
+            {icalLoading ? '…' : t.icalGenerateLink}
+          </button>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+            <div style={{
+              background: 'var(--color-surface)',
+              borderRadius: 'var(--rounded-sm)',
+              padding: '10px 12px',
+              fontSize: '12px',
+              color: 'var(--color-muted)',
+              wordBreak: 'break-all',
+            }}>
+              {getIcalUrl(icalToken)}
+            </div>
+            <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+              {typeof navigator !== 'undefined' && 'share' in navigator ? (
+                <button
+                  className="btn-primary"
+                  style={{ flex: 1 }}
+                  onClick={() => navigator.share({ url: getIcalUrl(icalToken) })}
+                >
+                  {t.icalShare}
+                </button>
+              ) : null}
+              <button
+                className="btn-primary"
+                style={{ flex: 1, background: icalCopied ? 'var(--color-surface-strong)' : undefined, color: icalCopied ? 'var(--color-ink)' : undefined }}
+                onClick={async () => {
+                  await navigator.clipboard.writeText(getIcalUrl(icalToken));
+                  setIcalCopied(true);
+                  setTimeout(() => setIcalCopied(false), 2000);
+                }}
+              >
+                {icalCopied ? t.icalCopied : t.icalCopyUrl}
+              </button>
+            </div>
+            <p className="text-body-sm text-muted" style={{ fontSize: '12px' }}>{t.icalHint}</p>
+            {isAdmin && (
+              <button
+                style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: '13px', cursor: 'pointer', padding: '2px 0', textAlign: 'left' }}
+                onClick={generateIcalToken}
+                disabled={icalLoading}
+              >
+                {t.icalReset}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Dragging ghost */}
       {draggingMeta && (

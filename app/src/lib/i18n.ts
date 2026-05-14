@@ -215,6 +215,16 @@ const en = {
   weekLabel: (n: number) => `Week ${n}`,
   noEventsDay: 'No events',
 
+  // ICS subscription
+  icalSection: 'Calendar Subscription',
+  icalDesc: 'Subscribe to your Shnoozy calendar in Apple Calendar, Google Calendar or any ICS-compatible app. Updates automatically every hour.',
+  icalGenerateLink: 'Generate subscription link',
+  icalCopyUrl: 'Copy URL',
+  icalCopied: 'Copied!',
+  icalShare: 'Share',
+  icalReset: '↺ Generate new link',
+  icalHint: 'Anyone with this link can view your home\'s calendar events.',
+
   // Invite
   inviteSection: 'Invite Member',
   generateInvite: 'Create invite link',
@@ -440,6 +450,16 @@ const de: typeof en = {
   viewWeek: 'Woche',
   weekLabel: (n: number) => `KW ${n}`,
   noEventsDay: 'Keine Termine',
+
+  // ICS subscription
+  icalSection: 'Kalender-Abo',
+  icalDesc: 'Abonniere deinen Shnoozy-Kalender in Apple Kalender, Google Kalender oder jeder anderen ICS-kompatiblen App. Aktualisiert sich stündlich automatisch.',
+  icalGenerateLink: 'Abo-Link erstellen',
+  icalCopyUrl: 'URL kopieren',
+  icalCopied: 'Kopiert!',
+  icalShare: 'Teilen',
+  icalReset: '↺ Neuen Link erstellen',
+  icalHint: 'Jeder mit diesem Link kann die Kalender-Termine deines Homes einsehen.',
 
   // Invite
   inviteSection: 'Mitglied einladen',
