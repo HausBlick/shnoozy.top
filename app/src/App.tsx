@@ -171,7 +171,7 @@ function getNavLabel(id: ModuleId, t: ReturnType<typeof getT>): string {
     case 'lists':     return t.navLists;
     case 'notes':     return t.moduleNotes;
     case 'todos':     return t.navTodos;
-    case 'luna':      return t.navLuna;
+    case 'luna':      return t.moduleLuna;
     case 'home-info': return t.moduleHomeInfo;
     case 'car':       return t.moduleCar;
     case 'budget':    return t.navBudget;
