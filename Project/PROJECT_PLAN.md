@@ -211,12 +211,11 @@
 - [x] Copy-URL + Web Share API, REFRESH-INTERVAL PT1H im ICS-Header
 - [x] i18n en/de für alle ICS-Strings
 
-#### 9.2 Kalender-Abonnements (ICS-URL Import) ⬜ OFFEN
-- [ ] SQL-Migration: `calendar_subscriptions` (`id`, `home_id`, `name`, `ics_url`, `color`, `show_on_dashboard`, `last_synced_at`) + `external_events` (`id`, `subscription_id`, `home_id`, `uid`, `title`, `start_time`, `end_time`, `is_all_day`, `description`)
-- [ ] Edge Function `sync-calendar-subscriptions` (pg_cron alle 6h): fetcht ICS-URLs, parst RFC 5545, upsert in `external_events`
-- [ ] Frontend: Kalender-Settings → "Abonnement hinzufügen" (URL, Name, Farbe, Dashboard-Toggle)
-- [ ] `external_events` in Kalenderansichten integriert, schreibgeschützt, in eigener Farbe
-- [ ] RLS: nur Home-Mitglieder sehen externe Events ihres Homes
+#### 9.2 Kalender-Abonnements (ICS-URL Import) ✅ FERTIG (2026-05-14)
+- [x] SQL-Migration: `calendar_subscriptions` + `external_events`, RLS, Realtime-Publication
+- [x] Edge Function `sync-ical-subscriptions` (pg_cron alle 6h, verify_jwt: false): RFC 5545 Parser (Line-Unfolding, DATE/DATETIME, Timezone-Heuristik), Upsert via Delete+Insert-Batch, max 2000 Events/Feed. Aufruf per `{ subscription_id }` für sofortige Erstsynchronisierung nach Hinzufügen.
+- [x] HomeSettings: Abonnements-Liste mit Farbpunkt + Name + letzter Sync-Zeit; Add-Formular (ICS-URL, Name, 8-Farb-Picker); Löschen mit 2-Tap-Bestätigung; sofortiger Sync nach Hinzufügen
+- [x] Kalenderansichten: externe Events in allen 3 Views (Agenda, Monat, Woche) mit Subscription-Farbe als Chip/Karte; Tag-Detail zeigt externe Events unterhalb regulärer Events; schreibgeschützt (kein Edit-Modal)
 
 ---
 
@@ -351,6 +350,7 @@
 | `accept-invite` | HTTP (Frontend, JWT-Auth) | Einladungslink einlösen → `home_members` eintragen | ✅ aktiv |
 | `generate-invite` | HTTP (Frontend, JWT-Auth) | Einladungstoken erstellen (Admin) | ✅ aktiv |
 | `ics-feed` | HTTP (public, Token-Auth) | ICS-Kalender-Feed für externe Abonnements | ✅ aktiv |
+| `sync-ical-subscriptions` | HTTP (pg_cron alle 6h + Frontend) | Externe ICS-Feeds fetchen, parsen, in `external_events` speichern | ✅ aktiv |
 
 ---
 
@@ -380,5 +380,6 @@
 *   **2026-05-14 (Session 3):** Phase 8.3.3 (Erscheinungsbild) teilweise: Dark/Light Mode Toggle. `theme`-Spalte in `profiles`. `[data-theme="dark"]` CSS-Block mit 13 Farb-Variablen. Gespeichert in DB, wird beim Login geladen. Standard-Kalenderansicht + Wochenstartag zurückgestellt (warten auf Phase 9.1).
 *   **2026-05-14 (Session 3):** Service Worker komplett überarbeitet: `skipWaiting()` + `clients.claim()` für sofortige Aktivierung. Network-first für HTML (immer aktueller Code), Cache-first für gehashte Assets (`/assets/*`). Behebt "PWA zeigt alten Stand"-Problem auf iOS/Android.
 *   **2026-05-14 (Session 3):** Dark Mode Bug-Fixes: `button { color: inherit }` global (Button-Text war Browser-Standard-Schwarz). `.form-input` + `option` in Dark Mode mit explizitem `background`/`color`. `.sticky-note { color: #222 }` hardcoded (Pastell-Hintergründe brauchen immer dunkle Schrift). Logout-Button aus Dashboard-Header entfernt (nur noch in Mehr → Profil → Abmelden).
+*   **2026-05-14 (Session 4):** Phase 9.2 (ICS-Import / Kalender-Abonnements) abgeschlossen: `calendar_subscriptions` + `external_events` Tabellen mit RLS + Realtime. EF `sync-ical-subscriptions` deployed (pg_cron alle 6h + manuell per `subscription_id`). RFC 5545 Parser in Deno (Line-Unfolding, DATE/DATETIME, CET-Fallback für nicht-UTC). HomeSettings: Abonnements verwalten (Add mit 8-Farb-Picker, Delete 2-Tap, Sofort-Sync). Kalender: externe Events in Agenda/Monat/Woche mit Subscription-Farb-Chips, schreibgeschützt.
 *   **2026-05-14 (Session 4):** Phase 9.1 (Kalender-Ansichten + ICS-Export) abgeschlossen: Agenda/Monat/Woche-Views mit Sticky Header, farbigen Event-Chips (getCatChipStyle, rgba-Fill + linker Border). Agenda zeigt nur heute + Zukunft (kein Scroll-Jump). `ics-feed` Edge Function deployed (Token-Auth, REFRESH PT1H). ICS-Sektion in HomeSettings (Token generieren, URL kopieren/teilen/zurücksetzen). i18n en/de vollständig.
 *   **2026-05-14 (Session 4):** Phase 6.4 Einladungssystem vollständig implementiert: EF `generate-invite` (JWT-auth'd, Admin-Check über `home_members.role`, `crypto.randomUUID()`-Token, INSERT in `home_invitations`, gibt `https://shnoozy.top?token=…` zurück), EF `accept-invite` (JWT-auth'd, Token-Validierung, idempotenter `home_members` INSERT, Token als used markieren). Frontend `HomeSettings.tsx`: Invite-Sektion nur für Admins sichtbar, Web Share API + Clipboard-Fallback, Link-Anzeige, "Neuen Link erstellen"-Reset. i18n en/de vollständig.
