@@ -92,6 +92,7 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const todayRef = useRef<HTMLDivElement>(null);
+  const stickyHeaderRef = useRef<HTMLDivElement>(null);
 
   // View state
   const [view, setView] = useState<CalView>('agenda');
@@ -135,15 +136,16 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
   useEffect(() => {
     if (!loading && events.length > 0 && view === 'agenda') {
       const timer = setTimeout(() => {
+        const headerHeight = (stickyHeaderRef.current?.offsetHeight ?? 80) + 8;
         if (todayRef.current) {
           todayRef.current.scrollIntoView({ behavior: 'auto', block: 'start' });
-          window.scrollBy(0, -20);
+          window.scrollBy(0, -headerHeight);
         } else {
           const firstUpcoming = events.find(e => new Date(e.start_time) >= today);
           if (firstUpcoming) {
             const el = document.getElementById(`event-${firstUpcoming.id}`);
             el?.scrollIntoView({ behavior: 'auto', block: 'start' });
-            window.scrollBy(0, -80);
+            window.scrollBy(0, -headerHeight);
           }
         }
       }, 100);
@@ -683,7 +685,8 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
         paddingTop: 'var(--spacing-md)',
         paddingBottom: '10px',
         marginBottom: 'var(--spacing-sm)',
-      }}>
+      }}
+      ref={stickyHeaderRef}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-sm)' }}>
           <h1 className="text-display-lg">{t.schedule}</h1>
           <button className="icon-button-circle" onClick={exportICS} title="Export as .ics"><ExportIcon /></button>
