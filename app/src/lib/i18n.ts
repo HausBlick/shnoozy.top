@@ -207,6 +207,16 @@ const en = {
   visibilityOthers: '→ Others only',
   saveChanges: 'Save changes',
   addNoteAction: 'Add note',
+
+  // Invite
+  inviteSection: 'Invite Member',
+  generateInvite: 'Create invite link',
+  inviteGenerating: 'Creating…',
+  inviteExpiry: 'Valid for 7 days · link can only be used once',
+  inviteCopy: 'Copy link',
+  inviteCopied: 'Copied!',
+  inviteShare: 'Share',
+  inviteError: 'Failed to create invite link',
 };
 
 const de: typeof en = {
@@ -416,6 +426,16 @@ const de: typeof en = {
   visibilityOthers: '→ Nur andere',
   saveChanges: 'Änderungen speichern',
   addNoteAction: 'Notiz hinzufügen',
+
+  // Invite
+  inviteSection: 'Mitglied einladen',
+  generateInvite: 'Einladungslink erstellen',
+  inviteGenerating: 'Erstelle…',
+  inviteExpiry: '7 Tage gültig · Link kann nur einmal verwendet werden',
+  inviteCopy: 'Link kopieren',
+  inviteCopied: 'Kopiert!',
+  inviteShare: 'Teilen',
+  inviteError: 'Fehler beim Erstellen des Einladungslinks',
 };
 
 const translations: Record<Lang, typeof en> = { en, de };

@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from './lib/supabase';
 import { getT, type Lang } from './lib/i18n';
 import { Auth } from './Auth';
+import { SetNewPassword } from './SetNewPassword';
 import { HomeOnboarding } from './HomeOnboarding';
 import { Calendar } from './Calendar';
 import { Lists } from './Lists';
@@ -475,6 +476,7 @@ function urlBase64ToUint8Array(base64: string): ArrayBuffer {
 
 function App() {
   const [session, setSession] = useState<any>(null);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [homeId, setHomeId] = useState<string | null>(null);
   const [homeLoading, setHomeLoading] = useState(true);
   const [language, setLanguage] = useState<Lang>('en');
@@ -524,7 +526,10 @@ function App() {
       if (!session) setHomeLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setPasswordRecovery(true);
+      }
       setSession(session);
       if (!session) {
         setHomeId(null);
@@ -768,6 +773,7 @@ function App() {
     await supabase.auth.signOut();
   };
 
+  if (passwordRecovery) return <SetNewPassword onDone={() => setPasswordRecovery(false)} />;
   if (!session) return <Auth onSession={() => {}} />;
 
   if (homeLoading) {

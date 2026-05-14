@@ -30,11 +30,12 @@
 - [x] Alle Tabellen mit neuer Policy-Logik via `is_home_member(home_id)` Helper-Funktion (SECURITY DEFINER)
 - [x] Realtime-Publication für `shopping_items`, `sticky_notes`, `events` neu aktiviert (ging beim Reset verloren)
 
-#### 6.4 Einladungssystem (Link-Generator) ⬜ OFFEN
+#### 6.4 Einladungssystem (Link-Generator) ✅ FERTIG (2026-05-14)
 - [x] Tabelle `home_invitations` angelegt (Schema bereit)
 - [x] Frontend `HomeOnboarding.tsx`: "Join Home"-Tab vorhanden, ruft `accept-invite` auf
-- [ ] **Edge Function `accept-invite`**: Noch nicht gebaut — "Join Home"-Button in der App führt aktuell ins Leere
-- [ ] **Edge Function `generate-invite`**: Noch nicht gebaut — kein UI zum Erstellen von Einladungslinks
+- [x] **Edge Function `accept-invite`**: JWT-auth'd, Token validieren, `home_members` INSERT, Token als used markieren
+- [x] **Edge Function `generate-invite`**: JWT-auth'd, Admin-Check, Token erzeugen, `home_invitations` INSERT, Link zurückgeben
+- [x] **Frontend `HomeSettings.tsx`**: Invite-Sektion (nur Admin), Web Share API + Clipboard-Fallback, Link-Anzeige, i18n (en/de)
 
 #### 6.5 Google Tasks Integration ⏸ ON HOLD
 - [x] `sync-google-tasks` angepasst: `title` → `name`, `home_id` aus Env-Var `DEFAULT_HOME_ID`
@@ -371,3 +372,4 @@
 *   **2026-05-14 (Session 3):** Phase 8.3.3 (Erscheinungsbild) teilweise: Dark/Light Mode Toggle. `theme`-Spalte in `profiles`. `[data-theme="dark"]` CSS-Block mit 13 Farb-Variablen. Gespeichert in DB, wird beim Login geladen. Standard-Kalenderansicht + Wochenstartag zurückgestellt (warten auf Phase 9.1).
 *   **2026-05-14 (Session 3):** Service Worker komplett überarbeitet: `skipWaiting()` + `clients.claim()` für sofortige Aktivierung. Network-first für HTML (immer aktueller Code), Cache-first für gehashte Assets (`/assets/*`). Behebt "PWA zeigt alten Stand"-Problem auf iOS/Android.
 *   **2026-05-14 (Session 3):** Dark Mode Bug-Fixes: `button { color: inherit }` global (Button-Text war Browser-Standard-Schwarz). `.form-input` + `option` in Dark Mode mit explizitem `background`/`color`. `.sticky-note { color: #222 }` hardcoded (Pastell-Hintergründe brauchen immer dunkle Schrift). Logout-Button aus Dashboard-Header entfernt (nur noch in Mehr → Profil → Abmelden).
+*   **2026-05-14 (Session 4):** Phase 6.4 Einladungssystem vollständig implementiert: EF `generate-invite` (JWT-auth'd, Admin-Check über `home_members.role`, `crypto.randomUUID()`-Token, INSERT in `home_invitations`, gibt `https://shnoozy.top?token=…` zurück), EF `accept-invite` (JWT-auth'd, Token-Validierung, idempotenter `home_members` INSERT, Token als used markieren). Frontend `HomeSettings.tsx`: Invite-Sektion nur für Admins sichtbar, Web Share API + Clipboard-Fallback, Link-Anzeige, "Neuen Link erstellen"-Reset. i18n en/de vollständig.

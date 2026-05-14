@@ -33,6 +33,15 @@ interface Props {
   onModuleSettings: (id: ModuleId) => void;
 }
 
+async function generateInviteLink(homeId: string): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('generate-invite', {
+    body: { home_id: homeId },
+  });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data.link as string;
+}
+
 export function getModuleLabel(id: ModuleId, t: ReturnType<typeof getT>): string {
   switch (id) {
     case 'calendar':  return t.moduleCalendar;
@@ -72,13 +81,17 @@ const GearIcon = () => (
   </svg>
 );
 
-export function HomeSettings({ homeId, language, onBack, onModuleSettings }: Props) {
+export function HomeSettings({ homeId, language, isAdmin, onBack, onModuleSettings }: Props) {
   const t = getT(language);
   const [navSlots, setNavSlots] = useState<ModuleId[]>(DEFAULT_NAV_SLOTS);
   const [activeIds, setActiveIds] = useState<ModuleId[]>(DEFAULT_ACTIVE);
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
 
   // Drag-and-drop state
   const [draggingId, setDraggingId] = useState<ModuleId | null>(null);
@@ -457,6 +470,80 @@ export function HomeSettings({ homeId, language, onBack, onModuleSettings }: Pro
           );
         })}
       </div>
+
+      {/* Invite section — admin only */}
+      {isAdmin && (
+        <div className="card" style={{ marginTop: 'var(--spacing-md)' }}>
+          <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)' }}>{t.inviteSection}</h2>
+          <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>{t.inviteExpiry}</p>
+
+          {!inviteLink ? (
+            <button
+              className="btn-primary"
+              disabled={inviteLoading}
+              onClick={async () => {
+                setInviteLoading(true);
+                setInviteError(null);
+                try {
+                  const link = await generateInviteLink(homeId);
+                  setInviteLink(link);
+                } catch (e: any) {
+                  setInviteError(e.message ?? t.inviteError);
+                } finally {
+                  setInviteLoading(false);
+                }
+              }}
+            >
+              {inviteLoading ? t.inviteGenerating : t.generateInvite}
+            </button>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+              <div style={{
+                background: 'var(--color-surface)',
+                borderRadius: 'var(--rounded-sm)',
+                padding: '10px 12px',
+                fontSize: '13px',
+                color: 'var(--color-muted)',
+                wordBreak: 'break-all',
+              }}>
+                {inviteLink}
+              </div>
+              <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+                {typeof navigator !== 'undefined' && 'share' in navigator ? (
+                  <button
+                    className="btn-primary"
+                    style={{ flex: 1 }}
+                    onClick={() => navigator.share({ url: inviteLink })}
+                  >
+                    {t.inviteShare}
+                  </button>
+                ) : null}
+                <button
+                  className="btn-primary"
+                  style={{ flex: 1, background: inviteCopied ? 'var(--color-surface-strong)' : undefined, color: inviteCopied ? 'var(--color-ink)' : undefined }}
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(inviteLink);
+                    setInviteCopied(true);
+                    setTimeout(() => setInviteCopied(false), 2000);
+                  }}
+                >
+                  {inviteCopied ? t.inviteCopied : t.inviteCopy}
+                </button>
+              </div>
+              <button
+                style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: '13px', cursor: 'pointer', padding: '4px 0', textAlign: 'left' }}
+                onClick={() => { setInviteLink(null); setInviteCopied(false); }}
+              >
+                ↺ {t.generateInvite}
+              </button>
+            </div>
+          )}
+
+          {inviteError && (
+            <p style={{ color: '#c13515', fontSize: '13px', marginTop: 'var(--spacing-sm)' }}>{inviteError}</p>
+          )}
+        </div>
+      )}
 
       {/* Dragging ghost */}
       {draggingMeta && (
