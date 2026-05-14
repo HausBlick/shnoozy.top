@@ -131,7 +131,10 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
     return map;
   }, [events]);
 
-  useEffect(() => { fetchEvents(); }, [homeId]);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    fetchEvents();
+  }, [homeId]);
 
   useEffect(() => {
     if (!loading && events.length > 0 && view === 'agenda') {
