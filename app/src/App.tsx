@@ -467,15 +467,36 @@ function UserSettingsPage({
           <div className="card" style={{ marginBottom: 'var(--spacing-md)' }}>
             <h2 className="text-title-md" style={{ marginBottom: '4px' }}>{t.dashboardWidgetsSection}</h2>
             <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>{t.dashboardWidgetsDesc}</p>
-            {ALL_MIDDLE.map(w => {
+            {/* Enabled widgets in their sorted order */}
+            {enabledWidgets.map((w, idx) => (
+              <div key={w} style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', padding: '10px 0', borderBottom: '1px solid var(--color-hairline-soft)' }}>
+                <span style={{ fontSize: '18px' }}>{emojis[w]}</span>
+                <span className="text-body-md" style={{ flex: 1, fontWeight: 500 }}>{labels[w] ?? w}</span>
+                <button
+                  onClick={() => toggleWidget(w)}
+                  style={{
+                    position: 'relative', width: '40px', height: '22px',
+                    borderRadius: '11px', border: 'none', cursor: 'pointer',
+                    background: 'var(--color-primary)', transition: 'background 0.2s', flexShrink: 0,
+                  }}
+                >
+                  <span style={{ position: 'absolute', top: '3px', left: '21px', width: '16px', height: '16px', borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.2s' }} />
+                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <button onClick={() => idx > 0 && moveWidget(idx, idx - 1)} disabled={idx === 0}
+                    style={{ background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', color: idx === 0 ? 'var(--color-hairline)' : 'var(--color-muted)', padding: '2px 6px', fontSize: '14px', lineHeight: 1 }}>▲</button>
+                  <button onClick={() => idx < enabledWidgets.length - 1 && moveWidget(idx, idx + 1)} disabled={idx === enabledWidgets.length - 1}
+                    style={{ background: 'none', border: 'none', cursor: idx === enabledWidgets.length - 1 ? 'default' : 'pointer', color: idx === enabledWidgets.length - 1 ? 'var(--color-hairline)' : 'var(--color-muted)', padding: '2px 6px', fontSize: '14px', lineHeight: 1 }}>▼</button>
+                </div>
+              </div>
+            ))}
+            {/* Disabled widgets below */}
+            {ALL_MIDDLE.filter(w => !enabledWidgets.includes(w)).map(w => {
               const moduleActive = standaloneW.includes(w) || activeModuleIds.includes(w);
-              const isOn = enabledWidgets.includes(w);
-              const idx = enabledWidgets.indexOf(w);
               return (
                 <div key={w} style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', padding: '10px 0', borderBottom: '1px solid var(--color-hairline-soft)', opacity: moduleActive ? 1 : 0.4 }}>
                   <span style={{ fontSize: '18px' }}>{emojis[w]}</span>
                   <span className="text-body-md" style={{ flex: 1, fontWeight: 500 }}>{labels[w] ?? w}</span>
-                  {/* toggle */}
                   <button
                     onClick={() => moduleActive && toggleWidget(w)}
                     disabled={!moduleActive}
@@ -483,35 +504,12 @@ function UserSettingsPage({
                     style={{
                       position: 'relative', width: '40px', height: '22px',
                       borderRadius: '11px', border: 'none', cursor: moduleActive ? 'pointer' : 'default',
-                      background: isOn ? 'var(--color-primary)' : 'var(--color-hairline)',
-                      transition: 'background 0.2s', flexShrink: 0,
+                      background: 'var(--color-hairline)', transition: 'background 0.2s', flexShrink: 0,
                     }}
                   >
-                    <span style={{
-                      position: 'absolute', top: '3px',
-                      left: isOn ? '21px' : '3px',
-                      width: '16px', height: '16px',
-                      borderRadius: '50%', background: '#fff',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                      transition: 'left 0.2s',
-                    }} />
+                    <span style={{ position: 'absolute', top: '3px', left: '3px', width: '16px', height: '16px', borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.2s' }} />
                   </button>
-                  {/* reorder arrows — only for enabled widgets */}
-                  {isOn && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <button
-                        onClick={() => idx > 0 && moveWidget(idx, idx - 1)}
-                        disabled={idx === 0}
-                        style={{ background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', color: idx === 0 ? 'var(--color-hairline)' : 'var(--color-muted)', padding: '2px 6px', fontSize: '14px', lineHeight: 1 }}
-                      >▲</button>
-                      <button
-                        onClick={() => idx < enabledWidgets.length - 1 && moveWidget(idx, idx + 1)}
-                        disabled={idx === enabledWidgets.length - 1}
-                        style={{ background: 'none', border: 'none', cursor: idx === enabledWidgets.length - 1 ? 'default' : 'pointer', color: idx === enabledWidgets.length - 1 ? 'var(--color-hairline)' : 'var(--color-muted)', padding: '2px 6px', fontSize: '14px', lineHeight: 1 }}
-                      >▼</button>
-                    </div>
-                  )}
-                  {!isOn && <div style={{ width: '32px' }} />}
+                  <div style={{ width: '32px' }} />
                 </div>
               );
             })}
