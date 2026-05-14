@@ -439,13 +439,14 @@ function UserSettingsPage({
 
       {/* Dashboard widget order + visibility */}
       {(() => {
-        const ALL_MIDDLE = ['todos', 'budget', 'weather'] as const;
-        const labels: Record<string, string> = { todos: t.moduleTodos, budget: t.moduleBudget, weather: t.weatherWidget };
-        const emojis: Record<string, string> = { todos: '✅', budget: '💰', weather: '🌤️' };
-        // enabled = in dashboardWidgets AND (weather OR module active)
+        const ALL_MIDDLE = ['todos', 'budget', 'weather', 'quote', 'pollen'] as const;
+        const labels: Record<string, string> = { todos: t.moduleTodos, budget: t.moduleBudget, weather: t.weatherWidget, quote: t.quoteWidget, pollen: t.pollenWidget };
+        const emojis: Record<string, string> = { todos: '✅', budget: '💰', weather: '🌤️', quote: '💬', pollen: '🤧' };
+        const standaloneW = ['weather', 'quote', 'pollen'];
+        // enabled = in dashboardWidgets AND (standalone OR module active)
         const enabledWidgets = dashboardWidgets.filter(w =>
           ALL_MIDDLE.includes(w as typeof ALL_MIDDLE[number]) &&
-          (w === 'weather' || activeModuleIds.includes(w))
+          (standaloneW.includes(w) || activeModuleIds.includes(w))
         );
         function toggleWidget(id: string) {
           const isEnabled = enabledWidgets.includes(id);
@@ -467,7 +468,7 @@ function UserSettingsPage({
             <h2 className="text-title-md" style={{ marginBottom: '4px' }}>{t.dashboardWidgetsSection}</h2>
             <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>{t.dashboardWidgetsDesc}</p>
             {ALL_MIDDLE.map(w => {
-              const moduleActive = w === 'weather' || activeModuleIds.includes(w);
+              const moduleActive = standaloneW.includes(w) || activeModuleIds.includes(w);
               const isOn = enabledWidgets.includes(w);
               const idx = enabledWidgets.indexOf(w);
               return (
@@ -828,6 +829,164 @@ function WeatherWidget({ language }: { language: Lang }) {
           {data.recommendation}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── QuoteWidget ─────────────────────────────────────────────────────────────
+
+const QUOTE_CACHE_TTL = 24 * 60 * 60 * 1000; // 1 day in ms
+
+function quoteCacheKey(lang: Lang, date: string) {
+  return `shnoozy_quote_${lang}_${date}`;
+}
+
+function QuoteWidget({ language }: { language: Lang }) {
+  const t = getT(language);
+  const [quote, setQuote] = useState<string | null>(null);
+  const [status, setStatus] = useState<'loading' | 'error' | 'ok'>('loading');
+
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const cacheKey = quoteCacheKey(language, today);
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Date.now() - parsed.cachedAt < QUOTE_CACHE_TTL) {
+          setQuote(parsed.quote);
+          setStatus('ok');
+          return;
+        }
+      }
+    } catch { /* ignore */ }
+
+    supabase.functions.invoke('get-daily-quote', { body: { lang: language, date: today } })
+      .then(({ data, error }) => {
+        if (error || !data?.quote) { setStatus('error'); return; }
+        localStorage.setItem(cacheKey, JSON.stringify({ quote: data.quote, cachedAt: Date.now() }));
+        setQuote(data.quote);
+        setStatus('ok');
+      })
+      .catch(() => setStatus('error'));
+  }, [language]);
+
+  if (status === 'loading') return (
+    <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
+      <p className="text-body-sm text-muted">{t.quoteLoading}</p>
+    </div>
+  );
+  if (status === 'error' || !quote) return (
+    <div className="card" style={{ marginBottom: 'var(--spacing-lg)', opacity: 0.6 }}>
+      <p className="text-body-sm text-muted">{t.quoteUnavailable}</p>
+    </div>
+  );
+  return (
+    <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
+      <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+        <span style={{ fontSize: '28px', lineHeight: 1, color: 'var(--color-primary)', flexShrink: 0, marginTop: '2px' }}>"</span>
+        <p style={{ fontSize: '15px', fontWeight: 500, lineHeight: 1.55, color: 'var(--color-ink)', margin: 0, fontStyle: 'italic' }}>
+          {quote}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── PollenWidget ─────────────────────────────────────────────────────────────
+
+const POLLEN_CACHE_TTL = 6 * 60 * 60 * 1000;
+
+function pollenCacheKey(lang: Lang) { return `shnoozy_pollen_cache_${lang}`; }
+
+interface PollenTypeData {
+  index: number;
+  label: { de: string; en: string };
+  color: string;
+  inSeason: boolean;
+}
+
+function PollenWidget({ language }: { language: Lang }) {
+  const t = getT(language);
+  const [types, setTypes] = useState<Record<string, PollenTypeData> | null>(null);
+  const [status, setStatus] = useState<'loading' | 'denied' | 'error' | 'ok'>('loading');
+
+  useEffect(() => {
+    const cacheKey = pollenCacheKey(language);
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Date.now() - parsed.cachedAt < POLLEN_CACHE_TTL) {
+          setTypes(parsed.types);
+          setStatus('ok');
+          return;
+        }
+      }
+    } catch { /* ignore */ }
+
+    if (!navigator.geolocation) { setStatus('error'); return; }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { data, error } = await supabase.functions.invoke('get-pollen', {
+            body: { lat: pos.coords.latitude, lon: pos.coords.longitude },
+          });
+          if (error || data?.error) { setStatus('error'); return; }
+          localStorage.setItem(cacheKey, JSON.stringify({ types: data.types, cachedAt: Date.now() }));
+          setTypes(data.types);
+          setStatus('ok');
+        } catch { setStatus('error'); }
+      },
+      () => setStatus('denied'),
+      { timeout: 8000 }
+    );
+  }, [language]);
+
+  const POLLEN_ROWS: { code: string; emoji: string; label: string }[] = [
+    { code: 'GRASS', emoji: '🌿', label: t.pollenGrass },
+    { code: 'TREE',  emoji: '🌳', label: t.pollenTree },
+    { code: 'WEED',  emoji: '🌱', label: t.pollenWeed },
+  ];
+
+  if (status === 'denied') return (
+    <div className="card" style={{ marginBottom: 'var(--spacing-lg)', opacity: 0.6 }}>
+      <p className="text-body-sm text-muted">{t.pollenLocationDenied}</p>
+    </div>
+  );
+  if (status === 'error') return (
+    <div className="card" style={{ marginBottom: 'var(--spacing-lg)', opacity: 0.6 }}>
+      <p className="text-body-sm text-muted">{t.pollenUnavailable}</p>
+    </div>
+  );
+  if (!types) return (
+    <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
+      <p className="text-body-sm text-muted">{t.pollenLoading}</p>
+    </div>
+  );
+
+  return (
+    <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
+      <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)' }}>🤧 {t.pollenWidget}</h2>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {POLLEN_ROWS.map(({ code, emoji, label }) => {
+          const pt = types[code];
+          if (!pt) return null;
+          return (
+            <div key={code} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '18px', width: '24px', textAlign: 'center' }}>{emoji}</span>
+              <span className="text-body-sm" style={{ flex: 1, fontWeight: 500 }}>{label}</span>
+              <span style={{
+                padding: '3px 10px', borderRadius: 'var(--rounded-full)',
+                background: pt.color + '22', border: `1px solid ${pt.color}55`,
+                color: pt.color, fontSize: '12px', fontWeight: 700,
+              }}>
+                {pt.label[language] ?? pt.label.de}
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1430,9 +1589,10 @@ function App() {
     );
 
     // Home dashboard
-    const middleWidgetIds = ['todos', 'budget', 'weather'];
+    const standaloneWidgets = ['weather', 'quote', 'pollen'];
+    const middleWidgetIds = ['todos', 'budget', ...standaloneWidgets];
     const orderedMiddleWidgets = dashboardWidgets.filter(w => {
-      if (w === 'weather') return true;
+      if (standaloneWidgets.includes(w)) return true;
       return activeModuleIds.includes(w as ModuleId) && middleWidgetIds.includes(w);
     });
     return (
@@ -1492,6 +1652,8 @@ function App() {
           if (w === 'todos') return <TodosDashboardWidget key="todos" homeId={homeId} language={language} onNavigate={() => setActiveTab('todos')} />;
           if (w === 'budget') return <BudgetDashboardWidget key="budget" homeId={homeId} language={language} onNavigate={() => setActiveTab('budget')} />;
           if (w === 'weather') return <WeatherWidget key="weather" language={language} />;
+          if (w === 'quote') return <QuoteWidget key="quote" language={language} />;
+          if (w === 'pollen') return <PollenWidget key="pollen" language={language} />;
           return null;
         })}
 

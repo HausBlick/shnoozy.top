@@ -301,6 +301,26 @@ const en = {
   weatherLoading: 'Loading weather…',
   weatherUnavailable: 'Weather unavailable',
   weatherLocationDenied: 'Location access denied',
+
+  // Quote
+  quoteWidget: 'Quote of the Day',
+  quoteLoading: 'Loading quote…',
+  quoteUnavailable: 'Quote unavailable',
+
+  // Pollen
+  pollenWidget: 'Pollen',
+  pollenLoading: 'Loading pollen data…',
+  pollenUnavailable: 'Pollen data unavailable',
+  pollenLocationDenied: 'Location access denied',
+  pollenGrass: 'Grass',
+  pollenTree: 'Tree',
+  pollenWeed: 'Weed',
+  pollenNone: 'None',
+  pollenVeryLow: 'Very Low',
+  pollenLow: 'Low',
+  pollenModerate: 'Moderate',
+  pollenHigh: 'High',
+  pollenVeryHigh: 'Very High',
 };
 
 const de: typeof en = {
@@ -604,6 +624,26 @@ const de: typeof en = {
   weatherLoading: 'Wetter wird geladen…',
   weatherUnavailable: 'Wetter nicht verfügbar',
   weatherLocationDenied: 'Standortzugriff verweigert',
+
+  // Quote
+  quoteWidget: 'Zitat des Tages',
+  quoteLoading: 'Zitat wird geladen…',
+  quoteUnavailable: 'Zitat nicht verfügbar',
+
+  // Pollen
+  pollenWidget: 'Pollen',
+  pollenLoading: 'Pollendaten werden geladen…',
+  pollenUnavailable: 'Pollendaten nicht verfügbar',
+  pollenLocationDenied: 'Standortzugriff verweigert',
+  pollenGrass: 'Gräser',
+  pollenTree: 'Bäume',
+  pollenWeed: 'Kräuter',
+  pollenNone: 'Keine',
+  pollenVeryLow: 'Sehr niedrig',
+  pollenLow: 'Niedrig',
+  pollenModerate: 'Mäßig',
+  pollenHigh: 'Hoch',
+  pollenVeryHigh: 'Sehr hoch',
 };
 
 const translations: Record<Lang, typeof en> = { en, de };
