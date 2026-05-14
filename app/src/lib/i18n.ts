@@ -237,6 +237,7 @@ const en = {
 
   // Calendar settings modal
   calSettingsTitle: 'Calendar Settings',
+  calDefaultView: 'Default View',
 
   // Calendar subscriptions (ICS import)
   calSubSection: 'Subscribed Calendars',
@@ -487,6 +488,7 @@ const de: typeof en = {
 
   // Calendar settings modal
   calSettingsTitle: 'Kalender-Einstellungen',
+  calDefaultView: 'Standard-Ansicht',
 
   // Calendar subscriptions (ICS import)
   calSubSection: 'Abonnierte Kalender',

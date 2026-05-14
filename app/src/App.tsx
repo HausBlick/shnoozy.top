@@ -207,6 +207,7 @@ function UserSettingsPage({
   language, onLanguageChange, onBack, onLogout, notifStatus, onReRegister,
   notifPrefs, onNotifPrefChange, myDisplayName, myAvatarColor, onDisplayNameSave, onAvatarColorChange,
   myAvatarUrl, theme, onThemeChange, onAvatarUpload, onAvatarRemove,
+  defaultCalView, onDefaultCalViewChange,
 }: {
   language: Lang;
   onLanguageChange: (lang: Lang) => void;
@@ -225,6 +226,8 @@ function UserSettingsPage({
   onThemeChange: (t: 'light' | 'dark') => void;
   onAvatarUpload: (f: File) => void;
   onAvatarRemove: () => void;
+  defaultCalView: 'agenda' | 'month' | 'week';
+  onDefaultCalViewChange: (v: 'agenda' | 'month' | 'week') => void;
 }) {
   const t = getT(language);
   const [localName, setLocalName] = useState(myDisplayName);
@@ -395,6 +398,31 @@ function UserSettingsPage({
         </div>
       </div>
 
+      {/* Default calendar view */}
+      <div className="card" style={{ marginBottom: 'var(--spacing-md)' }}>
+        <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-md)' }}>{t.calDefaultView}</h2>
+        <div style={{ display: 'flex', background: 'var(--color-surface)', borderRadius: 'var(--rounded-lg)', padding: '3px', gap: '3px' }}>
+          {(['agenda', 'month', 'week'] as const).map(v => (
+            <button
+              key={v}
+              onClick={() => onDefaultCalViewChange(v)}
+              style={{
+                flex: 1, padding: '9px 4px',
+                borderRadius: 'calc(var(--rounded-lg) - 2px)',
+                border: 'none', cursor: 'pointer',
+                fontWeight: 600, fontSize: '13px', fontFamily: 'inherit',
+                background: defaultCalView === v ? 'var(--color-canvas)' : 'transparent',
+                color: defaultCalView === v ? 'var(--color-ink)' : 'var(--color-muted)',
+                boxShadow: defaultCalView === v ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                transition: 'all 0.15s',
+              }}
+            >
+              {v === 'agenda' ? t.viewAgenda : v === 'month' ? t.viewMonth : t.viewWeek}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {notifStatus === 'granted' && (
         <div className="card" style={{ marginBottom: 'var(--spacing-md)' }}>
           <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-md)', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -501,6 +529,7 @@ function App() {
   const [myAvatarColor, setMyAvatarColor] = useState('#14d8db');
   const [myAvatarUrl, setMyAvatarUrl] = useState('');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [defaultCalView, setDefaultCalView] = useState<'agenda' | 'month' | 'week'>('agenda');
   const [toast, setToast] = useState<string | null>(null);
   const [wifiSsid, setWifiSsid] = useState('');
   const [wifiPassword, setWifiPassword] = useState('');
@@ -569,7 +598,7 @@ function App() {
   async function fetchUserProfile(userId: string) {
     const { data } = await supabase
       .from('profiles')
-      .select('language, notification_preferences, display_name, avatar_color, avatar_url, theme')
+      .select('language, notification_preferences, display_name, avatar_color, avatar_url, theme, default_calendar_view')
       .eq('id', userId)
       .maybeSingle();
     if (data?.language) setLanguage(data.language as Lang);
@@ -584,6 +613,7 @@ function App() {
       setMyAvatarUrl(data.avatar_url);
     }
     if (data?.theme === 'dark') setTheme('dark');
+    if (data?.default_calendar_view) setDefaultCalView(data.default_calendar_view as 'agenda' | 'month' | 'week');
   }
 
   async function fetchMemberColors(hId: string) {
@@ -757,6 +787,11 @@ function App() {
     await supabase.from('profiles').update({ theme: newTheme }).eq('id', session.user.id);
   }
 
+  async function handleDefaultCalViewChange(v: 'agenda' | 'month' | 'week') {
+    setDefaultCalView(v);
+    await supabase.from('profiles').update({ default_calendar_view: v }).eq('id', session.user.id);
+  }
+
   async function handleDisplayNameSave(name: string) {
     if (!name.trim()) return;
     setMyDisplayName(name.trim());
@@ -794,7 +829,7 @@ function App() {
   // ─── Tab content ───────────────────────────────────────────────────────────
   const renderTab = () => {
     // Module tabs
-    if (activeTab === 'calendar') return <Calendar homeId={homeId} language={language} />;
+    if (activeTab === 'calendar') return <Calendar homeId={homeId} language={language} defaultView={defaultCalView} />;
     if (activeTab === 'lists') return <Lists homeId={homeId} language={language} />;
     if (activeTab === 'todos') return <Todos homeId={homeId} userId={session.user.id} language={language} />;
     if (activeTab === 'luna') return (
@@ -956,6 +991,8 @@ function App() {
         onThemeChange={handleThemeChange}
         onAvatarUpload={handleAvatarUpload}
         onAvatarRemove={handleAvatarRemove}
+        defaultCalView={defaultCalView}
+        onDefaultCalViewChange={handleDefaultCalViewChange}
       />
     );
 

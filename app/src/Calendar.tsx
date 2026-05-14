@@ -124,7 +124,7 @@ function toDayKey(d: Date): string {
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 
-export function Calendar({ homeId, language }: { homeId: string; language: Lang }) {
+export function Calendar({ homeId, language, defaultView = 'agenda' }: { homeId: string; language: Lang; defaultView?: 'agenda' | 'month' | 'week' }) {
   const t = getT(language);
   const [events, setEvents] = useState<Event[]>([]);
   const [externalEvents, setExternalEvents] = useState<ExternalEvent[]>([]);
@@ -151,7 +151,7 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
   const [showImportInfo, setShowImportInfo] = useState(false);
 
   // View state
-  const [view, setView] = useState<CalView>('agenda');
+  const [view, setView] = useState<CalView>(defaultView);
   const [currentDate, setCurrentDate] = useState<Date>(() => {
     const d = new Date();
     d.setDate(1);
