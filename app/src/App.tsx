@@ -654,20 +654,27 @@ function WeatherWidget({ language }: { language: Lang }) {
   const t = getT(language);
   const [data, setData] = useState<WeatherData | null>(null);
   const [status, setStatus] = useState<'loading' | 'denied' | 'error' | 'ok'>('loading');
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
+  function fetchWeather(skipCache = false) {
     const cacheKey = weatherCacheKey(language);
-    const cached = (() => {
+
+    if (!skipCache) {
       try {
         const raw = localStorage.getItem(cacheKey);
-        if (!raw) return null;
-        const parsed = JSON.parse(raw);
-        if (Date.now() - parsed.cachedAt < WEATHER_CACHE_TTL) return parsed.data as WeatherData;
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Date.now() - parsed.cachedAt < WEATHER_CACHE_TTL) {
+            setData(parsed.data as WeatherData);
+            setStatus('ok');
+            return;
+          }
+        }
       } catch { /* ignore */ }
-      return null;
-    })();
-
-    if (cached) { setData(cached); setStatus('ok'); return; }
+    } else {
+      localStorage.removeItem(cacheKey);
+      setRefreshing(true);
+    }
 
     if (!navigator.geolocation) { setStatus('error'); return; }
 
@@ -677,16 +684,19 @@ function WeatherWidget({ language }: { language: Lang }) {
           const { data: res, error } = await supabase.functions.invoke('get-weather', {
             body: { lat: pos.coords.latitude, lon: pos.coords.longitude, lang: language },
           });
-          if (error || res?.error) { setStatus('error'); return; }
+          if (error || res?.error) { setStatus('error'); setRefreshing(false); return; }
           localStorage.setItem(cacheKey, JSON.stringify({ data: res, cachedAt: Date.now() }));
           setData(res as WeatherData);
           setStatus('ok');
         } catch { setStatus('error'); }
+        finally { setRefreshing(false); }
       },
-      () => setStatus('denied'),
+      () => { setStatus('denied'); setRefreshing(false); },
       { timeout: 8000 }
     );
-  }, [language]);
+  }
+
+  useEffect(() => { fetchWeather(); }, [language]);
 
   if (status === 'denied') return (
     <div className="card" style={{ marginBottom: 'var(--spacing-lg)', opacity: 0.6 }}>
@@ -720,7 +730,20 @@ function WeatherWidget({ language }: { language: Lang }) {
           <div className="text-body-sm text-muted" style={{ marginTop: '4px', textTransform: 'capitalize' }}>{data.description}</div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div className="text-body-sm" style={{ fontWeight: 600 }}>{data.city}</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+            <div className="text-body-sm" style={{ fontWeight: 600 }}>{data.city}</div>
+            <button
+              onClick={() => fetchWeather(true)}
+              disabled={refreshing}
+              title={language === 'de' ? 'Wetter aktualisieren' : 'Refresh weather'}
+              style={{
+                background: 'none', border: 'none', cursor: refreshing ? 'default' : 'pointer',
+                padding: '2px', lineHeight: 1, fontSize: '14px', opacity: refreshing ? 0.4 : 0.7,
+                display: 'flex', alignItems: 'center',
+                animation: refreshing ? 'spin 1s linear infinite' : 'none',
+              }}
+            >↺</button>
+          </div>
           <div className="text-body-sm text-muted" style={{ marginTop: '2px' }}>💧 {data.humidity}% · 💨 {data.windSpeed} m/s</div>
           {aqiMeta && (
             <div style={{
