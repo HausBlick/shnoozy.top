@@ -234,6 +234,17 @@ const en = {
   inviteCopied: 'Copied!',
   inviteShare: 'Share',
   inviteError: 'Failed to create invite link',
+
+  // Calendar subscriptions (ICS import)
+  calSubSection: 'Subscribed Calendars',
+  calSubDesc: 'Add public ICS/iCal links from schools, clubs or other services. Syncs every 6 hours.',
+  calSubAdd: '+ Add calendar',
+  calSubUrlPlaceholder: 'https://example.com/calendar.ics',
+  calSubNamePlaceholder: 'e.g. German Holidays',
+  calSubSave: 'Add',
+  calSubLastSynced: (s: string) => `Synced: ${s}`,
+  calSubNeverSynced: 'Not yet synced',
+  calSubSyncing: 'Syncing…',
 };
 
 const de: typeof en = {
@@ -470,6 +481,17 @@ const de: typeof en = {
   inviteCopied: 'Kopiert!',
   inviteShare: 'Teilen',
   inviteError: 'Fehler beim Erstellen des Einladungslinks',
+
+  // Calendar subscriptions (ICS import)
+  calSubSection: 'Abonnierte Kalender',
+  calSubDesc: 'ICS/iCal-Links von Schulen, Vereinen oder anderen Diensten hinzufügen. Wird alle 6 Stunden synchronisiert.',
+  calSubAdd: '+ Kalender hinzufügen',
+  calSubUrlPlaceholder: 'https://beispiel.de/kalender.ics',
+  calSubNamePlaceholder: 'z.B. Deutsche Feiertage',
+  calSubSave: 'Hinzufügen',
+  calSubLastSynced: (s: string) => `Synchronisiert: ${s}`,
+  calSubNeverSynced: 'Noch nicht synchronisiert',
+  calSubSyncing: 'Synchronisiere…',
 };
 
 const translations: Record<Lang, typeof en> = { en, de };

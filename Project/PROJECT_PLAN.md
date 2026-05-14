@@ -194,15 +194,22 @@
 
 ---
 
-### 🟡 Phase 9: Kalender-Erweiterungen (MITTELPRIO)
+### 🟢 Phase 9: Kalender-Erweiterungen
 
-#### 9.1 Kalender-Ansichten (Monat / Woche / Tag) ⬜ OFFEN
-- [ ] Segmented Control im Kalender-Header: Schedule | Monat | Woche | Tag
-- [ ] **Monatsansicht:** 7×5-Grid, farbige Event-Dots pro Tag, Tap → Tagesdetail
-- [ ] **Wochenansicht:** Zeitstrahl (0–24 Uhr), Events als farbige Blöcke mit Höhe = Dauer, Ganztages-Banner oben
-- [ ] **Tagesansicht:** Zeitstrahl für einen Tag, Stundenraster
-- [ ] Design-Referenz: Fantastical / Google Calendar — kompakt, farbkodiert, kein overengineering
-- [ ] Kein neues Backend nötig — reine Frontend-Erweiterung
+#### 9.1 Kalender-Ansichten ✅ FERTIG (2026-05-14)
+- [x] Segmented Control im Kalender-Header: Agenda | Monat | Woche
+- [x] **Agenda-Ansicht:** ab heute (keine Vergangenheit), farbige Category-Chips mit pastelMedium-Fill + linkem Border
+- [x] **Monatsansicht:** 7-Spalten-Grid (Mo-So), Event-Chips (11px, gefärbt, max. ~2 pro Tag), Tap → Tagesdetail
+- [x] **Wochenansicht:** KW-Header, 7-Tage-Strip, Event-Chips (10px), Tap → Tagesdetail (identisch mit Monat)
+- [x] Sticky Header (h1 + Export-Button + View-Toggle) mit `position: sticky; top: 0`
+- [x] `getCatChipStyle()` mit rgba-Fills + dunklem Text + linkem Accent-Border
+- [x] `window.scrollTo(0, 0)` on mount (kein Scroll-Jump bei View-Wechsel)
+
+#### 9.1b ICS-Export ✅ FERTIG (2026-05-14)
+- [x] Edge Function `ics-feed` deployed (verify_jwt: false, Token-Auth via `home_settings.ical_token`)
+- [x] Token-Generierung + Reset in HomeSettings (alle Mitglieder)
+- [x] Copy-URL + Web Share API, REFRESH-INTERVAL PT1H im ICS-Header
+- [x] i18n en/de für alle ICS-Strings
 
 #### 9.2 Kalender-Abonnements (ICS-URL Import) ⬜ OFFEN
 - [ ] SQL-Migration: `calendar_subscriptions` (`id`, `home_id`, `name`, `ics_url`, `color`, `show_on_dashboard`, `last_synced_at`) + `external_events` (`id`, `subscription_id`, `home_id`, `uid`, `title`, `start_time`, `end_time`, `is_all_day`, `description`)
@@ -341,8 +348,9 @@
 | `sync-google-tasks` | pg_cron alle 2 Min | Google Tasks → Shopping List | ✅ aktiv (braucht `DEFAULT_HOME_ID` Secret) |
 | `send-daily-push` | pg_cron täglich 8:30 MESZ | Push-Notifications für Kalender-Termine | ✅ aktiv |
 | `send-note-push` | HTTP (Frontend) | Push-Notification bei neuer Sticky Note (prüft `notes_new`-Präferenz pro User) | ✅ aktiv |
-| `accept-invite` | HTTP | Einladungslink einlösen → `home_members` eintragen | ⬜ noch nicht gebaut |
-| `generate-invite` | HTTP | Einladungstoken erstellen (Admin) | ⬜ noch nicht gebaut |
+| `accept-invite` | HTTP (Frontend, JWT-Auth) | Einladungslink einlösen → `home_members` eintragen | ✅ aktiv |
+| `generate-invite` | HTTP (Frontend, JWT-Auth) | Einladungstoken erstellen (Admin) | ✅ aktiv |
+| `ics-feed` | HTTP (public, Token-Auth) | ICS-Kalender-Feed für externe Abonnements | ✅ aktiv |
 
 ---
 
@@ -372,4 +380,5 @@
 *   **2026-05-14 (Session 3):** Phase 8.3.3 (Erscheinungsbild) teilweise: Dark/Light Mode Toggle. `theme`-Spalte in `profiles`. `[data-theme="dark"]` CSS-Block mit 13 Farb-Variablen. Gespeichert in DB, wird beim Login geladen. Standard-Kalenderansicht + Wochenstartag zurückgestellt (warten auf Phase 9.1).
 *   **2026-05-14 (Session 3):** Service Worker komplett überarbeitet: `skipWaiting()` + `clients.claim()` für sofortige Aktivierung. Network-first für HTML (immer aktueller Code), Cache-first für gehashte Assets (`/assets/*`). Behebt "PWA zeigt alten Stand"-Problem auf iOS/Android.
 *   **2026-05-14 (Session 3):** Dark Mode Bug-Fixes: `button { color: inherit }` global (Button-Text war Browser-Standard-Schwarz). `.form-input` + `option` in Dark Mode mit explizitem `background`/`color`. `.sticky-note { color: #222 }` hardcoded (Pastell-Hintergründe brauchen immer dunkle Schrift). Logout-Button aus Dashboard-Header entfernt (nur noch in Mehr → Profil → Abmelden).
+*   **2026-05-14 (Session 4):** Phase 9.1 (Kalender-Ansichten + ICS-Export) abgeschlossen: Agenda/Monat/Woche-Views mit Sticky Header, farbigen Event-Chips (getCatChipStyle, rgba-Fill + linker Border). Agenda zeigt nur heute + Zukunft (kein Scroll-Jump). `ics-feed` Edge Function deployed (Token-Auth, REFRESH PT1H). ICS-Sektion in HomeSettings (Token generieren, URL kopieren/teilen/zurücksetzen). i18n en/de vollständig.
 *   **2026-05-14 (Session 4):** Phase 6.4 Einladungssystem vollständig implementiert: EF `generate-invite` (JWT-auth'd, Admin-Check über `home_members.role`, `crypto.randomUUID()`-Token, INSERT in `home_invitations`, gibt `https://shnoozy.top?token=…` zurück), EF `accept-invite` (JWT-auth'd, Token-Validierung, idempotenter `home_members` INSERT, Token als used markieren). Frontend `HomeSettings.tsx`: Invite-Sektion nur für Admins sichtbar, Web Share API + Clipboard-Fallback, Link-Anzeige, "Neuen Link erstellen"-Reset. i18n en/de vollständig.

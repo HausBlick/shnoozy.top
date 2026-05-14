@@ -15,6 +15,18 @@ interface Event {
   recurrence_type: string;
 }
 
+interface ExternalEvent {
+  id: string;
+  subscription_id: string;
+  uid: string;
+  title: string;
+  start_time: string;
+  end_time: string | null;
+  is_all_day: boolean;
+  description: string | null;
+  calendar_subscriptions: { color: string; name: string } | null;
+}
+
 type CalView = 'agenda' | 'month' | 'week';
 
 const PlusIcon = () => (
@@ -52,6 +64,13 @@ function escapeICS(str: string): string {
   return str.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
 }
 
+function getExternalChipStyle(color: string): React.CSSProperties {
+  const r = parseInt(color.slice(1, 3), 16);
+  const g = parseInt(color.slice(3, 5), 16);
+  const b = parseInt(color.slice(5, 7), 16);
+  return { background: `rgba(${r},${g},${b},0.12)`, color, borderLeft: `2px solid rgba(${r},${g},${b},0.4)` };
+}
+
 function getCatChipStyle(cat: string): React.CSSProperties {
   switch (cat) {
     case 'birthday': return { background: 'rgba(122,4,31,0.12)', color: '#7a041f', borderLeft: '2px solid rgba(122,4,31,0.4)' };
@@ -86,6 +105,7 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
   const t = getT(language);
   const [events, setEvents] = useState<Event[]>([]);
   const [rawEvents, setRawEvents] = useState<Event[]>([]);
+  const [externalEvents, setExternalEvents] = useState<ExternalEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
@@ -130,6 +150,16 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
     return map;
   }, [events]);
 
+  const externalEventsByDay = useMemo(() => {
+    const map: Record<string, ExternalEvent[]> = {};
+    externalEvents.forEach(e => {
+      const k = toDayKey(new Date(e.start_time));
+      if (!map[k]) map[k] = [];
+      map[k].push(e);
+    });
+    return map;
+  }, [externalEvents]);
+
   useEffect(() => {
     window.scrollTo(0, 0);
     fetchEvents();
@@ -139,8 +169,12 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
   async function fetchEvents() {
     try {
       setLoading(true);
-      const { data, error } = await supabase.from('events').select('*').eq('home_id', homeId);
+      const [{ data, error }, { data: extData }] = await Promise.all([
+        supabase.from('events').select('*').eq('home_id', homeId),
+        supabase.from('external_events').select('*, calendar_subscriptions(color, name)').eq('home_id', homeId),
+      ]);
       if (error) throw error;
+      setExternalEvents(extData || []);
 
       setRawEvents(data || []);
       const processedEvents: Event[] = [];
@@ -329,12 +363,15 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
     const dayEvts = (eventsByDay[key] || []).sort(
       (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
     );
+    const extEvts = (externalEventsByDay[key] || []).sort(
+      (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+    );
     return (
       <div style={{ marginTop: 'var(--spacing-md)', paddingTop: 'var(--spacing-md)', borderTop: '1px solid var(--color-hairline)' }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-muted)', marginBottom: 'var(--spacing-sm)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           {d}. {t.monthNames[m - 1]} {y}
         </div>
-        {dayEvts.length === 0 ? (
+        {dayEvts.length === 0 && extEvts.length === 0 ? (
           <p className="text-body-sm text-muted" style={{ padding: '8px 0' }}>{t.noEventsDay}</p>
         ) : (
           <div className="schedule-container">
@@ -366,6 +403,22 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
                 </div>
               );
             })}
+            {extEvts.map(event => {
+              const color = event.calendar_subscriptions?.color || '#6366f1';
+              return (
+                <div key={`ext-${event.id}`} className="schedule-event-item" style={{ borderLeft: `3px solid ${color}`, cursor: 'default' }}>
+                  <div style={{ flex: 1 }}>
+                    <div className="text-title-md">{event.title}</div>
+                    <div className="text-body-sm text-muted">
+                      {event.is_all_day ? t.allDay : new Date(event.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {event.calendar_subscriptions?.name && (
+                        <span style={{ marginLeft: 6, fontSize: 11, opacity: 0.7 }}>· {event.calendar_subscriptions.name}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -375,16 +428,72 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
   // ── Agenda view ───────────────────────────────────────────────────────────
 
   const renderAgenda = () => {
-    const groupedEvents: Record<string, Event[]> = {};
+    type AgendaItem = { time: number; node: React.ReactNode; key: string };
+    const grouped: Record<string, AgendaItem[]> = {};
+
     events.forEach(event => {
       const d = new Date(event.start_time);
-      if (d < today) return; // only today + future
-      const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-      if (!groupedEvents[key]) groupedEvents[key] = [];
-      groupedEvents[key].push(event);
+      if (d < today) return;
+      const key = toDayKey(d);
+      if (!grouped[key]) grouped[key] = [];
+      const age = event.original_birth_year ? d.getFullYear() - event.original_birth_year : 0;
+      grouped[key].push({
+        time: d.getTime(),
+        key: event.id,
+        node: (
+          <div
+            key={event.id}
+            id={`event-${event.id}`}
+            className={`schedule-event-item ${event.category || 'event'}`}
+            onClick={() => openEditModal(event)}
+            style={{ cursor: 'pointer' }}
+          >
+            <div style={{ flex: 1 }}>
+              <div className="text-title-md">
+                {event.category === 'birthday' ? '🎂 ' : ''}{event.title}
+                {event.category === 'birthday' && age > 0 && (
+                  <span style={{ color: 'var(--color-luxe)', fontWeight: 600, marginLeft: '8px', fontSize: '14px' }}>
+                    ({getOrdinal(age)})
+                  </span>
+                )}
+              </div>
+              <div className="text-body-sm text-muted">
+                {event.is_all_day ? t.allDay : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {event.description && <div style={{ fontSize: '12px', marginTop: '2px', fontStyle: 'italic' }}>{event.description}</div>}
+              </div>
+            </div>
+          </div>
+        ),
+      });
     });
 
-    const sortedKeys = Object.keys(groupedEvents).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    externalEvents.forEach(event => {
+      const d = new Date(event.start_time);
+      if (d < today) return;
+      const key = toDayKey(d);
+      if (!grouped[key]) grouped[key] = [];
+      const color = event.calendar_subscriptions?.color || '#6366f1';
+      grouped[key].push({
+        time: d.getTime(),
+        key: `ext-${event.id}`,
+        node: (
+          <div key={`ext-${event.id}`} className="schedule-event-item" style={{ borderLeft: `3px solid ${color}`, cursor: 'default' }}>
+            <div style={{ flex: 1 }}>
+              <div className="text-title-md">{event.title}</div>
+              <div className="text-body-sm text-muted">
+                {event.is_all_day ? t.allDay : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {event.calendar_subscriptions?.name && (
+                  <span style={{ marginLeft: 6, fontSize: 11, opacity: 0.7 }}>· {event.calendar_subscriptions.name}</span>
+                )}
+              </div>
+            </div>
+          </div>
+        ),
+      });
+    });
+
+    Object.values(grouped).forEach(arr => arr.sort((a, b) => a.time - b.time));
+    const sortedKeys = Object.keys(grouped).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
     let currentMonthYear = '';
 
     return (
@@ -412,35 +521,7 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
                   <span className={`schedule-day-number ${isToday ? 'today' : ''}`}>{d}</span>
                 </div>
                 <div className="schedule-events">
-                  {groupedEvents[key].map(event => {
-                    const age = event.original_birth_year
-                      ? new Date(event.start_time).getFullYear() - event.original_birth_year
-                      : 0;
-                    return (
-                      <div
-                        key={event.id}
-                        id={`event-${event.id}`}
-                        className={`schedule-event-item ${event.category || 'event'}`}
-                        onClick={() => openEditModal(event)}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <div style={{ flex: 1 }}>
-                          <div className="text-title-md">
-                            {event.category === 'birthday' ? '🎂 ' : ''}{event.title}
-                            {event.category === 'birthday' && age > 0 && (
-                              <span style={{ color: 'var(--color-luxe)', fontWeight: 600, marginLeft: '8px', fontSize: '14px' }}>
-                                ({getOrdinal(age)})
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-body-sm text-muted">
-                            {event.is_all_day ? t.allDay : new Date(event.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            {event.description && <div style={{ fontSize: '12px', marginTop: '2px', fontStyle: 'italic' }}>{event.description}</div>}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {grouped[key].map(item => item.node)}
                 </div>
               </div>
             </div>
@@ -522,23 +603,23 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
                   {day}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingInline: 1, minWidth: 0 }}>
-                  {dayEvts.slice(0, 2).map(e => (
-                    <div key={e.id} style={{
-                      fontSize: 11, lineHeight: '15px',
-                      borderRadius: 4,
-                      padding: '1px 4px',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      fontWeight: 500,
-                      ...getCatChipStyle(e.category),
-                    }}>
-                      {e.title}
-                    </div>
-                  ))}
-                  {dayEvts.length > 2 && (
-                    <div style={{ fontSize: 10, color: 'var(--color-muted)', textAlign: 'center', lineHeight: '14px' }}>
-                      +{dayEvts.length - 2}
-                    </div>
-                  )}
+                  {(() => {
+                    const extEvts = externalEventsByDay[k] || [];
+                    const regChips = dayEvts.slice(0, 2);
+                    const extChips = regChips.length < 2 ? extEvts.slice(0, 2 - regChips.length) : [];
+                    const overflow = dayEvts.length + extEvts.length - regChips.length - extChips.length;
+                    return (
+                      <>
+                        {regChips.map(e => (
+                          <div key={e.id} style={{ fontSize: 11, lineHeight: '15px', borderRadius: 4, padding: '1px 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, ...getCatChipStyle(e.category) }}>{e.title}</div>
+                        ))}
+                        {extChips.map(e => (
+                          <div key={`ext-${e.id}`} style={{ fontSize: 11, lineHeight: '15px', borderRadius: 4, padding: '1px 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, ...getExternalChipStyle(e.calendar_subscriptions?.color || '#6366f1') }}>{e.title}</div>
+                        ))}
+                        {overflow > 0 && <div style={{ fontSize: 10, color: 'var(--color-muted)', textAlign: 'center', lineHeight: '14px' }}>+{overflow}</div>}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             );
@@ -629,23 +710,24 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
                   {d.getDate()}
                 </div>
                 <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-                  {(eventsByDay[k] || []).slice(0, 2).map(e => (
-                    <div key={e.id} style={{
-                      fontSize: 10, lineHeight: '14px',
-                      borderRadius: 3,
-                      padding: '1px 3px',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      width: '100%', minWidth: 0, fontWeight: 500,
-                      ...getCatChipStyle(e.category),
-                    }}>
-                      {e.title}
-                    </div>
-                  ))}
-                  {(eventsByDay[k] || []).length > 2 && (
-                    <div style={{ fontSize: 9, color: 'var(--color-muted)', textAlign: 'center', lineHeight: '13px' }}>
-                      +{(eventsByDay[k] || []).length - 2}
-                    </div>
-                  )}
+                  {(() => {
+                    const regEvts = eventsByDay[k] || [];
+                    const extEvts = externalEventsByDay[k] || [];
+                    const regChips = regEvts.slice(0, 2);
+                    const extChips = regChips.length < 2 ? extEvts.slice(0, 2 - regChips.length) : [];
+                    const overflow = regEvts.length + extEvts.length - regChips.length - extChips.length;
+                    return (
+                      <>
+                        {regChips.map(e => (
+                          <div key={e.id} style={{ fontSize: 10, lineHeight: '14px', borderRadius: 3, padding: '1px 3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', minWidth: 0, fontWeight: 500, ...getCatChipStyle(e.category) }}>{e.title}</div>
+                        ))}
+                        {extChips.map(e => (
+                          <div key={`ext-${e.id}`} style={{ fontSize: 10, lineHeight: '14px', borderRadius: 3, padding: '1px 3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', minWidth: 0, fontWeight: 500, ...getExternalChipStyle(e.calendar_subscriptions?.color || '#6366f1') }}>{e.title}</div>
+                        ))}
+                        {overflow > 0 && <div style={{ fontSize: 9, color: 'var(--color-muted)', textAlign: 'center', lineHeight: '13px' }}>+{overflow}</div>}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             );
