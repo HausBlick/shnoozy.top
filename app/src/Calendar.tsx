@@ -520,8 +520,9 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
                 onClick={() => setSelectedDayKey(isSelected ? null : k)}
                 style={{
                   cursor: 'pointer', padding: '3px 2px 5px',
-                  borderRadius: 8, minHeight: 54,
+                  borderRadius: 8, minHeight: 76,
                   background: isSelected ? 'var(--color-surface)' : 'transparent',
+                  minWidth: 0,
                 }}
               >
                 <div style={{
@@ -534,15 +535,20 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
                 }}>
                   {day}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingInline: 1 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingInline: 1, minWidth: 0 }}>
                   {dayEvts.slice(0, 2).map(e => (
                     <div key={e.id} style={{
-                      height: 4, borderRadius: 2,
+                      fontSize: 9, lineHeight: '13px',
                       background: getCatColor(e.category),
-                    }} />
+                      color: 'white', borderRadius: 3,
+                      padding: '1px 3px',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {e.title}
+                    </div>
                   ))}
                   {dayEvts.length > 2 && (
-                    <div style={{ fontSize: 9, color: 'var(--color-muted)', textAlign: 'center', lineHeight: 1.2 }}>
+                    <div style={{ fontSize: 9, color: 'var(--color-muted)', textAlign: 'center', lineHeight: '13px' }}>
                       +{dayEvts.length - 2}
                     </div>
                   )}
@@ -620,10 +626,10 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
                 key={k}
                 onClick={() => setSelectedDayKey(k)}
                 style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                  cursor: 'pointer', padding: '6px 2px', borderRadius: 10,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                  cursor: 'pointer', padding: '6px 2px 5px', borderRadius: 10,
                   background: isSelected ? 'var(--color-surface)' : 'transparent',
-                  transition: 'background 0.15s',
+                  transition: 'background 0.15s', minWidth: 0,
                 }}
               >
                 <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-muted)', letterSpacing: '0.3px' }}>{dayLabel}</span>
@@ -636,13 +642,25 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
                 }}>
                   {d.getDate()}
                 </div>
-                {hasEvents && (
-                  <div style={{
-                    width: 5, height: 5, borderRadius: '50%',
-                    background: isToday ? 'white' : 'var(--color-primary)',
-                  }} />
-                )}
-                {!hasEvents && <div style={{ width: 5, height: 5 }} />}
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+                  {(eventsByDay[k] || []).slice(0, 2).map(e => (
+                    <div key={e.id} style={{
+                      fontSize: 8, lineHeight: '12px',
+                      background: getCatColor(e.category),
+                      color: 'white', borderRadius: 3,
+                      padding: '1px 2px',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      width: '100%', minWidth: 0,
+                    }}>
+                      {e.title}
+                    </div>
+                  ))}
+                  {(eventsByDay[k] || []).length > 2 && (
+                    <div style={{ fontSize: 8, color: 'var(--color-muted)', textAlign: 'center', lineHeight: '12px' }}>
+                      +{(eventsByDay[k] || []).length - 2}
+                    </div>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -662,7 +680,17 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
         <button className="icon-button-circle" onClick={exportICS} title="Export as .ics"><ExportIcon /></button>
       </div>
 
-      <div style={{ marginBottom: 'var(--spacing-lg)' }}>{renderViewToggle()}</div>
+      <div style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 50,
+        background: 'var(--color-canvas)',
+        paddingTop: '4px',
+        paddingBottom: '10px',
+        marginBottom: 'var(--spacing-sm)',
+      }}>
+        {renderViewToggle()}
+      </div>
 
       {loading ? (
         <p className="text-body-sm text-muted">{t.loading}</p>
