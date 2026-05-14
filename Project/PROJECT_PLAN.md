@@ -188,8 +188,8 @@
 
 #### 8.3.3 Weitere Settings-Kandidaten ✅ TEILFERTIG (2026-05-14)
 - [x] Dark/Light Mode Toggle (`theme`-Feld in `profiles`) — `[data-theme="dark"]` CSS-Variablen, Toggle in Settings
-- [ ] Standard-Kalenderansicht (`default_calendar_view` in `profiles`) — zurückgestellt bis Phase 9.1 (Kalenderansichten)
-- [ ] Wochenstartag Mo/So (`week_start` in `profiles`) — zurückgestellt bis Phase 9.1
+- [x] Standard-Kalenderansicht (`default_calendar_view` in `profiles`) — Segmented Control in User-Settings, sofort gespeichert
+- [ ] Wochenstartag Mo/So (`week_start` in `profiles`) — nicht benötigt (Woche ist immer Mo-So)
 - [ ] Push-Uhrzeit individuell pro User (`preferred_push_time` in `profiles`) — erfordert Architektur-Umbau von `send-daily-push` (Hoch-Aufwand, zurückgestellt)
 
 ---
@@ -219,13 +219,15 @@
 
 ---
 
-### 🟡 Phase 10: Budgeting-Tool (MITTELPRIO)
+### ✅ Phase 10: Budgeting-Tool (MITTELPRIO)
 
-#### 10.1 Haushaltsbuch — Manuelle Eingabe (MVP) ⬜ OFFEN
-- [ ] SQL-Migration: `budget_categories` (per Home, analog Shopping-Kategorien) + `budget_entries` (`id`, `home_id`, `user_id`, `amount`, `category_id`, `description`, `date`, `split_mode` [`shared`|`personal`], `split_ratio`)
-- [ ] Frontend: Ausgaben-Eingabe (Betrag, Kategorie, Datum, geteilt/persönlich)
-- [ ] Monatsübersicht: Ausgaben nach Kategorie (Balkendiagramm), Gesamt, Bilanz zwischen Mitgliedern
-- [ ] Kostensplitting-Anzeige: "Niko hat 120 € mehr bezahlt — Ausgleich ausstehend"
+#### 10.1 Haushaltsbuch — Manuelle Eingabe (MVP) ✅ FERTIG (2026-05-14)
+- [x] SQL-Migration: `budget_categories` + `budget_entries` (amount, category_id, description, date, is_shared), RLS, Default-Kategorien eingefügt
+- [x] `Budget.tsx`: Overview-Tab (Gesamtsumme, Kategorie-Balken, Mitglieder-Bilanz) + Entries-Tab (Liste chronologisch)
+- [x] Monat-Navigation (‹ / ›), Modul `budget` in HomeSettings.tsx + MODULE_META
+- [x] Add/Edit-Modal: Betrag (Numberpad), Kategorie-Chips, Beschreibung, Datum, Shared/Personal-Toggle
+- [x] Löschen mit 2-Tap-Bestätigung
+- [x] i18n en/de für alle Budget-Strings
 
 #### 10.2 Foto-Scan (KI-gestützt) — Konzept ausstehend ⬜ OFFEN
 - [ ] Konzept mit Gemini Vision API abstimmen (Datenschutz, Genauigkeit, Flow)
