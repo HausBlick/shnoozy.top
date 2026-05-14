@@ -52,12 +52,12 @@ function escapeICS(str: string): string {
   return str.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
 }
 
-function getCatColor(cat: string): string {
+function getCatChipStyle(cat: string): React.CSSProperties {
   switch (cat) {
-    case 'birthday': return '#e91e63';
-    case 'reminder': return '#ff9500';
-    case 'trash': return '#78909c';
-    default: return '#14d8db';
+    case 'birthday': return { background: 'rgba(122,4,31,0.12)', color: '#7a041f', borderLeft: '2px solid rgba(122,4,31,0.4)' };
+    case 'reminder': return { background: 'rgba(4,179,132,0.12)', color: '#04b384', borderLeft: '2px solid rgba(4,179,132,0.4)' };
+    case 'trash':    return { background: 'rgba(191,115,0,0.12)', color: '#bf7300', borderLeft: '2px solid rgba(191,115,0,0.4)' };
+    default:         return { background: 'rgba(20,216,219,0.12)', color: '#0099a3', borderLeft: '2px solid rgba(20,216,219,0.4)' };
   }
 }
 
@@ -538,17 +538,18 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingInline: 1, minWidth: 0 }}>
                   {dayEvts.slice(0, 2).map(e => (
                     <div key={e.id} style={{
-                      fontSize: 9, lineHeight: '13px',
-                      background: getCatColor(e.category),
-                      color: 'white', borderRadius: 3,
-                      padding: '1px 3px',
+                      fontSize: 11, lineHeight: '15px',
+                      borderRadius: 4,
+                      padding: '1px 4px',
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      fontWeight: 500,
+                      ...getCatChipStyle(e.category),
                     }}>
                       {e.title}
                     </div>
                   ))}
                   {dayEvts.length > 2 && (
-                    <div style={{ fontSize: 9, color: 'var(--color-muted)', textAlign: 'center', lineHeight: '13px' }}>
+                    <div style={{ fontSize: 10, color: 'var(--color-muted)', textAlign: 'center', lineHeight: '14px' }}>
                       +{dayEvts.length - 2}
                     </div>
                   )}
@@ -618,7 +619,6 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
             const k = toDayKey(d);
             const isToday = k === todayKey;
             const isSelected = k === effectiveKey;
-            const hasEvents = (eventsByDay[k] || []).length > 0;
             const dayLabel = t.dayNames[d.getDay()];
 
             return (
@@ -642,21 +642,21 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
                 }}>
                   {d.getDate()}
                 </div>
-                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
                   {(eventsByDay[k] || []).slice(0, 2).map(e => (
                     <div key={e.id} style={{
-                      fontSize: 8, lineHeight: '12px',
-                      background: getCatColor(e.category),
-                      color: 'white', borderRadius: 3,
-                      padding: '1px 2px',
+                      fontSize: 10, lineHeight: '14px',
+                      borderRadius: 3,
+                      padding: '1px 3px',
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      width: '100%', minWidth: 0,
+                      width: '100%', minWidth: 0, fontWeight: 500,
+                      ...getCatChipStyle(e.category),
                     }}>
                       {e.title}
                     </div>
                   ))}
                   {(eventsByDay[k] || []).length > 2 && (
-                    <div style={{ fontSize: 8, color: 'var(--color-muted)', textAlign: 'center', lineHeight: '12px' }}>
+                    <div style={{ fontSize: 9, color: 'var(--color-muted)', textAlign: 'center', lineHeight: '13px' }}>
                       +{(eventsByDay[k] || []).length - 2}
                     </div>
                   )}
@@ -675,20 +675,19 @@ export function Calendar({ homeId, language }: { homeId: string; language: Lang 
 
   return (
     <div style={{ paddingBottom: '120px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-md)' }}>
-        <h1 className="text-display-lg">{t.schedule}</h1>
-        <button className="icon-button-circle" onClick={exportICS} title="Export as .ics"><ExportIcon /></button>
-      </div>
-
       <div style={{
         position: 'sticky',
         top: 0,
         zIndex: 50,
         background: 'var(--color-canvas)',
-        paddingTop: '4px',
+        paddingTop: 'var(--spacing-md)',
         paddingBottom: '10px',
         marginBottom: 'var(--spacing-sm)',
       }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-sm)' }}>
+          <h1 className="text-display-lg">{t.schedule}</h1>
+          <button className="icon-button-circle" onClick={exportICS} title="Export as .ics"><ExportIcon /></button>
+        </div>
         {renderViewToggle()}
       </div>
 
