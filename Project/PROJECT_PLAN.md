@@ -36,7 +36,7 @@
 - [ ] **Edge Function `accept-invite`**: Noch nicht gebaut — "Join Home"-Button in der App führt aktuell ins Leere
 - [ ] **Edge Function `generate-invite`**: Noch nicht gebaut — kein UI zum Erstellen von Einladungslinks
 
-#### 6.5 Google Tasks Integration ✅ (vereinfacht)
+#### 6.5 Google Tasks Integration 📋 Bitte Checken und evtl abschließen
 - [x] `sync-google-tasks` angepasst: `title` → `name`, `home_id` aus Env-Var `DEFAULT_HOME_ID`
 - [x] `add-shopping-item` bereinigt: IFTTT-Pfad entfernt, nur noch JWT-Auth, `user_id` aus JWT
 - [ ] `DEFAULT_HOME_ID` Secret in Supabase setzen: `89cd774f-b26e-40ce-9362-7589ded42c8d` (**manueller Schritt**)
@@ -46,9 +46,9 @@
 - [x] `Calendar.tsx`, `Lists.tsx`, `StickyNotes.tsx`: alle Queries mit `home_id` gefiltert
 - [x] `home_settings` für WiFi-Credentials statt `app_settings`
 
-#### 6.7 Manuelle Nacharbeiten nach DB-Reset ⬜ OFFEN
-- [ ] **WiFi-Credentials** neu eintragen (SSID + Passwort) — App-Einstellungen
-- [ ] **Push Notifications** neu aktivieren — für beide Nutzer in der App (alte Subscriptions gelöscht)
+#### 6.7 Manuelle Nacharbeiten nach DB-Reset 📋 Bitte Checken und evtl abschließen
+- [x] **WiFi-Credentials** neu eintragen (SSID + Passwort) — App-Einstellungen
+- [x] **Push Notifications** neu aktivieren — für beide Nutzer in der App (alte Subscriptions gelöscht)
 - [ ] **`DEFAULT_HOME_ID`** Supabase Secret setzen (siehe 6.5)
 
 ---
@@ -57,7 +57,7 @@
 - [x] React + Vite + TypeScript Setup
 - [x] Design System (Airbnb Cereal VF, teal #14d8db)
 - [x] PWA-Struktur, Bottom Navigation (5 Tabs)
-- [ ] **Bugfix PWA-Struktur:** Das `manifest.webmanifest` (bzw. `manifest.json`) und die Verlinkung in der `index.html` fehlen komplett. Dadurch greift das "Add to Homescreen" Popup auf Smartphones nicht. *Aufgabe an Claude: Bitte das Web App Manifest inkl. Theme-Color und den benötigten Icon-Größen (z.B. 192x192, 512x512) generieren, in `app/public` ablegen und in der `index.html` einbinden.*
+- [x] **Bugfix PWA-Manifest (2026-05-14):** `manifest.webmanifest` erstellt (name, icons, theme_color #14d8db, display standalone), Icons in `app/public/icons/` (192px, 512px, maskable 512px, apple-touch 180px), `index.html` um manifest-Link, theme-color, apple-touch-icon und Apple-PWA-Meta-Tags ergänzt. Hinweis: maskable Icon hat weißen statt teal Hintergrund — kann bei Gelegenheit nachgebessert werden.
 - [x] Dashboard & Placeholder-Screens
 
 ### Phase 2: Infrastruktur & Auth ✅
@@ -154,21 +154,41 @@
 - [x] `userRole` ('admin'|'member') aus `home_members.role` — Home-Settings nur für Admins sichtbar
 - [x] Default-Werte in `home_settings` per SQL für bestehendes Home eingefügt
 
-### 🔴 Phase 8.2: ToDo-Listen & Aufgaben (HOCHPRIO, offen)
+### ✅ Phase 8.2: ToDo-Listen & Aufgaben (abgeschlossen 2026-05-14)
 
 #### 8.2 ToDo-Listen & Aufgaben (3.12)
-- [ ] SQL-Migration: `todo_lists` (`id`, `home_id`, `name`, `icon`, `color`, `sort_order`) + `todo_items` (`id`, `list_id`, `home_id`, `title`, `description`, `due_date`, `status`, `assigned_to`, `created_by`, `sort_order`) + RLS
-- [ ] Frontend: Listen-Übersicht, Task-Listenansicht, Add/Edit/Done Tasks
-- [ ] Zuweisung an Home-Mitglied (Avatar/Farbindikator)
-- [ ] Realtime-Sync via Supabase
-- [ ] Dashboard-Widget: "Meine offenen Aufgaben"
-- [ ] Optional: Push-Notification bei neuer Zuweisung
+- [x] SQL-Migration: `todo_lists` + `todo_items` mit allen Spalten, RLS (`is_home_member`), Realtime-Publication — bereits in DB vorhanden
+- [x] Frontend: Listen-Übersicht, Task-Listenansicht, Add/Edit/Done Tasks (`Todos.tsx`)
+- [x] Zuweisung an Home-Mitglied (Avatar mit Farb-Indikator)
+- [x] Realtime-Sync via Supabase (Channels für beide Tabellen)
+- [x] Dashboard-Widget: offene Aufgaben (`TodosDashboardWidget`), bedingt aktiv wenn Modul `todos` aktiviert
+- [x] Push-Notification bei neuer Zuweisung → Edge Function `send-todo-push`
+
+---
+
+### 🟡 Phase 8.3: User-Settings Erweiterungen (MITTELPRIO, offen)
+
+#### 8.3.1 Notification Preferences ⬜ OFFEN
+- [ ] `notification_preferences`-JSON-Spalte in `profiles` (z. B. `{"shopping": true, "todos": true, "calendar": true}`)
+- [ ] User-Settings UI: Toggles pro Modul (Shopping, ToDo, Kalender, Dokumente)
+- [ ] `send-daily-push` und `send-todo-push` prüfen Preference vor dem Senden
+
+#### 8.3.2 Profil-Bearbeitung ⬜ OFFEN
+- [ ] Name bearbeiten (`display_name` in `profiles`, bereits vorhanden — einfaches Textfeld in User-Settings)
+- [ ] Avatar-Upload: Supabase Storage Bucket `avatars` + `avatar_url`-Spalte in `profiles`
+- [ ] Platzhalter-Avatar (Initial aus display_name) wenn kein Foto vorhanden — `Avatar`-Komponente aus `Todos.tsx` wiederverwendbar
+
+#### 8.3.3 Weitere Settings-Kandidaten (niedrige Prio) ⬜ OFFEN
+- [ ] Dark/Light Mode Toggle (`theme`-Feld in `profiles`)
+- [ ] Standard-Kalenderansicht (`default_calendar_view` in `profiles`)
+- [ ] Wochenstartag Mo/So (`week_start` in `profiles`)
+- [ ] Push-Uhrzeit individuell pro User (`preferred_push_time` in `profiles`) — erfordert Architektur-Umbau von `send-daily-push` (stündlicher Cron statt fixer Zeit, Hoch-Aufwand)
 
 ---
 
 ### 🟡 Phase 9: Kalender-Erweiterungen (MITTELPRIO)
 
-#### 9.1 Kalender-Ansichten (Monat / Woche / Tag)
+#### 9.1 Kalender-Ansichten (Monat / Woche / Tag) ⬜ OFFEN
 - [ ] Segmented Control im Kalender-Header: Schedule | Monat | Woche | Tag
 - [ ] **Monatsansicht:** 7×5-Grid, farbige Event-Dots pro Tag, Tap → Tagesdetail
 - [ ] **Wochenansicht:** Zeitstrahl (0–24 Uhr), Events als farbige Blöcke mit Höhe = Dauer, Ganztages-Banner oben
@@ -176,7 +196,7 @@
 - [ ] Design-Referenz: Fantastical / Google Calendar — kompakt, farbkodiert, kein overengineering
 - [ ] Kein neues Backend nötig — reine Frontend-Erweiterung
 
-#### 9.2 Kalender-Abonnements (ICS-URL Import)
+#### 9.2 Kalender-Abonnements (ICS-URL Import) ⬜ OFFEN
 - [ ] SQL-Migration: `calendar_subscriptions` (`id`, `home_id`, `name`, `ics_url`, `color`, `show_on_dashboard`, `last_synced_at`) + `external_events` (`id`, `subscription_id`, `home_id`, `uid`, `title`, `start_time`, `end_time`, `is_all_day`, `description`)
 - [ ] Edge Function `sync-calendar-subscriptions` (pg_cron alle 6h): fetcht ICS-URLs, parst RFC 5545, upsert in `external_events`
 - [ ] Frontend: Kalender-Settings → "Abonnement hinzufügen" (URL, Name, Farbe, Dashboard-Toggle)
@@ -187,22 +207,49 @@
 
 ### 🟡 Phase 10: Budgeting-Tool (MITTELPRIO)
 
-#### 10.1 Haushaltsbuch — Manuelle Eingabe (MVP)
+#### 10.1 Haushaltsbuch — Manuelle Eingabe (MVP) ⬜ OFFEN
 - [ ] SQL-Migration: `budget_categories` (per Home, analog Shopping-Kategorien) + `budget_entries` (`id`, `home_id`, `user_id`, `amount`, `category_id`, `description`, `date`, `split_mode` [`shared`|`personal`], `split_ratio`)
 - [ ] Frontend: Ausgaben-Eingabe (Betrag, Kategorie, Datum, geteilt/persönlich)
 - [ ] Monatsübersicht: Ausgaben nach Kategorie (Balkendiagramm), Gesamt, Bilanz zwischen Mitgliedern
 - [ ] Kostensplitting-Anzeige: "Niko hat 120 € mehr bezahlt — Ausgleich ausstehend"
 
-#### 10.2 Foto-Scan (KI-gestützt) — Konzept ausstehend
+#### 10.2 Foto-Scan (KI-gestützt) — Konzept ausstehend ⬜ OFFEN
 - [ ] Konzept mit Gemini Vision API abstimmen (Datenschutz, Genauigkeit, Flow)
 - [ ] Upload von Kassenbon-Foto → Gemini extrahiert Betrag, Händler, Datum
 - [ ] Vorausgefülltes Formular → 1-Tap-Speichern
 
 ---
 
+### 🟡 Phase 11: Dashboard-Redesign (MITTELPRIO, offen)
+
+#### 11.1 Neues Dashboard-Layout ⬜ OFFEN
+- [ ] Sticky Notes fix an oberster Stelle (großes Widget)
+- [ ] Kalender-Widget mit 4–7 kommenden Terminen (statt aktuell unlimitierter 14-Tage-Liste)
+- [ ] Per-User anpassbarer Widget-Block: `dashboard_widgets`-JSON-Spalte in `profiles` (Array von Widget-IDs + Reihenfolge)
+- [ ] Widget-Registry im Frontend: add/remove/reorder via Drag & Drop (analog zum bestehenden Modul-Manager)
+- [ ] WLAN-Sharing Button fix unten
+- [ ] Aktivitäts-Log fix ganz unten
+
+#### 11.2 Aktivitäts-Log Widget ⬜ OFFEN
+- [ ] SQL-Migration: `activity_log`-Tabelle (`home_id`, `user_id`, `action_type`, `entity_type`, `entity_title`, `created_at`) + RLS
+- [ ] Frontend schreibt Einträge beim Speichern/Erledigen/Löschen (Shopping, ToDo, Notizen)
+- [ ] Widget zeigt letzte 5–10 Einträge mit Realtime-Subscription
+
+#### 11.3 Wetter + Luftqualität + KI-Empfehlung Widget ⬜ OFFEN
+- [ ] Edge Function `get-weather`: OpenWeatherMap API (kostenlos: 1.000 Calls/Tag) für Wetter + Luftqualität + Pollendaten
+- [ ] Live-Location via Browser Geolocation API; Fallback: gespeicherte Stadt/PLZ in `profiles`
+- [ ] Gemini generiert aus Wetterdaten kurze Tagesempfehlung ("Schirm mitnehmen", "Sonnencreme nicht vergessen" etc.)
+
+#### 11.4 Tages-Quote / Inspiration Widget ⬜ OFFEN
+- [ ] Gemini-Prompt mit täglichem Caching (1x pro Tag generieren, in `home_settings` zwischenspeichern)
+- [ ] Alternativ: freie Quotes-API (quotable.io)
+- [ ] Fokus: Selbstverwirklichung/Optimierung + interessante Fakten zum Kalendertag
+
+---
+
 ### ⚪ Weitere Module (niedrige Prio, Konzepte ausstehend)
 
-### Document Storage (3.4)
+### Document Storage (3.4) ⬜ OFFEN
 - [ ] Supabase Storage Bucket (`documents`) anlegen inkl. RLS Policies.
 - [ ] UI: Listenansicht mit festen Basis-Ordnern (`Apartment`, `Car`, `Insurances`, `Luna`, `Personal`, `Misc`) als **Accordion-Design** (flache Hierarchie, ausklappbar).
 - [ ] UI: Funktionalität zum Anlegen von dynamischen Unterordnern innerhalb der Hauptordner.
@@ -211,36 +258,49 @@
 - [ ] UI: Drei-Punkte-Menü (`⋮`) pro Datei für Aktionen (Teilen via Web Share API, Löschen).
 - [ ] **Smart Renaming (Zero-Friction Flow):** *Frage an Claude: Bitte den Upload-Flow so bauen, dass der Nutzer keine leeren Formulare ausfüllen muss. Nach Dateiauswahl soll im Hintergrund per Edge Function (Gemini) der Inhalt analysiert werden. Dann öffnet sich ein Dialog mit dem von der KI bereits vorausgefüllten Namensvorschlag. Zwingendes Format: `YYYYMMDD_KATEGORIE_Inhalt` (z.B. `20260501_Car_Leasing-Contract`). Der Nutzer muss nur noch "Speichern" tippen. Bitte Konzept skizzieren und implementieren.*
 
-### Home Info (neu)
-- [ ] Zählernummern (Strom, Gas, Wasser)
+### Home Info (neu) ⬜ OFFEN
+- [ ] Zählernummern (Strom, Gas, Wasser) (Homespezifisch anlegbar, historie der Zählerstände)
 - [ ] Vertragsdaten (Anbieter, Vertragsnummer, Laufzeit, Kündigungsfrist)
 - [ ] Vermieter-Kontakte
 - [ ] Übergabeprotokoll / wichtige Dokumente
-- [ ] Wiederkehrende Kosten (Nebenkosten, etc.)
+- [ ] Wiederkehrende Kosten (Nebenkosten, etc.) -> Evtl Einbindung in Budgeting-Tool
 
-### Car (neu)
+### Car (neu) ⬜ OFFEN
 - [ ] Fahrzeugdaten (Kennzeichen, Modell, Erstzulassung, Fahrgestellnummer)
 - [ ] Versicherungsdaten (Anbieter, Vertragsnummer, Ablaufdatum)
 - [ ] TÜV / HU-Datum mit Kalender-Erinnerung
 - [ ] Servicetermine & Kilometerstand-Verlauf
 - [ ] Dokumente (Fahrzeugschein, Versicherungsnachweis)
 
-### Luna Portal (3.3)
+### Luna Portal (3.3) ⬜ OFFEN
 - [ ] Info-Dashboard (Chipnummer, Versicherung, Futterplan)
 - [ ] Wiederkehrende Tierarzt-Termine → Hauptkalender
 
-### Moodboard & Wishlist (3.6)
+### Foto-Notizen (neu — bestätigt 2026-05-14)
+- [ ] Supabase Storage Bucket `photo_notes` + Tabelle (`home_id`, `sender_id`, `storage_path`, `caption`, `created_at`) + RLS
+- [ ] Frontend: Foto aufnehmen (Camera-API) oder aus Galerie wählen, Caption optional, Upload zu Storage
+- [ ] Partner sieht neues Foto via Realtime-Subscription + Toast (analog Sticky Notes)
+- [ ] Vollansicht: Foto-Feed chronologisch, Löschen eigener Fotos
+- *Homescreen-Widget-Variante: On Hold bis Native-App-Phase*
+
+### Moodboard & Wishlist (3.6) ⬜ OFFEN
 - [ ] Web Share Target API
 - [ ] Visuelle Sammlung für Ideen und Produktwünsche
 
-### Entertainment & Dining (3.7)
+### Entertainment & Dining (3.7) ⬜ OFFEN
 - [ ] Medien-Watchlist + "Spin the Wheel"
 - [ ] Restaurant Favorites + "Spin the Wheel"
 
-### Custom Map (3.8)
+### Custom Map (3.8) ⬜ OFFEN
 - [ ] Leaflet oder Google Maps API
 - [ ] Eigene Pins mit Kategorien
 - [ ] Google Maps Listen-Import
+
+### Native App (on hold — nach PWA-Abschluss)
+- [ ] Evaluierung: Capacitor als nativer App-Wrapper für iOS & Android
+- [ ] Homescreen-Widget für Einkaufsliste, Kalender, Todos (iOS WidgetKit / Android AppWidgets)
+- [ ] Homescreen-Widget für Foto-Notizen (Partner sieht Foto direkt im Homescreen-Widget)
+- *Erst relevant wenn der gesamte PWA-Ausbau abgeschlossen ist*
 
 ---
 
@@ -296,3 +356,4 @@
 *   **2026-05-13 (Session 1):** Architektur-Entscheidung: Shopping-Kategorien werden per-Home dynamisch in neuen Tabellen `shopping_categories` / `shopping_subcategories` gespeichert (nicht mehr hardcodiert). Jede Kategorie hat `name`, `icon` (Emoji), `color`, `description` (für Gemini-Prompt) und `sort_order`. `Luna` ist KEINE Default-Kategorie für neue Homes. Gemini-Prompt wird dynamisch aus DB gebaut. Per-User Spracheinstellung (`profiles.language`) für EN/DE-Unterstützung. Phase 7 in Roadmap verankert.
 *   **2026-05-13 (Session 2):** Phase 8.1 abgeschlossen: Konfigurierbare Navigation + Modul-Manager. `HomeSettings.tsx` neu: 3 Nav-Slots per Dropdown, Modul-Manager mit Drag & Drop (Pointer Events, keine Library). `home_settings`-Keys `nav_slots` + `modules_active` ersetzen separate Feature-Flags. More-Menü komplett umgebaut: dynamische Modul-Cards oben, User-/Home-Settings als Zeilen getrennt. Admin-Rolle aus `home_members.role`. Phase 8.2 (ToDo-Listen) folgt als nächste HOCHPRIO-Aufgabe.
 *   **2026-05-13 (Session 2):** Phase 7.3 abgeschlossen: Kategorie-Editor in Shopping-Liste. ⚙️-Icon im Header → Kategorien-Verwaltung. `CategoryEditForm` mit Emoji, 12 Farb-Swatches, AI-Beschreibungsfeld und Live-Vorschau. `CategoryListView` mit ▲▼-Reihenfolge-Buttons. 2-Tap-Löschen mit roter Bestätigung. Kein neues Backend erforderlich.
+*   **2026-05-14:** Phase 8.2 verifiziert und abgeschlossen: `todo_lists` + `todo_items` waren bereits vollständig in Supabase vorhanden (alle Spalten, RLS aktiv, Realtime-Publication eingetragen). Frontend `Todos.tsx` war bereits komplett implementiert (Listen-CRUD, Task-CRUD, Inline-Add, Realtime, Push, Dashboard-Widget, i18n EN/DE). Kein weiterer Handlungsbedarf — Feature ist live.
