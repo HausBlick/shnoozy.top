@@ -973,11 +973,8 @@ function App() {
     // Home dashboard
     return (
       <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-lg)', marginTop: 'var(--spacing-md)' }}>
+        <div style={{ marginBottom: 'var(--spacing-lg)', marginTop: 'var(--spacing-md)' }}>
           <h1 className="text-display-lg">{t.dashboard}</h1>
-          <button onClick={handleLogout} className="icon-button-circle" title="Logout">
-            <LogoutIcon />
-          </button>
         </div>
 
         <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
