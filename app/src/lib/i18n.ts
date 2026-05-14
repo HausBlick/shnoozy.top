@@ -66,6 +66,13 @@ const en = {
   displayNamePlaceholder: 'Your name',
   avatarColor: 'Avatar Color',
   avatarColorHint: 'This is how your contributions (notes, assignments, etc.) appear to others.',
+  avatarUpload: 'Upload photo',
+  avatarRemove: 'Remove photo',
+
+  // Theme
+  themeSection: 'Appearance',
+  themeLight: 'Light',
+  themeDark: 'Dark',
 
   // General
   loading: 'Loading...',
@@ -304,6 +311,13 @@ const de: typeof en = {
   displayNamePlaceholder: 'Dein Name',
   avatarColor: 'Avatar-Farbe',
   avatarColorHint: 'So werden deine Beiträge (Notizen, Zuweisungen, etc.) in der App angezeigt.',
+  avatarUpload: 'Foto hochladen',
+  avatarRemove: 'Foto entfernen',
+
+  // Theme
+  themeSection: 'Erscheinungsbild',
+  themeLight: 'Hell',
+  themeDark: 'Dunkel',
 
   // General
   loading: 'Lädt...',

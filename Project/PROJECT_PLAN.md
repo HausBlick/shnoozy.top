@@ -176,20 +176,20 @@
 - [x] `send-todo-push` prüft `todo_assigned` vor dem Senden
 - Tageszeit: Cron läuft 06:30 UTC = 08:30 CEST / 07:30 CET (kein User-konfigurierbarer Zeitpunkt — pg_cron unterstützt keine User-spezifischen Schedules)
 
-#### 8.3.2 Profil-Bearbeitung 🟡 TEILFERTIG (2026-05-14)
+#### 8.3.2 Profil-Bearbeitung ✅ FERTIG (2026-05-14)
 - [x] `display_name` editierbar in User-Settings (Textfeld + Save-Button)
 - [x] `avatar_color` — Farb-Picker mit 8 vordefinierten Farben in User-Settings
 - [x] Avatar-Preview in User-Settings (Kreis mit Initial + gewählter Farbe)
 - [x] Farbe wird in Todos-Avatar-Komponente genutzt (aus `profiles.avatar_color` statt hardcoded)
-- [x] Sticky Notes zeigen Strip + Hintergrund in der Farbe des Erstellers (`hexToRgba` + `memberColors`-Prop)
-- [x] `memberColors`-State in App.tsx — bereit für Activity-Widget (Phase 11)
-- [ ] Avatar-Upload: Supabase Storage Bucket `avatars` + `avatar_url`-Spalte in `profiles` (separater Schritt)
+- [x] Sticky Notes zeigen Strip + Hintergrund in der Farbe des Erstellers (`hexToLight` + `memberColors`-Prop)
+- [x] `memberColors` + `memberAvatarUrls`-State in App.tsx — bereit für Activity-Widget (Phase 11)
+- [x] Avatar-Upload: Supabase Storage Bucket `avatars` + `avatar_url`-Spalte in `profiles`; Bild ersetzt Farb-Kreis in Settings + Todos; Kamera-Badge zum Auslösen; "Foto entfernen"-Link
 
-#### 8.3.3 Weitere Settings-Kandidaten (niedrige Prio) ⬜ OFFEN
-- [ ] Dark/Light Mode Toggle (`theme`-Feld in `profiles`)
-- [ ] Standard-Kalenderansicht (`default_calendar_view` in `profiles`)
-- [ ] Wochenstartag Mo/So (`week_start` in `profiles`)
-- [ ] Push-Uhrzeit individuell pro User (`preferred_push_time` in `profiles`) — erfordert Architektur-Umbau von `send-daily-push` (stündlicher Cron statt fixer Zeit, Hoch-Aufwand)
+#### 8.3.3 Weitere Settings-Kandidaten ✅ TEILFERTIG (2026-05-14)
+- [x] Dark/Light Mode Toggle (`theme`-Feld in `profiles`) — `[data-theme="dark"]` CSS-Variablen, Toggle in Settings
+- [ ] Standard-Kalenderansicht (`default_calendar_view` in `profiles`) — zurückgestellt bis Phase 9.1 (Kalenderansichten)
+- [ ] Wochenstartag Mo/So (`week_start` in `profiles`) — zurückgestellt bis Phase 9.1
+- [ ] Push-Uhrzeit individuell pro User (`preferred_push_time` in `profiles`) — erfordert Architektur-Umbau von `send-daily-push` (Hoch-Aufwand, zurückgestellt)
 
 ---
 

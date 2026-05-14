@@ -33,6 +33,7 @@ interface Member {
   user_id: string;
   display_name: string;
   color: string;
+  avatar_url?: string;
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -101,6 +102,13 @@ function memberInitial(member: Member | undefined): string {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Avatar({ member, size = 22 }: { member: Member | undefined; size?: number }) {
+  if (member?.avatar_url) {
+    return (
+      <div style={{ width: size, height: size, borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
+        <img src={member.avatar_url} alt={member.display_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+    );
+  }
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%',
@@ -660,7 +668,7 @@ export function Todos({ homeId, userId, language }: Props) {
 
     const { data: profileRows } = await supabase
       .from('profiles')
-      .select('id, display_name, avatar_color')
+      .select('id, display_name, avatar_color, avatar_url')
       .in('id', userIds);
 
     setMembers(userIds.map((uid: string, i: number) => {
@@ -668,7 +676,7 @@ export function Todos({ homeId, userId, language }: Props) {
       const isMe = uid === userId;
       const name = profile?.display_name || (isMe ? 'You' : `Member ${i + 1}`);
       const color = profile?.avatar_color || '#14d8db';
-      return { user_id: uid, display_name: name, color };
+      return { user_id: uid, display_name: name, color, avatar_url: profile?.avatar_url || undefined };
     }));
   }
 

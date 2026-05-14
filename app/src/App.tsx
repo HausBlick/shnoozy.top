@@ -205,6 +205,7 @@ function NotifToggle({ label, description, value, onChange }: {
 function UserSettingsPage({
   language, onLanguageChange, onBack, onLogout, notifStatus, onReRegister,
   notifPrefs, onNotifPrefChange, myDisplayName, myAvatarColor, onDisplayNameSave, onAvatarColorChange,
+  myAvatarUrl, theme, onThemeChange, onAvatarUpload, onAvatarRemove,
 }: {
   language: Lang;
   onLanguageChange: (lang: Lang) => void;
@@ -218,9 +219,15 @@ function UserSettingsPage({
   myAvatarColor: string;
   onDisplayNameSave: (name: string) => void;
   onAvatarColorChange: (color: string) => void;
+  myAvatarUrl: string;
+  theme: 'light' | 'dark';
+  onThemeChange: (t: 'light' | 'dark') => void;
+  onAvatarUpload: (f: File) => void;
+  onAvatarRemove: () => void;
 }) {
   const t = getT(language);
   const [localName, setLocalName] = useState(myDisplayName);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { setLocalName(myDisplayName); }, [myDisplayName]);
 
   return (
@@ -233,16 +240,69 @@ function UserSettingsPage({
       {/* Profile Card */}
       <div className="card" style={{ marginBottom: 'var(--spacing-md)' }}>
         <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-md)' }}>{t.profileSection}</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-md)' }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: '50%', background: myAvatarColor,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 22, fontWeight: 700, color: 'white', flexShrink: 0,
-          }}>
-            {(localName || myDisplayName || '?').charAt(0).toUpperCase()}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-md)' }}>
+          {/* Avatar circle with upload */}
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              style={{ display: 'none' }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) onAvatarUpload(f); e.target.value = ''; }}
+            />
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                width: 56, height: 56, borderRadius: '50%',
+                background: myAvatarUrl ? 'transparent' : myAvatarColor,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 22, fontWeight: 700, color: 'white', cursor: 'pointer',
+                overflow: 'hidden',
+              }}
+            >
+              {myAvatarUrl
+                ? <img src={myAvatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : (localName || myDisplayName || '?').charAt(0).toUpperCase()
+              }
+            </div>
+            {/* Camera badge */}
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                position: 'absolute', bottom: -1, right: -1,
+                width: 20, height: 20, borderRadius: '50%',
+                background: 'var(--color-surface-strong)',
+                border: '1.5px solid var(--color-canvas)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', fontSize: '11px',
+              }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+            </div>
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ marginBottom: '8px' }}>
+            {/* Upload/Remove links */}
+            <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                style={{ fontSize: '13px', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 500 }}
+              >
+                {t.avatarUpload}
+              </button>
+              {myAvatarUrl && (
+                <button
+                  onClick={onAvatarRemove}
+                  style={{ fontSize: '13px', color: 'var(--color-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                >
+                  {t.avatarRemove}
+                </button>
+              )}
+            </div>
+            {/* Color picker */}
+            <div style={{ marginBottom: '6px' }}>
               <span className="text-body-sm" style={{ fontWeight: 600 }}>{t.avatarColor}</span>
               <span className="text-body-sm text-muted" style={{ marginLeft: '6px' }}>{t.avatarColorHint}</span>
             </div>
@@ -305,6 +365,29 @@ function UserSettingsPage({
               }}
             >
               {lang === 'en' ? t.languageEn : t.languageDe}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Theme Card */}
+      <div className="card" style={{ marginBottom: 'var(--spacing-md)' }}>
+        <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-md)' }}>{t.themeSection}</h2>
+        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+          {(['light', 'dark'] as const).map(th => (
+            <button
+              key={th}
+              onClick={() => onThemeChange(th)}
+              style={{
+                flex: 1, padding: '10px',
+                borderRadius: 'var(--rounded-lg)',
+                border: `2px solid ${theme === th ? 'var(--color-primary)' : 'var(--color-hairline)'}`,
+                background: theme === th ? 'var(--color-primary)' : 'transparent',
+                color: theme === th ? 'white' : 'var(--color-ink)',
+                fontWeight: 600, cursor: 'pointer', fontSize: '15px',
+              }}
+            >
+              {th === 'light' ? t.themeLight : t.themeDark}
             </button>
           ))}
         </div>
@@ -405,8 +488,11 @@ function App() {
     notes_new: false,
   });
   const [memberColors, setMemberColors] = useState<Record<string, string>>({});
+  const [memberAvatarUrls, setMemberAvatarUrls] = useState<Record<string, string>>({});
   const [myDisplayName, setMyDisplayName] = useState('');
   const [myAvatarColor, setMyAvatarColor] = useState('#14d8db');
+  const [myAvatarUrl, setMyAvatarUrl] = useState('');
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [toast, setToast] = useState<string | null>(null);
   const [wifiSsid, setWifiSsid] = useState('');
   const [wifiPassword, setWifiPassword] = useState('');
@@ -451,6 +537,10 @@ function App() {
   }, []);
 
   useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
+  useEffect(() => {
     if (session) {
       fetchUserHome(session.user.id);
       fetchUserProfile(session.user.id);
@@ -468,7 +558,7 @@ function App() {
   async function fetchUserProfile(userId: string) {
     const { data } = await supabase
       .from('profiles')
-      .select('language, notification_preferences, display_name, avatar_color')
+      .select('language, notification_preferences, display_name, avatar_color, avatar_url, theme')
       .eq('id', userId)
       .maybeSingle();
     if (data?.language) setLanguage(data.language as Lang);
@@ -479,6 +569,11 @@ function App() {
     const color = data?.avatar_color || '#14d8db';
     setMyAvatarColor(color);
     setMemberColors(prev => ({ ...prev, [userId]: color }));
+    if (data?.avatar_url) {
+      setMyAvatarUrl(data.avatar_url);
+      setMemberAvatarUrls(prev => ({ ...prev, [userId]: data.avatar_url }));
+    }
+    if (data?.theme === 'dark') setTheme('dark');
   }
 
   async function fetchMemberColors(hId: string) {
@@ -490,13 +585,16 @@ function App() {
     const userIds = members.map((m: any) => m.user_id);
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, avatar_color')
+      .select('id, avatar_color, avatar_url')
       .in('id', userIds);
     const colors: Record<string, string> = {};
+    const avatarUrls: Record<string, string> = {};
     for (const p of profiles ?? []) {
       colors[p.id] = p.avatar_color || '#14d8db';
+      if (p.avatar_url) avatarUrls[p.id] = p.avatar_url;
     }
     setMemberColors(colors);
+    setMemberAvatarUrls(avatarUrls);
   }
 
   async function fetchUserHome(userId: string) {
@@ -629,6 +727,29 @@ function App() {
     setMyAvatarColor(color);
     setMemberColors(prev => ({ ...prev, [session.user.id]: color }));
     await supabase.from('profiles').update({ avatar_color: color }).eq('id', session.user.id);
+  }
+
+  async function handleAvatarUpload(file: File) {
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+    const path = `${session.user.id}/avatar.${ext}`;
+    const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type });
+    if (error) { showToast('Upload fehlgeschlagen'); return; }
+    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
+    const url = `${publicUrl}?v=${Date.now()}`;
+    setMyAvatarUrl(url);
+    setMemberAvatarUrls(prev => ({ ...prev, [session.user.id]: url }));
+    await supabase.from('profiles').update({ avatar_url: url }).eq('id', session.user.id);
+  }
+
+  async function handleAvatarRemove() {
+    setMyAvatarUrl('');
+    setMemberAvatarUrls(prev => { const next = { ...prev }; delete next[session.user.id]; return next; });
+    await supabase.from('profiles').update({ avatar_url: null }).eq('id', session.user.id);
+  }
+
+  async function handleThemeChange(newTheme: 'light' | 'dark') {
+    setTheme(newTheme);
+    await supabase.from('profiles').update({ theme: newTheme }).eq('id', session.user.id);
   }
 
   async function handleDisplayNameSave(name: string) {
@@ -824,6 +945,11 @@ function App() {
         myAvatarColor={myAvatarColor}
         onDisplayNameSave={handleDisplayNameSave}
         onAvatarColorChange={handleAvatarColorChange}
+        myAvatarUrl={myAvatarUrl}
+        theme={theme}
+        onThemeChange={handleThemeChange}
+        onAvatarUpload={handleAvatarUpload}
+        onAvatarRemove={handleAvatarRemove}
       />
     );
 
