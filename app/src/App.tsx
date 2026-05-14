@@ -661,6 +661,98 @@ function BudgetDashboardWidget({ homeId, language, onNavigate }: { homeId: strin
   );
 }
 
+// ─── TourModal ────────────────────────────────────────────────────────────────
+
+const TOURS: Record<string, { title: { de: string; en: string }; steps: { de: string; en: string }[] }> = {
+  dashboard: {
+    title: { de: 'Willkommen im Dashboard', en: 'Welcome to your Dashboard' },
+    steps: [
+      { de: 'Sticky Notes und Kalender stehen immer oben — der Rest ist frei sortierbar.', en: 'Sticky Notes and Calendar always stay at the top — everything else is freely sortable.' },
+      { de: 'Widgets (Wetter, Pollen, Zitat, …) kannst du in den User-Settings ein- und ausschalten.', en: 'Widgets (Weather, Pollen, Quote, …) can be toggled on/off in User Settings.' },
+      { de: 'Der Aktivitätslog unten zeigt, was zuletzt im Haushalt passiert ist.', en: 'The activity log at the bottom shows recent household activity.' },
+    ],
+  },
+  todos: {
+    title: { de: 'Aufgaben & Listen', en: 'Tasks & Lists' },
+    steps: [
+      { de: 'Erstelle mehrere Listen (z.B. „Haushalt", „Arbeit") und füge Aufgaben per Tippen hinzu.', en: 'Create multiple lists (e.g. "Household", "Work") and add tasks with a tap.' },
+      { de: 'Weise Aufgaben einem Haushaltsmitglied zu — sie bekommen eine Push-Benachrichtigung.', en: 'Assign tasks to a household member — they\'ll get a push notification.' },
+      { de: 'Setze ein Fälligkeitsdatum, damit nichts vergessen wird.', en: 'Set a due date so nothing slips through the cracks.' },
+      { de: 'Erledigte Aufgaben verschwinden automatisch aus der Ansicht.', en: 'Completed tasks automatically disappear from the view.' },
+    ],
+  },
+  calendar: {
+    title: { de: 'Kalender', en: 'Calendar' },
+    steps: [
+      { de: 'Füge Termine für dich oder den ganzen Haushalt hinzu.', en: 'Add events for yourself or the whole household.' },
+      { de: 'Geburtstage sind eine eigene Kategorie — sie erscheinen jedes Jahr automatisch.', en: 'Birthdays are a special category — they repeat automatically every year.' },
+      { de: 'Abonniere externe Kalender (Schulferien, Vereinstermine) per ICS-Link.', en: 'Subscribe to external calendars (school holidays, clubs) via ICS link.' },
+      { de: 'Wechsle zwischen Agenda-, Monats- und Wochenansicht in den User-Settings.', en: 'Switch between agenda, month, and week view in User Settings.' },
+    ],
+  },
+  notes: {
+    title: { de: 'Notizen', en: 'Sticky Notes' },
+    steps: [
+      { de: 'Klebe Post-its für dich selbst oder den ganzen Haushalt.', en: 'Pin sticky notes for yourself or the whole household.' },
+      { de: '„Privat" — nur du siehst es. „Alle" — jeder kann lesen und bearbeiten. „Nur andere" — du siehst es nicht, ideal für Überraschungen.', en: '"Private" — only you see it. "All" — everyone can read and edit. "Others only" — you don\'t see it, perfect for surprises.' },
+      { de: 'Tippe auf eine Notiz um sie zu bearbeiten oder zu löschen.', en: 'Tap a note to edit or delete it.' },
+    ],
+  },
+  lists: {
+    title: { de: 'Einkaufslisten', en: 'Shopping Lists' },
+    steps: [
+      { de: 'Erstelle beliebig viele Einkaufslisten.', en: 'Create as many shopping lists as you need.' },
+      { de: 'Artikel werden per KI automatisch kategorisiert (Obst, Milchprodukte, …).', en: 'Items are automatically categorised by AI (Fruit, Dairy, …).' },
+      { de: 'Tippe auf einen Artikel um ihn als gekauft zu markieren — er wandert nach unten.', en: 'Tap an item to mark it as bought — it moves to the bottom.' },
+      { de: 'Eigene Kategorien kannst du in den Listen-Einstellungen anlegen.', en: 'Add custom categories in the list settings.' },
+    ],
+  },
+  budget: {
+    title: { de: 'Budget', en: 'Budget' },
+    steps: [
+      { de: 'Erfasse Ausgaben mit Betrag, Datum und Beschreibung.', en: 'Log expenses with amount, date, and description.' },
+      { de: 'Die Dashboard-Kachel zeigt dir den Gesamtbetrag des laufenden Monats.', en: 'The dashboard tile shows your total spending for the current month.' },
+      { de: 'Filtere Einträge nach Monat um den Überblick zu behalten.', en: 'Filter entries by month to keep track over time.' },
+    ],
+  },
+};
+
+function TourModal({ tourId, language, onDismiss }: { tourId: string; language: Lang; onDismiss: () => void }) {
+  const tour = TOURS[tourId];
+  if (!tour) return null;
+  const lang = language as 'de' | 'en';
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9000,
+      background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)',
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+      padding: '0 0 24px',
+    }}>
+      <div className="card" style={{
+        width: '100%', maxWidth: '480px', margin: '0 16px',
+        padding: 'var(--spacing-lg)',
+        boxShadow: '0 8px 40px rgba(0,0,0,0.25)',
+        borderRadius: 'var(--rounded-xl)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 'var(--spacing-md)' }}>
+          <span style={{ fontSize: '22px' }}>👋</span>
+          <h2 className="text-title-md" style={{ margin: 0 }}>{tour.title[lang]}</h2>
+        </div>
+        <ul style={{ margin: '0 0 var(--spacing-lg)', padding: '0 0 0 18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {tour.steps.map((step, i) => (
+            <li key={i} className="text-body-sm" style={{ lineHeight: 1.5, color: 'var(--color-ink)' }}>
+              {step[lang]}
+            </li>
+          ))}
+        </ul>
+        <button className="btn-primary" style={{ width: '100%' }} onClick={onDismiss}>
+          {lang === 'de' ? 'Verstanden!' : 'Got it!'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── WeatherWidget ────────────────────────────────────────────────────────────
 
 const WEATHER_CACHE_TTL = 60 * 60 * 1000; // 1 hour
@@ -1067,6 +1159,7 @@ function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [defaultCalView, setDefaultCalView] = useState<'agenda' | 'month' | 'week'>('agenda');
   const [dashboardWidgets, setDashboardWidgets] = useState<string[]>(['todos', 'budget']);
+  const [toursSeen, setToursSeen] = useState<string[]>([]);
   const [activityEntries, setActivityEntries] = useState<any[]>([]);
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [memberDisplayNames, setMemberDisplayNames] = useState<Record<string, string>>({});
@@ -1149,7 +1242,7 @@ function App() {
   async function fetchUserProfile(userId: string) {
     const { data } = await supabase
       .from('profiles')
-      .select('language, notification_preferences, display_name, avatar_color, avatar_url, theme, default_calendar_view, dashboard_widgets')
+      .select('language, notification_preferences, display_name, avatar_color, avatar_url, theme, default_calendar_view, dashboard_widgets, tours_seen')
       .eq('id', userId)
       .maybeSingle();
     if (data?.language) setLanguage(data.language as Lang);
@@ -1166,6 +1259,7 @@ function App() {
     if (data?.theme === 'dark') setTheme('dark');
     if (data?.default_calendar_view) setDefaultCalView(data.default_calendar_view as 'agenda' | 'month' | 'week');
     if (Array.isArray(data?.dashboard_widgets)) setDashboardWidgets(data.dashboard_widgets as string[]);
+    if (Array.isArray(data?.tours_seen)) setToursSeen(data.tours_seen as string[]);
   }
 
   async function fetchMemberColors(hId: string) {
@@ -1307,6 +1401,12 @@ function App() {
   async function handleDashboardWidgetsChange(widgets: string[]) {
     setDashboardWidgets(widgets);
     await supabase.from('profiles').update({ dashboard_widgets: widgets }).eq('id', session.user.id);
+  }
+
+  async function handleTourDismiss(tourId: string) {
+    const updated = [...toursSeen, tourId];
+    setToursSeen(updated);
+    await supabase.from('profiles').update({ tours_seen: updated }).eq('id', session.user.id);
   }
 
   async function enableNotifications() {
@@ -1720,6 +1820,11 @@ function App() {
       <main className="main-content">
         {renderTab()}
       </main>
+
+      {/* One-time tour modals */}
+      {session && homeId && !toursSeen.includes(activeTab) && TOURS[activeTab] && (
+        <TourModal tourId={activeTab} language={language} onDismiss={() => handleTourDismiss(activeTab)} />
+      )}
 
       {/* Dynamic Bottom Navigation */}
       <nav className="bottom-nav">
