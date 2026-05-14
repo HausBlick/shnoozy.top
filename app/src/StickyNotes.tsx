@@ -41,7 +41,6 @@ function getTextConfig(content: string): { fontSize: number; lineClamp: number; 
 
 interface DeckProps {
   notes: StickyNote[];
-  myId: string;
   topIndex: number;
   onSwipe: () => void;
   onSeeAll?: () => void;
@@ -50,7 +49,7 @@ interface DeckProps {
   memberColors: Record<string, string>;
 }
 
-function NoteDeck({ notes, myId, topIndex, onSwipe, onSeeAll, onAdd, labels, memberColors }: DeckProps) {
+function NoteDeck({ notes, topIndex, onSwipe, onSeeAll, onAdd, labels, memberColors }: DeckProps) {
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [leaving, setLeaving] = useState<'left' | 'right' | null>(null);
@@ -351,7 +350,6 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote, lan
       {compact ? (
         <NoteDeck
           notes={visibleNotes}
-          myId={myId}
           topIndex={deckTopIndex}
           onSwipe={() => setDeckTopIndex(prev => visibleNotes.length > 0 ? (prev + 1) % visibleNotes.length : 0)}
           onSeeAll={onSeeAll}

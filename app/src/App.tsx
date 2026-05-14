@@ -488,7 +488,6 @@ function App() {
     notes_new: false,
   });
   const [memberColors, setMemberColors] = useState<Record<string, string>>({});
-  const [memberAvatarUrls, setMemberAvatarUrls] = useState<Record<string, string>>({});
   const [myDisplayName, setMyDisplayName] = useState('');
   const [myAvatarColor, setMyAvatarColor] = useState('#14d8db');
   const [myAvatarUrl, setMyAvatarUrl] = useState('');
@@ -585,16 +584,13 @@ function App() {
     const userIds = members.map((m: any) => m.user_id);
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, avatar_color, avatar_url')
+      .select('id, avatar_color')
       .in('id', userIds);
     const colors: Record<string, string> = {};
-    const avatarUrls: Record<string, string> = {};
     for (const p of profiles ?? []) {
       colors[p.id] = p.avatar_color || '#14d8db';
-      if (p.avatar_url) avatarUrls[p.id] = p.avatar_url;
     }
     setMemberColors(colors);
-    setMemberAvatarUrls(avatarUrls);
   }
 
   async function fetchUserHome(userId: string) {
@@ -737,13 +733,11 @@ function App() {
     const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
     const url = `${publicUrl}?v=${Date.now()}`;
     setMyAvatarUrl(url);
-    setMemberAvatarUrls(prev => ({ ...prev, [session.user.id]: url }));
     await supabase.from('profiles').update({ avatar_url: url }).eq('id', session.user.id);
   }
 
   async function handleAvatarRemove() {
     setMyAvatarUrl('');
-    setMemberAvatarUrls(prev => { const next = { ...prev }; delete next[session.user.id]; return next; });
     await supabase.from('profiles').update({ avatar_url: null }).eq('id', session.user.id);
   }
 
