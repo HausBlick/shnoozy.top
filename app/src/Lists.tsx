@@ -28,16 +28,39 @@ interface ShoppingSubcategory {
   sort_order: number;
 }
 
+const CAT_TRANSLATIONS: Record<string, { de: string }> = {
+  // categories
+  'Fruits & Veggies': { de: 'Obst & Gemüse' },
+  'Cleaning':         { de: 'Reinigung' },
+  'Groceries':        { de: 'Lebensmittel' },
+  'Misc':             { de: 'Sonstiges' },
+  // subcategories
+  'Spices':           { de: 'Gewürze' },
+  'Meat':             { de: 'Fleisch' },
+  'Frozen':           { de: 'Tiefkühl' },
+  'Coffee & Tea':     { de: 'Kaffee & Tee' },
+  'Dairy':            { de: 'Milchprodukte' },
+  'Cans & Boxes':     { de: 'Konserven & Packungen' },
+  'Dry Food':         { de: 'Trockenwaren' },
+  'Drinks':           { de: 'Getränke' },
+  'Snacks':           { de: 'Snacks' },
+};
+
+function tCat(name: string, lang: Lang): string {
+  if (lang !== 'de') return name;
+  return CAT_TRANSLATIONS[name]?.de ?? name;
+}
+
 const SWATCHES = [
   '#14d8db', '#7a041f', '#f57c00', '#1e88e5',
   '#43a047', '#8e24aa', '#e53935', '#546e7a',
   '#ff9500', '#00897b', '#d81b60', '#6d4c41',
 ];
 
-const CategoryLabel = ({ cat }: { cat: ShoppingCategory }) => (
+const CategoryLabel = ({ cat, lang }: { cat: ShoppingCategory; lang: Lang }) => (
   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
     <span style={{ fontSize: '15px', lineHeight: 1 }}>{cat.icon}</span>
-    <span style={{ color: cat.color }}>{cat.name}</span>
+    <span style={{ color: cat.color }}>{tCat(cat.name, lang)}</span>
   </span>
 );
 
@@ -526,7 +549,7 @@ export function Lists({ homeId, language, userId }: { homeId: string; language: 
               padding: '8px 0 2px 0',
               marginTop: '2px',
             }}>
-              {subName}
+              {tCat(subName, language)}
             </div>
           )}
           {subItems.map(item => renderItem(item))}
@@ -688,7 +711,7 @@ export function Lists({ homeId, language, userId }: { homeId: string; language: 
             return (
               <div key={cat.id} style={{ marginBottom: 'var(--spacing-lg)' }}>
                 <div className="schedule-month-divider" style={{ marginBottom: 'var(--spacing-sm)' }}>
-                  <CategoryLabel cat={cat} />
+                  <CategoryLabel cat={cat} lang={language} />
                 </div>
                 {renderCategoryItems(cat, catItems)}
               </div>
