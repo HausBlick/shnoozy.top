@@ -570,7 +570,6 @@ function App() {
     setMemberColors(prev => ({ ...prev, [userId]: color }));
     if (data?.avatar_url) {
       setMyAvatarUrl(data.avatar_url);
-      setMemberAvatarUrls(prev => ({ ...prev, [userId]: data.avatar_url }));
     }
     if (data?.theme === 'dark') setTheme('dark');
   }
