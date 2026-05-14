@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { lat, lon } = await req.json();
+    const { lat, lon, lang = 'de' } = await req.json();
     if (typeof lat !== 'number' || typeof lon !== 'number') {
       return new Response(JSON.stringify({ error: 'lat and lon required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -37,15 +37,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    const weatherRes = await fetch(
-      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${owmKey}&units=metric`
-    );
+    // Parallel: weather + air pollution
+    const [weatherRes, airRes] = await Promise.all([
+      fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${owmKey}&units=metric`),
+      fetch(`https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${owmKey}`),
+    ]);
+
     if (!weatherRes.ok) {
       return new Response(JSON.stringify({ error: 'Weather API error' }), {
         status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const weather = await weatherRes.json();
+
+    const [weather, air] = await Promise.all([weatherRes.json(), airRes.json()]);
 
     const temp = Math.round(weather.main.temp);
     const feelsLike = Math.round(weather.main.feels_like);
@@ -55,10 +59,25 @@ Deno.serve(async (req) => {
     const humidity = weather.main.humidity;
     const windSpeed = Math.round(weather.wind?.speed ?? 0);
 
+    const aqi: number = air?.list?.[0]?.main?.aqi ?? 0;
+    const components = air?.list?.[0]?.components ?? {};
+    const pm25 = Math.round((components.pm2_5 ?? 0) * 10) / 10;
+    const pm10 = Math.round((components.pm10 ?? 0) * 10) / 10;
+    const o3 = Math.round((components.o3 ?? 0) * 10) / 10;
+    const no2 = Math.round((components.no2 ?? 0) * 10) / 10;
+
     let recommendation = '';
     if (geminiKey) {
       try {
-        const prompt = `Aktuelles Wetter in ${city}: ${description}, ${temp}°C (gefühlt ${feelsLike}°C), Luftfeuchtigkeit ${humidity}%, Wind ${windSpeed} m/s. Gib eine kurze, praktische Alltagsempfehlung (max. 12 Wörter, kein Emoji am Anfang, direkt ansprechend).`;
+        const isDE = lang === 'de';
+        const aqiLabels = isDE
+          ? ['', 'Gut', 'Mäßig gut', 'Mäßig', 'Schlecht', 'Sehr schlecht']
+          : ['', 'Good', 'Fair', 'Moderate', 'Poor', 'Very Poor'];
+
+        const prompt = isDE
+          ? `Aktuelles Wetter in ${city}: ${description}, ${temp}°C (gefühlt ${feelsLike}°C), Luftfeuchtigkeit ${humidity}%, Wind ${windSpeed} m/s. Luftqualität: AQI ${aqiLabels[aqi] ?? aqi}, PM2.5 ${pm25} µg/m³. Gib eine kurze, praktische Alltagsempfehlung auf Deutsch (max. 15 Wörter, kein Emoji am Anfang, direkt ansprechend).`
+          : `Current weather in ${city}: ${description}, ${temp}°C (feels like ${feelsLike}°C), humidity ${humidity}%, wind ${windSpeed} m/s. Air quality: AQI ${aqiLabels[aqi] ?? aqi}, PM2.5 ${pm25} µg/m³. Give a short, practical everyday tip in English (max 15 words, no emoji at start, direct tone).`;
+
         const geminiRes = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
           {
@@ -70,12 +89,12 @@ Deno.serve(async (req) => {
         const geminiData = await geminiRes.json();
         recommendation = geminiData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
       } catch {
-        // Gemini failure is non-fatal
+        // non-fatal
       }
     }
 
     return new Response(
-      JSON.stringify({ temp, feelsLike, description, city, iconEmoji, humidity, windSpeed, recommendation }),
+      JSON.stringify({ temp, feelsLike, description, city, iconEmoji, humidity, windSpeed, recommendation, aqi, pm25, pm10, o3, no2 }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {

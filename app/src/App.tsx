@@ -623,8 +623,16 @@ function BudgetDashboardWidget({ homeId, language, onNavigate }: { homeId: strin
 
 // ─── WeatherWidget ────────────────────────────────────────────────────────────
 
-const WEATHER_CACHE_KEY = 'shnoozy_weather_cache';
 const WEATHER_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+function weatherCacheKey(lang: Lang) { return `shnoozy_weather_cache_${lang}`; }
+
+const AQI_META: Record<number, { label: { de: string; en: string }; color: string }> = {
+  1: { label: { de: 'Gut',          en: 'Good'       }, color: '#22c55e' },
+  2: { label: { de: 'Mäßig gut',    en: 'Fair'       }, color: '#84cc16' },
+  3: { label: { de: 'Mäßig',        en: 'Moderate'   }, color: '#f59e0b' },
+  4: { label: { de: 'Schlecht',     en: 'Poor'       }, color: '#f97316' },
+  5: { label: { de: 'Sehr schlecht',en: 'Very Poor'  }, color: '#ef4444' },
+};
 
 interface WeatherData {
   temp: number;
@@ -635,6 +643,11 @@ interface WeatherData {
   humidity: number;
   windSpeed: number;
   recommendation: string;
+  aqi: number;
+  pm25: number;
+  pm10: number;
+  o3: number;
+  no2: number;
 }
 
 function WeatherWidget({ language }: { language: Lang }) {
@@ -643,9 +656,10 @@ function WeatherWidget({ language }: { language: Lang }) {
   const [status, setStatus] = useState<'loading' | 'denied' | 'error' | 'ok'>('loading');
 
   useEffect(() => {
+    const cacheKey = weatherCacheKey(language);
     const cached = (() => {
       try {
-        const raw = localStorage.getItem(WEATHER_CACHE_KEY);
+        const raw = localStorage.getItem(cacheKey);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
         if (Date.now() - parsed.cachedAt < WEATHER_CACHE_TTL) return parsed.data as WeatherData;
@@ -661,10 +675,10 @@ function WeatherWidget({ language }: { language: Lang }) {
       async (pos) => {
         try {
           const { data: res, error } = await supabase.functions.invoke('get-weather', {
-            body: { lat: pos.coords.latitude, lon: pos.coords.longitude },
+            body: { lat: pos.coords.latitude, lon: pos.coords.longitude, lang: language },
           });
           if (error || res?.error) { setStatus('error'); return; }
-          localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ data: res, cachedAt: Date.now() }));
+          localStorage.setItem(cacheKey, JSON.stringify({ data: res, cachedAt: Date.now() }));
           setData(res as WeatherData);
           setStatus('ok');
         } catch { setStatus('error'); }
@@ -672,7 +686,7 @@ function WeatherWidget({ language }: { language: Lang }) {
       () => setStatus('denied'),
       { timeout: 8000 }
     );
-  }, []);
+  }, [language]);
 
   if (status === 'denied') return (
     <div className="card" style={{ marginBottom: 'var(--spacing-lg)', opacity: 0.6 }}>
@@ -692,26 +706,62 @@ function WeatherWidget({ language }: { language: Lang }) {
     </div>
   );
 
+  const aqiMeta = AQI_META[data.aqi];
+
   return (
     <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 'var(--spacing-xs)' }}>
+      {/* Top row: temp + city */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 'var(--spacing-sm)' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-            <span style={{ fontSize: '36px', lineHeight: 1 }}>{data.iconEmoji}</span>
-            <span style={{ fontSize: '32px', fontWeight: 700, lineHeight: 1 }}>{data.temp}°</span>
+            <span style={{ fontSize: '40px', lineHeight: 1 }}>{data.iconEmoji}</span>
+            <span style={{ fontSize: '36px', fontWeight: 700, lineHeight: 1 }}>{data.temp}°</span>
           </div>
           <div className="text-body-sm text-muted" style={{ marginTop: '4px', textTransform: 'capitalize' }}>{data.description}</div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <div className="text-body-sm" style={{ fontWeight: 600 }}>{data.city}</div>
-          <div className="text-body-sm text-muted">💧 {data.humidity}% · 💨 {data.windSpeed} m/s</div>
+          <div className="text-body-sm text-muted" style={{ marginTop: '2px' }}>💧 {data.humidity}% · 💨 {data.windSpeed} m/s</div>
+          {aqiMeta && (
+            <div style={{
+              display: 'inline-block', marginTop: '4px',
+              padding: '2px 8px', borderRadius: 'var(--rounded-full)',
+              background: aqiMeta.color + '22', border: `1px solid ${aqiMeta.color}55`,
+              color: aqiMeta.color, fontSize: '11px', fontWeight: 700,
+            }}>
+              AQI · {aqiMeta.label[language] ?? aqiMeta.label.de}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* AQI details row */}
+      {data.aqi > 0 && (
+        <div style={{ display: 'flex', gap: '10px', marginBottom: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
+          {[
+            { label: 'PM2.5', value: data.pm25, unit: 'µg/m³' },
+            { label: 'PM10',  value: data.pm10, unit: 'µg/m³' },
+            { label: 'O₃',    value: data.o3,   unit: 'µg/m³' },
+            { label: 'NO₂',   value: data.no2,  unit: 'µg/m³' },
+          ].map(({ label, value }) => (
+            <div key={label} style={{ fontSize: '11px', color: 'var(--color-muted)' }}>
+              <span style={{ fontWeight: 600, color: 'var(--color-ink)' }}>{label}</span> {value}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Gemini recommendation — prominent */}
       {data.recommendation && (
         <div style={{
-          marginTop: 'var(--spacing-sm)', padding: '8px 10px',
-          background: 'var(--color-surface)', borderRadius: 'var(--rounded-sm)',
-          fontSize: '13px', color: 'var(--color-ink)', fontStyle: 'italic',
+          padding: '10px 12px',
+          background: 'var(--color-surface)',
+          borderRadius: 'var(--rounded-sm)',
+          borderLeft: '3px solid var(--color-primary)',
+          fontSize: '15px',
+          fontWeight: 500,
+          color: 'var(--color-ink)',
+          lineHeight: 1.4,
         }}>
           {data.recommendation}
         </div>
