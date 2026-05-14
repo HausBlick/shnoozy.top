@@ -6,8 +6,8 @@
 
 ## Current Status
 **Live unter:** https://shnoozy.top
-**Phase:** Phase 11 ✅ — Dashboard-Redesign abgeschlossen (Session 6, 2026-05-14)
-**Nächste Phase:** Phase 11.4 — Tages-Quote Widget / Phase 12 (TBD)
+**Phase:** Phase 11 ✅ — Dashboard-Redesign + Widgets abgeschlossen (Session 7, 2026-05-14)
+**Nächste Phase:** Budget-Konzept ausarbeiten / Phase 12 (TBD)
 
 ---
 
@@ -254,16 +254,37 @@
 - [x] `lib/activityLog.ts` fire-and-forget Helper
 
 #### 11.3 Wetter + KI-Empfehlung Widget ✅ FERTIG
-- [x] Edge Function `get-weather` (OpenWeatherMap API, Gemini-Empfehlung, Emoji-Mapping, CORS)
+- [x] Edge Function `get-weather` (OpenWeatherMap API + Air Pollution API parallel, Gemini-Empfehlung, Emoji-Mapping, CORS)
 - [x] `OPENWEATHER_API_KEY` als Supabase Secret erforderlich (manuell setzen)
-- [x] WeatherWidget: Geolocation API → Edge Function → localStorage-Cache (1h TTL)
-- [x] Anzeige: Emoji + Temp, Beschreibung, Stadt, Luftfeuchtigkeit, Wind, Gemini-Empfehlung
-- [x] Reorderable: 'weather' in dashboardWidgets, ▲/▼-Reorder in User-Settings
+- [x] WeatherWidget: Geolocation API → Edge Function → localStorage-Cache (1h TTL, sprachspezifischer Cache-Key)
+- [x] Anzeige: Emoji + Temp, Beschreibung, Stadt, Luftfeuchtigkeit, Wind, AQI-Badge (farbkodiert), PM2.5/PM10/O₃/NO₂, Gemini-Empfehlung (DE/EN)
+- [x] Reload-Button (↺) neben Stadtname: löscht Cache, fetcht neu, Spin-Animation während Laden
+- [x] Reorderable + togglebar: 'weather' in dashboardWidgets, User-Settings zeigt alle 5 Widgets mit Toggle + ▲/▼
 
-#### 11.4 Tages-Quote / Inspiration Widget ⬜ OFFEN
-- [ ] Gemini-Prompt mit täglichem Caching (1x pro Tag generieren, in `home_settings` zwischenspeichern)
-- [ ] Alternativ: freie Quotes-API (quotable.io)
-- [ ] Fokus: Selbstverwirklichung/Optimierung + interessante Fakten zum Kalendertag
+#### 11.4 Tages-Quote Widget ✅ FERTIG
+- [x] Edge Function `get-daily-quote`: Gemini generiert tägl. inspirierende Aussage in DE/EN (max 2 Sätze)
+- [x] localStorage-Cache: Key = `shnoozy_quote_{lang}_{YYYY-MM-DD}`, TTL 24h (automatisch am nächsten Tag neu)
+- [x] QuoteWidget: großes Anführungszeichen, kursiver Text, Error/Loading States
+- [x] Standardmäßig deaktiviert — User aktiviert in User-Settings
+
+#### 11.5 Pollen Widget ✅ FERTIG
+- [x] Edge Function `get-pollen`: Google Pollen API (GRASS/TREE/WEED), Index 0–5 mit Farb- und DE/EN-Label-Mapping
+- [x] `GOOGLE_MAPS_API_KEY` als Supabase Secret erforderlich (manuell setzen)
+- [x] localStorage-Cache: 6h TTL analog WeatherWidget
+- [x] PollenWidget: 3 Zeilen (🌿/🌳/🌱), farbkodierte Index-Badges (grün→rot)
+- [x] Standardmäßig deaktiviert — User aktiviert in User-Settings
+
+#### 11.6 User-Settings Dashboard-Widgets ✅ FERTIG
+- [x] Alle 5 mittleren Widgets (Aufgaben, Budget, Wetter, Zitat, Pollen) mit Toggle-Schaltern in User-Settings
+- [x] Enabled-Widgets werden in ihrer Reihenfolge gerendert (Bug fix: ALL_MIDDLE-Order → enabledWidgets-Order)
+- [x] Disabled-Widgets unterhalb der enabled Widgets ohne Reorder-Pfeile
+- [x] Kalender-Label in User-Settings: "Kalender: Standard-Ansicht" (DE) / "Calendar: Default View" (EN)
+
+#### 11.7 Einmaliger Starter-Guide (Tour Modals) ✅ FERTIG
+- [x] `profiles.tours_seen` JSONB-Array (Migration `add_tours_seen_to_profiles`)
+- [x] `TourModal`-Komponente: Bottom-Sheet-Overlay, 👋-Header, Bullet-Liste, "Verstanden!"-Button
+- [x] `TOURS`-Konstante in App.tsx mit DE+EN-Texten für 6 Tools: Dashboard, Aufgaben, Kalender, Notizen, Einkauf, Budget
+- [x] Einmalig pro Tab beim ersten Besuch, in DB persistiert (geräteübergreifend)
 
 ---
 
@@ -345,6 +366,8 @@
 | — | `012_shopping_categories.sql` | `shopping_categories`, `shopping_subcategories`, `profiles.language`; Default-Kategorien für Home `89cd774f` |
 | — | `nav_slots_modules_active` | `home_settings`: `nav_slots` + `modules_active` Default-Werte für Home `89cd774f` per SQL eingefügt |
 | — | `phase11_activity_log_dashboard_widgets` | `activity_log`-Tabelle + RLS + Realtime; `profiles.dashboard_widgets` JSONB-Spalte (Default `["todos","budget","weather"]`) |
+| — | `add_tours_seen_to_profiles` | `profiles.tours_seen` JSONB-Array (Default `[]`) für einmalige Tour-Modals |
+| — | `seed_default_shopping_categories_on_home_create` | `handle_new_home()`-Trigger erweitert: seeded 5 Default-Kategorien (Fruits & Veggies, Drogerie, Cleaning, Groceries+9 Subs, Misc) für jedes neue Home |
 
 ## ⚙️ Supabase Edge Functions
 
@@ -359,7 +382,9 @@
 | `ics-feed` | HTTP (public, Token-Auth) | ICS-Kalender-Feed für externe Abonnements | ✅ aktiv |
 | `sync-ical-subscriptions` | HTTP (pg_cron alle 6h + Frontend) | Externe ICS-Feeds fetchen, parsen, in `external_events` speichern | ✅ aktiv |
 | `send-todo-push` | HTTP (Frontend, JWT-Auth) | Push-Notification bei Task-Zuweisung (prüft `todo_assigned`-Präferenz) | ✅ aktiv |
-| `get-weather` | HTTP (Frontend, JWT-Auth) | OpenWeatherMap + Gemini-Tagesempfehlung | ✅ aktiv (braucht `OPENWEATHER_API_KEY` Secret) |
+| `get-weather` | HTTP (Frontend, JWT-Auth) | OpenWeatherMap + Air Pollution API + Gemini-Tagesempfehlung | ✅ aktiv (braucht `OPENWEATHER_API_KEY` Secret) |
+| `get-daily-quote` | HTTP (Frontend, verify_jwt: false) | Gemini generiert tägl. Quote in DE/EN | ✅ aktiv |
+| `get-pollen` | HTTP (Frontend, verify_jwt: false) | Google Pollen API (GRASS/TREE/WEED, Index 0–5) | ✅ aktiv (braucht `GOOGLE_MAPS_API_KEY` Secret) |
 
 ---
 
@@ -392,3 +417,8 @@
 *   **2026-05-14 (Session 4):** Phase 9.2 (ICS-Import / Kalender-Abonnements) abgeschlossen: `calendar_subscriptions` + `external_events` Tabellen mit RLS + Realtime. EF `sync-ical-subscriptions` deployed (pg_cron alle 6h + manuell per `subscription_id`). RFC 5545 Parser in Deno (Line-Unfolding, DATE/DATETIME, CET-Fallback für nicht-UTC). HomeSettings: Abonnements verwalten (Add mit 8-Farb-Picker, Delete 2-Tap, Sofort-Sync). Kalender: externe Events in Agenda/Monat/Woche mit Subscription-Farb-Chips, schreibgeschützt.
 *   **2026-05-14 (Session 4):** Phase 9.1 (Kalender-Ansichten + ICS-Export) abgeschlossen: Agenda/Monat/Woche-Views mit Sticky Header, farbigen Event-Chips (getCatChipStyle, rgba-Fill + linker Border). Agenda zeigt nur heute + Zukunft (kein Scroll-Jump). `ics-feed` Edge Function deployed (Token-Auth, REFRESH PT1H). ICS-Sektion in HomeSettings (Token generieren, URL kopieren/teilen/zurücksetzen). i18n en/de vollständig.
 *   **2026-05-14 (Session 4):** Phase 6.4 Einladungssystem vollständig implementiert: EF `generate-invite` (JWT-auth'd, Admin-Check über `home_members.role`, `crypto.randomUUID()`-Token, INSERT in `home_invitations`, gibt `https://shnoozy.top?token=…` zurück), EF `accept-invite` (JWT-auth'd, Token-Validierung, idempotenter `home_members` INSERT, Token als used markieren). Frontend `HomeSettings.tsx`: Invite-Sektion nur für Admins sichtbar, Web Share API + Clipboard-Fallback, Link-Anzeige, "Neuen Link erstellen"-Reset. i18n en/de vollständig.
+*   **2026-05-14 (Session 7):** WeatherWidget: Reload-Button (↺) neben Stadtname, löscht localStorage-Cache und fetcht live, Spin-Animation via `@keyframes spin`. AQI aus Air Pollution API integriert (farbkodiertes Badge + PM2.5/PM10/O₃/NO₂). Gemini-Empfehlung sprachabhängig (DE/EN, separater Cache-Key pro Sprache).
+*   **2026-05-14 (Session 7):** Phase 11.4–11.5: QuoteWidget (Gemini, 24h localStorage-Cache nach Datum+Sprache) + PollenWidget (Google Pollen API, 6h Cache, Geolocation) als neue Dashboard-Widgets. EFs `get-daily-quote` + `get-pollen` deployed. Beide standardmäßig deaktiviert, in User-Settings aktivierbar.
+*   **2026-05-14 (Session 7):** Phase 11.6: User-Settings Dashboard-Widget-Sektion komplett überarbeitet: alle 5 mittleren Widgets (Aufgaben, Budget, Wetter, Zitat, Pollen) mit Toggle-Schaltern; Enabled-Widgets in ihrer Reihenfolge gerendert (Bug fix für Reorder-Anzeige); Disabled-Widgets getrennt darunter. Kalender-Label präzisiert.
+*   **2026-05-14 (Session 7):** Phase 11.7: Einmaliger Starter-Guide (Tour Modals). Migration `add_tours_seen_to_profiles` (`profiles.tours_seen` JSONB). `TourModal`-Komponente als Bottom-Sheet-Overlay. `TOURS`-Konstante mit DE+EN-Texten für 6 Tools. Erscheint einmalig beim ersten Besuch jedes Tabs, wird sofort in DB persistiert (geräteübergreifend kein zweites Mal).
+*   **2026-05-14 (Session 7):** Bug fixes: (1) Shopping-Kategorien werden für DE-User übersetzt (`CAT_TRANSLATIONS`-Map in Lists.tsx — DB-Werte bleiben Englisch für Gemini). (2) `handle_new_home()`-Trigger erweitert: seeded ab sofort 5 Default-Kategorien + 9 Groceries-Subkategorien für jedes neue Home (ohne Luna — die ist nur für Home `89cd774f`).
