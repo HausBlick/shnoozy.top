@@ -166,10 +166,45 @@ function getNavLabel(id: ModuleId, t: ReturnType<typeof getT>): string {
   }
 }
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const AVATAR_COLORS = ['#14d8db','#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6','#f97316','#ec4899'];
+
 // ─── User Settings page ───────────────────────────────────────────────────────
+
+function NotifToggle({ label, description, value, onChange }: {
+  label: string; description: string; value: boolean; onChange: (v: boolean) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 'var(--spacing-sm)', paddingBottom: 'var(--spacing-sm)', borderBottom: '1px solid var(--color-hairline-soft)' }}>
+      <div style={{ flex: 1, paddingRight: 'var(--spacing-md)' }}>
+        <div className="text-body-md" style={{ fontWeight: 500 }}>{label}</div>
+        <div className="text-body-sm text-muted">{description}</div>
+      </div>
+      <button
+        role="switch"
+        aria-checked={value}
+        onClick={() => onChange(!value)}
+        style={{
+          width: 44, height: 26, borderRadius: 13,
+          background: value ? 'var(--color-primary)' : 'var(--color-surface-strong)',
+          border: 'none', cursor: 'pointer', position: 'relative', flexShrink: 0,
+          transition: 'background 0.2s',
+        }}
+      >
+        <span style={{
+          position: 'absolute', top: 3, left: value ? 21 : 3,
+          width: 20, height: 20, borderRadius: '50%', background: 'white',
+          transition: 'left 0.2s',
+        }} />
+      </button>
+    </div>
+  );
+}
 
 function UserSettingsPage({
   language, onLanguageChange, onBack, onLogout, notifStatus, onReRegister,
+  notifPrefs, onNotifPrefChange, myDisplayName, myAvatarColor, onDisplayNameSave, onAvatarColorChange,
 }: {
   language: Lang;
   onLanguageChange: (lang: Lang) => void;
@@ -177,13 +212,77 @@ function UserSettingsPage({
   onLogout: () => void;
   notifStatus: 'unsupported' | 'default' | 'granted' | 'denied';
   onReRegister: () => void;
+  notifPrefs: Record<string, boolean>;
+  onNotifPrefChange: (key: string, value: boolean) => void;
+  myDisplayName: string;
+  myAvatarColor: string;
+  onDisplayNameSave: (name: string) => void;
+  onAvatarColorChange: (color: string) => void;
 }) {
   const t = getT(language);
+  const [localName, setLocalName] = useState(myDisplayName);
+  useEffect(() => { setLocalName(myDisplayName); }, [myDisplayName]);
+
   return (
     <div style={{ paddingBottom: '120px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: 0 }}>←</button>
         <h1 className="text-display-lg">{t.userSettings}</h1>
+      </div>
+
+      {/* Profile Card */}
+      <div className="card" style={{ marginBottom: 'var(--spacing-md)' }}>
+        <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-md)' }}>{t.profileSection}</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-md)' }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: '50%', background: myAvatarColor,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 22, fontWeight: 700, color: 'white', flexShrink: 0,
+          }}>
+            {(localName || myDisplayName || '?').charAt(0).toUpperCase()}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ marginBottom: '8px' }}>
+              <span className="text-body-sm" style={{ fontWeight: 600 }}>{t.avatarColor}</span>
+              <span className="text-body-sm text-muted" style={{ marginLeft: '6px' }}>{t.avatarColorHint}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {AVATAR_COLORS.map(c => (
+                <button
+                  key={c}
+                  onClick={() => onAvatarColorChange(c)}
+                  style={{
+                    width: 28, height: 28, borderRadius: '50%', background: c, border: 'none',
+                    cursor: 'pointer', padding: 0,
+                    outline: myAvatarColor === c ? `3px solid ${c}` : 'none',
+                    outlineOffset: '2px',
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div>
+          <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: '4px' }}>{t.displayName}</label>
+          <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+            <input
+              className="form-input"
+              style={{ flex: 1, width: 'auto' }}
+              value={localName}
+              onChange={e => setLocalName(e.target.value)}
+              placeholder={t.displayNamePlaceholder}
+              onKeyDown={e => { if (e.key === 'Enter') onDisplayNameSave(localName); }}
+            />
+            <button
+              className="btn-secondary"
+              onClick={() => onDisplayNameSave(localName)}
+              disabled={!localName.trim()}
+              style={{ flexShrink: 0, width: 'auto', padding: '13px 20px', background: 'var(--color-primary)', color: 'white', border: 'none' }}
+            >
+              {t.save}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: 'var(--spacing-md)' }}>
@@ -213,10 +312,35 @@ function UserSettingsPage({
 
       {notifStatus === 'granted' && (
         <div className="card" style={{ marginBottom: 'var(--spacing-md)' }}>
-          <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <BellIcon color="var(--color-primary)" size={18} /> {t.notificationsSection}
+          <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-md)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <BellIcon color="var(--color-primary)" size={18} /> {t.notifPrefsTitle}
           </h2>
-          <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>
+          <NotifToggle
+            label={t.notifCalendarDaily} description={t.notifCalendarDailyDesc}
+            value={notifPrefs.calendar_daily !== false}
+            onChange={v => onNotifPrefChange('calendar_daily', v)}
+          />
+          <NotifToggle
+            label={t.notifTodoAssigned} description={t.notifTodoAssignedDesc}
+            value={notifPrefs.todo_assigned !== false}
+            onChange={v => onNotifPrefChange('todo_assigned', v)}
+          />
+          <NotifToggle
+            label={t.notifTodoDueToday} description={t.notifTodoDueTodayDesc}
+            value={notifPrefs.todo_due_today !== false}
+            onChange={v => onNotifPrefChange('todo_due_today', v)}
+          />
+          <NotifToggle
+            label={t.notifShoppingAdded} description={t.notifShoppingAddedDesc}
+            value={notifPrefs.shopping_item_added === true}
+            onChange={v => onNotifPrefChange('shopping_item_added', v)}
+          />
+          <NotifToggle
+            label={t.notifNotesNew} description={t.notifNotesNewDesc}
+            value={notifPrefs.notes_new === true}
+            onChange={v => onNotifPrefChange('notes_new', v)}
+          />
+          <p className="text-body-sm text-muted" style={{ marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-md)' }}>
             {t.notifReRegisterHint}
           </p>
           <button className="btn-secondary" onClick={onReRegister}>{t.reRegister}</button>
@@ -273,6 +397,16 @@ function App() {
   const [isWifiModalOpen, setIsWifiModalOpen] = useState(false);
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
   const [notifStatus, setNotifStatus] = useState<'unsupported' | 'default' | 'granted' | 'denied'>('unsupported');
+  const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>({
+    calendar_daily: true,
+    todo_assigned: true,
+    todo_due_today: true,
+    shopping_item_added: false,
+    notes_new: false,
+  });
+  const [memberColors, setMemberColors] = useState<Record<string, string>>({});
+  const [myDisplayName, setMyDisplayName] = useState('');
+  const [myAvatarColor, setMyAvatarColor] = useState('#14d8db');
   const [toast, setToast] = useState<string | null>(null);
   const [wifiSsid, setWifiSsid] = useState('');
   const [wifiPassword, setWifiPassword] = useState('');
@@ -334,10 +468,35 @@ function App() {
   async function fetchUserProfile(userId: string) {
     const { data } = await supabase
       .from('profiles')
-      .select('language')
+      .select('language, notification_preferences, display_name, avatar_color')
       .eq('id', userId)
       .maybeSingle();
     if (data?.language) setLanguage(data.language as Lang);
+    if (data?.notification_preferences) {
+      setNotifPrefs(prev => ({ ...prev, ...(data.notification_preferences as Record<string, boolean>) }));
+    }
+    if (data?.display_name) setMyDisplayName(data.display_name);
+    const color = data?.avatar_color || '#14d8db';
+    setMyAvatarColor(color);
+    setMemberColors(prev => ({ ...prev, [userId]: color }));
+  }
+
+  async function fetchMemberColors(hId: string) {
+    const { data: members } = await supabase
+      .from('home_members')
+      .select('user_id')
+      .eq('home_id', hId);
+    if (!members || members.length === 0) return;
+    const userIds = members.map((m: any) => m.user_id);
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, avatar_color')
+      .in('id', userIds);
+    const colors: Record<string, string> = {};
+    for (const p of profiles ?? []) {
+      colors[p.id] = p.avatar_color || '#14d8db';
+    }
+    setMemberColors(colors);
   }
 
   async function fetchUserHome(userId: string) {
@@ -357,6 +516,7 @@ function App() {
         fetchUpcomingEvents(hId);
         fetchWifiSettings(hId);
         fetchHomeConfig(hId);
+        fetchMemberColors(hId);
       } else {
         setHomeId(null);
       }
@@ -465,6 +625,24 @@ function App() {
     }
   }
 
+  async function handleAvatarColorChange(color: string) {
+    setMyAvatarColor(color);
+    setMemberColors(prev => ({ ...prev, [session.user.id]: color }));
+    await supabase.from('profiles').update({ avatar_color: color }).eq('id', session.user.id);
+  }
+
+  async function handleDisplayNameSave(name: string) {
+    if (!name.trim()) return;
+    setMyDisplayName(name.trim());
+    await supabase.from('profiles').update({ display_name: name.trim() }).eq('id', session.user.id);
+  }
+
+  async function handleNotifPrefChange(key: string, value: boolean) {
+    const updated = { ...notifPrefs, [key]: value };
+    setNotifPrefs(updated);
+    await supabase.from('profiles').update({ notification_preferences: updated }).eq('id', session.user.id);
+  }
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
@@ -534,6 +712,7 @@ function App() {
           homeId={homeId}
           language={language}
           onNewNote={(note) => showToast(`New note from ${note.user_id.slice(0, 6)}`)}
+          memberColors={memberColors}
         />
       </div>
     );
@@ -639,6 +818,12 @@ function App() {
         onLogout={handleLogout}
         notifStatus={notifStatus}
         onReRegister={enableNotifications}
+        notifPrefs={notifPrefs}
+        onNotifPrefChange={handleNotifPrefChange}
+        myDisplayName={myDisplayName}
+        myAvatarColor={myAvatarColor}
+        onDisplayNameSave={handleDisplayNameSave}
+        onAvatarColorChange={handleAvatarColorChange}
       />
     );
 
@@ -680,6 +865,7 @@ function App() {
             language={language}
             onSeeAll={() => setActiveTab('notes')}
             onNewNote={(note) => showToast(`New note from ${note.user_id.slice(0, 6)}`)}
+            memberColors={memberColors}
           />
         </div>
 

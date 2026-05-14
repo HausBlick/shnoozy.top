@@ -660,15 +660,15 @@ export function Todos({ homeId, userId, language }: Props) {
 
     const { data: profileRows } = await supabase
       .from('profiles')
-      .select('id, display_name')
+      .select('id, display_name, avatar_color')
       .in('id', userIds);
 
-    const fallbackColors = ['#14d8db', '#7a041f', '#6366f1', '#f59e0b'];
     setMembers(userIds.map((uid: string, i: number) => {
       const profile = profileRows?.find((p: any) => p.id === uid);
       const isMe = uid === userId;
       const name = profile?.display_name || (isMe ? 'You' : `Member ${i + 1}`);
-      return { user_id: uid, display_name: name, color: fallbackColors[i % fallbackColors.length] };
+      const color = profile?.avatar_color || '#14d8db';
+      return { user_id: uid, display_name: name, color };
     }));
   }
 

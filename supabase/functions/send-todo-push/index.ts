@@ -168,6 +168,18 @@ Deno.serve(async (req) => {
       });
     }
 
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('notification_preferences')
+      .eq('id', assigned_to)
+      .maybeSingle();
+    const prefs = (profile?.notification_preferences ?? {}) as Record<string, boolean>;
+    if (prefs.todo_assigned === false) {
+      return new Response(JSON.stringify({ sent: 0 }), {
+        headers: { ...CORS, 'Content-Type': 'application/json' },
+      });
+    }
+
     let sent = 0;
     for (const sub of subs) {
       try {

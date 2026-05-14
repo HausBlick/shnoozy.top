@@ -36,24 +36,25 @@
 - [ ] **Edge Function `accept-invite`**: Noch nicht gebaut — "Join Home"-Button in der App führt aktuell ins Leere
 - [ ] **Edge Function `generate-invite`**: Noch nicht gebaut — kein UI zum Erstellen von Einladungslinks
 
-#### 6.5 Google Tasks Integration 📋 Bitte Checken und evtl abschließen
+#### 6.5 Google Tasks Integration ⏸ ON HOLD
 - [x] `sync-google-tasks` angepasst: `title` → `name`, `home_id` aus Env-Var `DEFAULT_HOME_ID`
 - [x] `add-shopping-item` bereinigt: IFTTT-Pfad entfernt, nur noch JWT-Auth, `user_id` aus JWT
-- [ ] `DEFAULT_HOME_ID` Secret in Supabase setzen: `89cd774f-b26e-40ce-9362-7589ded42c8d` (**manueller Schritt**)
+- [ ] ~~`DEFAULT_HOME_ID` Secret setzen~~ — **bewusst zurückgestellt**: globales Secret skaliert nicht für Multi-User/Multi-Home. Neukonzeption nötig (per-User OAuth + Home-Mapping). Siehe project-overview.md 3.2.
 
 #### 6.6 Frontend-Anpassungen (Home-Kontext) ✅
 - [x] `App.tsx`: Home aus `home_members` laden, Onboarding-Guard, `homeId` an alle Komponenten
 - [x] `Calendar.tsx`, `Lists.tsx`, `StickyNotes.tsx`: alle Queries mit `home_id` gefiltert
 - [x] `home_settings` für WiFi-Credentials statt `app_settings`
 
-#### 6.7 Manuelle Nacharbeiten nach DB-Reset 📋 Bitte Checken und evtl abschließen
+#### 6.7 Manuelle Nacharbeiten nach DB-Reset ✅
 - [x] **WiFi-Credentials** neu eintragen (SSID + Passwort) — App-Einstellungen
 - [x] **Push Notifications** neu aktivieren — für beide Nutzer in der App (alte Subscriptions gelöscht)
-- [ ] **`DEFAULT_HOME_ID`** Supabase Secret setzen (siehe 6.5)
+- [x] ~~**`DEFAULT_HOME_ID`** Supabase Secret setzen~~ — on hold, siehe 6.5
 
 ---
 
 ### Phase 1: Core Setup ✅
+> **📝 Notiz (2026-05-14):** Pull-to-Refresh auf iOS noch nicht getestet — kein iOS-Gerät vorhanden. In Safari-Browser nicht fixbar (kein `overscroll-behavior`-Support). In installierter PWA sollte es von Apple deaktiviert sein. Testen sobald erste iOS-User (Freunde) die App nutzen.
 - [x] React + Vite + TypeScript Setup
 - [x] Design System (Airbnb Cereal VF, teal #14d8db)
 - [x] PWA-Struktur, Bottom Navigation (5 Tabs)
@@ -166,17 +167,23 @@
 
 ---
 
-### 🟡 Phase 8.3: User-Settings Erweiterungen (MITTELPRIO, offen)
+### 🟡 Phase 8.3: User-Settings Erweiterungen (MITTELPRIO, teilweise fertig)
 
-#### 8.3.1 Notification Preferences ⬜ OFFEN
-- [ ] `notification_preferences`-JSON-Spalte in `profiles` (z. B. `{"shopping": true, "todos": true, "calendar": true}`)
-- [ ] User-Settings UI: Toggles pro Modul (Shopping, ToDo, Kalender, Dokumente)
-- [ ] `send-daily-push` und `send-todo-push` prüfen Preference vor dem Senden
+#### 8.3.1 Notification Preferences ✅ FERTIG (2026-05-14)
+- [x] `notification_preferences`-JSON-Spalte in `profiles` — 5 Keys: `calendar_daily`, `todo_assigned`, `todo_due_today`, `shopping_item_added`, `notes_new`
+- [x] User-Settings UI: Toggles pro Notification-Typ mit Label + Beschreibung (DE/EN)
+- [x] `send-daily-push` prüft `calendar_daily` + `todo_due_today` per User, sendet auch fällige Tasks
+- [x] `send-todo-push` prüft `todo_assigned` vor dem Senden
+- Tageszeit: Cron läuft 06:30 UTC = 08:30 CEST / 07:30 CET (kein User-konfigurierbarer Zeitpunkt — pg_cron unterstützt keine User-spezifischen Schedules)
 
-#### 8.3.2 Profil-Bearbeitung ⬜ OFFEN
-- [ ] Name bearbeiten (`display_name` in `profiles`, bereits vorhanden — einfaches Textfeld in User-Settings)
-- [ ] Avatar-Upload: Supabase Storage Bucket `avatars` + `avatar_url`-Spalte in `profiles`
-- [ ] Platzhalter-Avatar (Initial aus display_name) wenn kein Foto vorhanden — `Avatar`-Komponente aus `Todos.tsx` wiederverwendbar
+#### 8.3.2 Profil-Bearbeitung 🟡 TEILFERTIG (2026-05-14)
+- [x] `display_name` editierbar in User-Settings (Textfeld + Save-Button)
+- [x] `avatar_color` — Farb-Picker mit 8 vordefinierten Farben in User-Settings
+- [x] Avatar-Preview in User-Settings (Kreis mit Initial + gewählter Farbe)
+- [x] Farbe wird in Todos-Avatar-Komponente genutzt (aus `profiles.avatar_color` statt hardcoded)
+- [x] Sticky Notes zeigen Strip + Hintergrund in der Farbe des Erstellers (`hexToRgba` + `memberColors`-Prop)
+- [x] `memberColors`-State in App.tsx — bereit für Activity-Widget (Phase 11)
+- [ ] Avatar-Upload: Supabase Storage Bucket `avatars` + `avatar_url`-Spalte in `profiles` (separater Schritt)
 
 #### 8.3.3 Weitere Settings-Kandidaten (niedrige Prio) ⬜ OFFEN
 - [ ] Dark/Light Mode Toggle (`theme`-Feld in `profiles`)

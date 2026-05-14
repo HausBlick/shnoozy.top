@@ -27,14 +27,40 @@ Deno.serve(async () => {
   const tmrwD = tmrw.getDate();
   const tmrwStr = `${tmrw.getFullYear()}-${pad(tmrwM)}-${pad(tmrwD)}`;
 
-  const { data: allEvents } = await supabase
-    .from('events')
-    .select('title, category, recurrence_type, start_time');
+  const { data: subs } = await supabase
+    .from('push_subscriptions')
+    .select('endpoint, p256dh, auth_key, user_id');
+
+  if (!subs || subs.length === 0)
+    return new Response(JSON.stringify({ sent: 0 }), { headers: { 'Content-Type': 'application/json' } });
+
+  const userIds = [...new Set(subs.map(s => s.user_id))];
+
+  const [profilesRes, eventsRes, dueTodayRes] = await Promise.all([
+    supabase.from('profiles').select('id, notification_preferences').in('id', userIds),
+    supabase.from('events').select('title, category, recurrence_type, start_time'),
+    supabase.from('todo_items')
+      .select('title, assigned_to')
+      .not('assigned_to', 'is', null)
+      .eq('done', false)
+      .eq('due_date', todayStr),
+  ]);
+
+  const prefMap = new Map(
+    (profilesRes.data ?? []).map(p => [p.id, (p.notification_preferences ?? {}) as Record<string, boolean>])
+  );
+
+  const dueByUser = new Map<string, string[]>();
+  for (const task of dueTodayRes.data ?? []) {
+    const uid = task.assigned_to as string;
+    if (!dueByUser.has(uid)) dueByUser.set(uid, []);
+    dueByUser.get(uid)!.push(task.title);
+  }
 
   const todayTitles: string[] = [];
   const tmrwTitles: string[] = [];
 
-  for (const e of allEvents ?? []) {
+  for (const e of eventsRes.data ?? []) {
     const d = new Date(e.start_time);
     const em = d.getUTCMonth() + 1;
     const ed = d.getUTCDate();
@@ -49,21 +75,29 @@ Deno.serve(async () => {
     }
   }
 
-  const notifications: { title: string; body: string; tag: string }[] = [];
-  if (todayTitles.length > 0)
-    notifications.push({ title: 'Today 📅', body: todayTitles.join(' · '), tag: 'today' });
-  if (tmrwTitles.length > 0)
-    notifications.push({ title: 'Tomorrow 🗓️', body: tmrwTitles.join(' · '), tag: 'tomorrow' });
-
-  if (notifications.length === 0)
-    return new Response(JSON.stringify({ sent: 0 }), { headers: { 'Content-Type': 'application/json' } });
-
-  const { data: subs } = await supabase
-    .from('push_subscriptions')
-    .select('endpoint, p256dh, auth_key');
-
   let sent = 0;
-  for (const sub of subs ?? []) {
+
+  for (const sub of subs) {
+    const prefs = prefMap.get(sub.user_id) ?? {};
+    const wantsCalendar = prefs.calendar_daily !== false;
+    const wantsDueToday = prefs.todo_due_today !== false;
+
+    const notifications: { title: string; body: string; tag: string }[] = [];
+
+    if (wantsCalendar) {
+      if (todayTitles.length > 0)
+        notifications.push({ title: 'Today 📅', body: todayTitles.join(' · '), tag: 'today' });
+      if (tmrwTitles.length > 0)
+        notifications.push({ title: 'Tomorrow 🗓️', body: tmrwTitles.join(' · '), tag: 'tomorrow' });
+    }
+
+    if (wantsDueToday) {
+      const dueTasks = dueByUser.get(sub.user_id);
+      if (dueTasks && dueTasks.length > 0) {
+        notifications.push({ title: '✅ Due today', body: dueTasks.join(' · '), tag: 'due-today' });
+      }
+    }
+
     for (const notif of notifications) {
       try {
         await webpush.sendNotification(
@@ -72,7 +106,6 @@ Deno.serve(async () => {
         );
         sent++;
       } catch (err: any) {
-        // Subscription expired or invalid — clean up
         if (err.statusCode === 410 || err.statusCode === 404) {
           await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
         }

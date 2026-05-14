@@ -7,13 +7,24 @@ interface StickyNote {
   content: string;
   home_id: string;
   user_id: string;
-  visibility: 'both' | 'partner';
+  visibility: 'private' | 'all' | 'others' | 'both' | 'partner';
   created_at: string;
   updated_at: string;
 }
 
-function colorFor(noteUserId: string, myId: string): 'primary' | 'luxe' {
-  return noteUserId === myId ? 'primary' : 'luxe';
+function hexToLight(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgb(${Math.round(r + (255 - r) * 0.82)},${Math.round(g + (255 - g) * 0.82)},${Math.round(b + (255 - b) * 0.82)})`;
+}
+
+type Visibility = 'private' | 'all' | 'others';
+
+function normalizeVisibility(v: string): Visibility {
+  if (v === 'private') return 'private';
+  if (v === 'others') return 'others';
+  return 'all'; // 'all', 'both', 'partner' (legacy) → all visible
 }
 
 const STACK_ROT  = [-2.5,  2.0, -1.5];
@@ -36,9 +47,10 @@ interface DeckProps {
   onSeeAll?: () => void;
   onAdd: () => void;
   labels: { noNotesYet: string; addNote: string; seeAll: string; showAll: string; notesCount: (n: number) => string };
+  memberColors: Record<string, string>;
 }
 
-function NoteDeck({ notes, myId, topIndex, onSwipe, onSeeAll, onAdd, labels }: DeckProps) {
+function NoteDeck({ notes, myId, topIndex, onSwipe, onSeeAll, onAdd, labels, memberColors }: DeckProps) {
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [leaving, setLeaving] = useState<'left' | 'right' | null>(null);
@@ -101,7 +113,7 @@ function NoteDeck({ notes, myId, topIndex, onSwipe, onSeeAll, onAdd, labels }: D
           const stackPos = visibleCount - 1 - renderOrder;
           const note = orderedDeck[stackPos];
           const isTop = stackPos === 0;
-          const color = colorFor(note.user_id, myId);
+          const authorColor = memberColors[note.user_id] || '#14d8db';
           const textConfig = getTextConfig(note.content);
 
           const baseRot = STACK_ROT[stackPos];
@@ -119,7 +131,7 @@ function NoteDeck({ notes, myId, topIndex, onSwipe, onSeeAll, onAdd, labels }: D
           return (
             <div
               key={note.id}
-              className={`sticky-note sticky-note-${color}`}
+              className="sticky-note"
               style={{
                 position: 'absolute',
                 top: 0,
@@ -137,13 +149,14 @@ function NoteDeck({ notes, myId, topIndex, onSwipe, onSeeAll, onAdd, labels }: D
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
+                background: hexToLight(authorColor),
               }}
               onPointerDown={isTop ? onPointerDown : undefined}
               onPointerMove={isTop ? onPointerMove : undefined}
               onPointerUp={isTop ? onPointerUp : undefined}
               onPointerCancel={isTop ? onPointerUp : undefined}
             >
-              <div className={`sticky-note-strip sticky-note-strip-${color}`} />
+              <div className="sticky-note-strip" style={{ background: authorColor }} />
               <p
                 className="sticky-note-content"
                 style={{
@@ -209,21 +222,28 @@ interface Props {
   onSeeAll?: () => void;
   onNewNote?: (note: StickyNote) => void;
   language: Lang;
+  memberColors?: Record<string, string>;
 }
 
-export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote, language }: Props) {
+export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote, language, memberColors = {} }: Props) {
   const t = getT(language);
   const [notes, setNotes] = useState<StickyNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editNote, setEditNote] = useState<StickyNote | null>(null);
   const [content, setContent] = useState('');
-  const [visibleTo, setVisibleTo] = useState<'both' | 'partner'>('both');
+  const [visibleTo, setVisibleTo] = useState<Visibility>('all');
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deckTopIndex, setDeckTopIndex] = useState(0);
 
   const myId = session?.user?.id ?? '';
+
+  const visibleNotes = useMemo(() => notes.filter(note => {
+    if (note.visibility === 'private') return note.user_id === myId;
+    if (note.visibility === 'others') return note.user_id !== myId;
+    return true; // 'all', 'both', 'partner' (legacy)
+  }), [notes, myId]);
 
   useEffect(() => {
     fetchNotes();
@@ -239,7 +259,8 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote, lan
         if (payload.eventType === 'INSERT') {
           const note = payload.new as StickyNote;
           const isOwn = note.user_id === myId;
-          if (!isOwn) onNewNote?.(note);
+          const isVisibleToMe = note.visibility !== 'private' || isOwn;
+          if (!isOwn && isVisibleToMe) onNewNote?.(note);
           setNotes(prev => [note, ...prev]);
         } else if (payload.eventType === 'UPDATE') {
           setNotes(prev => prev.map(n => n.id === payload.new.id ? payload.new as StickyNote : n));
@@ -253,9 +274,9 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote, lan
   }, [homeId, myId]);
 
   useEffect(() => {
-    if (notes.length > 0) setDeckTopIndex(prev => prev % notes.length);
+    if (visibleNotes.length > 0) setDeckTopIndex(prev => prev % visibleNotes.length);
     else setDeckTopIndex(0);
-  }, [notes.length]);
+  }, [visibleNotes.length]);
 
   async function fetchNotes() {
     const { data } = await supabase
@@ -270,14 +291,14 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote, lan
   function openAdd() {
     setEditNote(null);
     setContent('');
-    setVisibleTo('both');
+    setVisibleTo('all');
     setShowModal(true);
   }
 
   function openEdit(note: StickyNote) {
     setEditNote(note);
     setContent(note.content);
-    setVisibleTo(note.visibility === 'partner' ? 'partner' : 'both');
+    setVisibleTo(normalizeVisibility(note.visibility));
     setShowModal(true);
   }
 
@@ -302,7 +323,14 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote, lan
           user_id: myId,
           visibility: visibleTo,
         }).select().single();
-        if (data) setNotes(prev => [data, ...prev]);
+        if (data) {
+          setNotes(prev => [data, ...prev]);
+          if (visibleTo !== 'private') {
+            supabase.functions.invoke('send-note-push', {
+              body: { home_id: homeId, author_id: myId },
+            }).catch(console.error);
+          }
+        }
       }
       setShowModal(false);
     } finally {
@@ -322,13 +350,14 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote, lan
     <>
       {compact ? (
         <NoteDeck
-          notes={notes}
+          notes={visibleNotes}
           myId={myId}
           topIndex={deckTopIndex}
-          onSwipe={() => setDeckTopIndex(prev => notes.length > 0 ? (prev + 1) % notes.length : 0)}
+          onSwipe={() => setDeckTopIndex(prev => visibleNotes.length > 0 ? (prev + 1) % visibleNotes.length : 0)}
           onSeeAll={onSeeAll}
           onAdd={openAdd}
           labels={{ noNotesYet: t.noNotesYet, addNote: t.addNote, seeAll: t.seeAll, showAll: t.showAll, notesCount: t.notesCount }}
+          memberColors={memberColors}
         />
       ) : (
         <>
@@ -337,18 +366,20 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote, lan
           )}
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-sm)' }}>
-            {notes.map(note => {
-              const color = colorFor(note.user_id, myId);
+            {visibleNotes.map(note => {
+              const authorColor = memberColors[note.user_id] || '#14d8db';
               const isOwn = note.user_id === myId;
+              const vis = normalizeVisibility(note.visibility);
+              const canEdit = vis === 'all' || (vis === 'private' && isOwn);
+              const canDelete = vis === 'all' || (vis === 'private' && isOwn) || (vis === 'others' && !isOwn);
+              const visLabel = vis === 'private' ? t.visibilityMe : vis === 'others' ? t.visibilityOthers : t.visibilityAll;
               return (
-                <div key={note.id} className={`sticky-note sticky-note-${color}`}>
-                  <div className={`sticky-note-strip sticky-note-strip-${color}`} />
+                <div key={note.id} className="sticky-note" style={{ background: hexToLight(authorColor) }}>
+                  <div className="sticky-note-strip" style={{ background: authorColor }} />
                   <p className="sticky-note-content">{note.content}</p>
                   <div className="sticky-note-footer">
-                    <span className="sticky-note-meta">
-                      {note.visibility === 'partner' ? t.visibilityPartner : t.visibilityBoth}
-                    </span>
-                    {isOwn && (
+                    <span className="sticky-note-meta">{visLabel}</span>
+                    {(canEdit || canDelete) && (
                       <div style={{ display: 'flex', gap: '2px' }}>
                         {confirmDelete === note.id ? (
                           <>
@@ -357,12 +388,16 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote, lan
                           </>
                         ) : (
                           <>
-                            <button onClick={() => openEdit(note)} className="sticky-note-btn" aria-label="Edit">
-                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                            </button>
-                            <button onClick={() => setConfirmDelete(note.id)} className="sticky-note-btn" aria-label="Delete">
-                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
-                            </button>
+                            {canEdit && (
+                              <button onClick={() => openEdit(note)} className="sticky-note-btn" aria-label="Edit">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button onClick={() => setConfirmDelete(note.id)} className="sticky-note-btn" aria-label="Delete">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                              </button>
+                            )}
                           </>
                         )}
                       </div>
@@ -401,18 +436,25 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote, lan
             />
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-lg)' }}>
               <button
-                onClick={() => setVisibleTo('both')}
-                className={visibleTo === 'both' ? 'btn-primary' : 'btn-secondary'}
-                style={{ flex: 1, fontSize: '13px' }}
+                onClick={() => setVisibleTo('private')}
+                className={visibleTo === 'private' ? 'btn-primary' : 'btn-secondary'}
+                style={{ flex: 1, fontSize: '13px', width: 'auto' }}
               >
-                {t.forBoth}
+                {t.forMe}
               </button>
               <button
-                onClick={() => setVisibleTo('partner')}
-                className={visibleTo === 'partner' ? 'btn-primary' : 'btn-secondary'}
-                style={{ flex: 1, fontSize: '13px' }}
+                onClick={() => setVisibleTo('all')}
+                className={visibleTo === 'all' ? 'btn-primary' : 'btn-secondary'}
+                style={{ flex: 1, fontSize: '13px', width: 'auto' }}
               >
-                {t.forPartner}
+                {t.forAll}
+              </button>
+              <button
+                onClick={() => setVisibleTo('others')}
+                className={visibleTo === 'others' ? 'btn-primary' : 'btn-secondary'}
+                style={{ flex: 1, fontSize: '13px', width: 'auto' }}
+              >
+                {t.forOthers}
               </button>
             </div>
             <button
