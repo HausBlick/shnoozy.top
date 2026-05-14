@@ -33,22 +33,6 @@ interface Props {
   onModuleSettings: (id: ModuleId) => void;
 }
 
-interface CalSub {
-  id: string;
-  name: string;
-  ics_url: string;
-  color: string;
-  last_synced_at: string | null;
-}
-
-const SUB_COLORS = ['#6366f1', '#ec4899', '#f97316', '#22c55e', '#3b82f6', '#a855f7', '#14b8a6', '#f59e0b'];
-
-function formatSyncDate(iso: string, language: string): string {
-  return new Date(iso).toLocaleString(language === 'de' ? 'de-DE' : 'en-GB', {
-    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-  });
-}
-
 async function generateInviteLink(homeId: string): Promise<string> {
   const { data, error } = await supabase.functions.invoke('generate-invite', {
     body: { home_id: homeId },
@@ -109,18 +93,6 @@ export function HomeSettings({ homeId, language, isAdmin, onBack, onModuleSettin
   const [inviteCopied, setInviteCopied] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
 
-  const [icalToken, setIcalToken] = useState<string | null>(null);
-  const [icalCopied, setIcalCopied] = useState(false);
-  const [icalLoading, setIcalLoading] = useState(false);
-
-  // Calendar subscriptions state
-  const [subscriptions, setSubscriptions] = useState<CalSub[]>([]);
-  const [showSubForm, setShowSubForm] = useState(false);
-  const [subUrl, setSubUrl] = useState('');
-  const [subName, setSubName] = useState('');
-  const [subColor, setSubColor] = useState(SUB_COLORS[0]);
-  const [subSaving, setSubSaving] = useState(false);
-  const [confirmDeleteSubId, setConfirmDeleteSubId] = useState<string | null>(null);
 
   // Drag-and-drop state
   const [draggingId, setDraggingId] = useState<ModuleId | null>(null);
@@ -210,73 +182,20 @@ export function HomeSettings({ homeId, language, isAdmin, onBack, onModuleSettin
   async function loadSettings() {
     setLoading(true);
     try {
-      const [{ data }, { data: subs }] = await Promise.all([
-        supabase.from('home_settings').select('key, value').eq('home_id', homeId).in('key', ['nav_slots', 'modules_active', 'ical_token']),
-        supabase.from('calendar_subscriptions').select('id, name, ics_url, color, last_synced_at').eq('home_id', homeId).order('created_at'),
-      ]);
+      const { data } = await supabase
+        .from('home_settings')
+        .select('key, value')
+        .eq('home_id', homeId)
+        .in('key', ['nav_slots', 'modules_active']);
       if (data) {
         const nav = data.find(r => r.key === 'nav_slots');
         const mods = data.find(r => r.key === 'modules_active');
-        const ical = data.find(r => r.key === 'ical_token');
         if (nav?.value) { try { setNavSlots(JSON.parse(nav.value)); } catch {} }
         if (mods?.value) { try { setActiveIds(JSON.parse(mods.value)); } catch {} }
-        if (ical?.value) setIcalToken(ical.value);
       }
-      if (subs) setSubscriptions(subs);
     } finally {
       setLoading(false);
     }
-  }
-
-  async function addSubscription() {
-    if (!subUrl || !subName) return;
-    setSubSaving(true);
-    try {
-      const { data, error } = await supabase
-        .from('calendar_subscriptions')
-        .insert({ home_id: homeId, name: subName, ics_url: subUrl, color: subColor })
-        .select('id, name, ics_url, color, last_synced_at')
-        .maybeSingle();
-      if (!error && data) {
-        setSubscriptions(prev => [...prev, data]);
-        setSubUrl(''); setSubName(''); setSubColor(SUB_COLORS[0]);
-        setShowSubForm(false);
-        // Trigger immediate sync for this subscription
-        await supabase.functions.invoke('sync-ical-subscriptions', { body: { subscription_id: data.id } });
-        // Refresh last_synced_at
-        const { data: updated } = await supabase
-          .from('calendar_subscriptions')
-          .select('id, name, ics_url, color, last_synced_at')
-          .eq('id', data.id)
-          .maybeSingle();
-        if (updated) setSubscriptions(prev => prev.map(s => s.id === updated.id ? updated : s));
-      }
-    } finally {
-      setSubSaving(false);
-    }
-  }
-
-  async function deleteSubscription(id: string) {
-    await supabase.from('calendar_subscriptions').delete().eq('id', id);
-    setSubscriptions(prev => prev.filter(s => s.id !== id));
-    setConfirmDeleteSubId(null);
-  }
-
-  async function generateIcalToken() {
-    setIcalLoading(true);
-    const token = crypto.randomUUID();
-    await supabase.from('home_settings').upsert(
-      { home_id: homeId, key: 'ical_token', value: token },
-      { onConflict: 'home_id,key' },
-    );
-    setIcalToken(token);
-    setIcalCopied(false);
-    setIcalLoading(false);
-  }
-
-  function getIcalUrl(token: string): string {
-    const base = import.meta.env.VITE_SUPABASE_URL as string;
-    return `${base}/functions/v1/ics-feed?token=${token}`;
   }
 
   async function saveSettings() {
@@ -622,144 +541,6 @@ export function HomeSettings({ homeId, language, isAdmin, onBack, onModuleSettin
           )}
         </div>
       )}
-
-      {/* ICS subscription — visible to all members */}
-      <div className="card" style={{ marginTop: 'var(--spacing-md)' }}>
-        <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)' }}>{t.icalSection}</h2>
-        <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>{t.icalDesc}</p>
-
-        {!icalToken ? (
-          <button className="btn-primary" disabled={icalLoading} onClick={generateIcalToken}>
-            {icalLoading ? '…' : t.icalGenerateLink}
-          </button>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
-            <div style={{
-              background: 'var(--color-surface)',
-              borderRadius: 'var(--rounded-sm)',
-              padding: '10px 12px',
-              fontSize: '12px',
-              color: 'var(--color-muted)',
-              wordBreak: 'break-all',
-            }}>
-              {getIcalUrl(icalToken)}
-            </div>
-            <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-              {typeof navigator !== 'undefined' && 'share' in navigator ? (
-                <button
-                  className="btn-primary"
-                  style={{ flex: 1 }}
-                  onClick={() => navigator.share({ url: getIcalUrl(icalToken) })}
-                >
-                  {t.icalShare}
-                </button>
-              ) : null}
-              <button
-                className="btn-primary"
-                style={{ flex: 1, background: icalCopied ? 'var(--color-surface-strong)' : undefined, color: icalCopied ? 'var(--color-ink)' : undefined }}
-                onClick={async () => {
-                  await navigator.clipboard.writeText(getIcalUrl(icalToken));
-                  setIcalCopied(true);
-                  setTimeout(() => setIcalCopied(false), 2000);
-                }}
-              >
-                {icalCopied ? t.icalCopied : t.icalCopyUrl}
-              </button>
-            </div>
-            <p className="text-body-sm text-muted" style={{ fontSize: '12px' }}>{t.icalHint}</p>
-            {isAdmin && (
-              <button
-                style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: '13px', cursor: 'pointer', padding: '2px 0', textAlign: 'left' }}
-                onClick={generateIcalToken}
-                disabled={icalLoading}
-              >
-                {t.icalReset}
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Calendar subscriptions — visible to all members */}
-      <div className="card" style={{ marginTop: 'var(--spacing-md)' }}>
-        <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)' }}>{t.calSubSection}</h2>
-        <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>{t.calSubDesc}</p>
-
-        {subscriptions.map(sub => (
-          <div key={sub.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', padding: '10px 0', borderBottom: '1px solid var(--color-hairline-soft)' }}>
-            <div style={{ width: 12, height: 12, borderRadius: '50%', background: sub.color, flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="text-body-md" style={{ fontWeight: 500 }}>{sub.name}</div>
-              <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>
-                {sub.last_synced_at ? t.calSubLastSynced(formatSyncDate(sub.last_synced_at, language)) : t.calSubNeverSynced}
-              </div>
-            </div>
-            {confirmDeleteSubId === sub.id ? (
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => deleteSubscription(sub.id)} style={{ background: '#c13515', border: 'none', borderRadius: 6, color: 'white', padding: '5px 10px', cursor: 'pointer', fontSize: 13 }}>✓</button>
-                <button onClick={() => setConfirmDeleteSubId(null)} style={{ background: 'var(--color-surface-strong)', border: 'none', borderRadius: 6, color: 'var(--color-ink)', padding: '5px 10px', cursor: 'pointer', fontSize: 13 }}>✕</button>
-              </div>
-            ) : (
-              <button onClick={() => setConfirmDeleteSubId(sub.id)} style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: 20, lineHeight: 1, cursor: 'pointer', padding: '4px 6px' }}>×</button>
-            )}
-          </div>
-        ))}
-
-        {!showSubForm ? (
-          <button
-            className="btn-primary"
-            onClick={() => setShowSubForm(true)}
-            style={{ marginTop: subscriptions.length > 0 ? 'var(--spacing-md)' : 0 }}
-          >
-            {t.calSubAdd}
-          </button>
-        ) : (
-          <div style={{ marginTop: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
-            <input
-              className="form-input"
-              placeholder={t.calSubUrlPlaceholder}
-              value={subUrl}
-              onChange={e => setSubUrl(e.target.value)}
-              type="url"
-            />
-            <input
-              className="form-input"
-              placeholder={t.calSubNamePlaceholder}
-              value={subName}
-              onChange={e => setSubName(e.target.value)}
-            />
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '2px 0' }}>
-              {SUB_COLORS.map(c => (
-                <button
-                  key={c}
-                  onClick={() => setSubColor(c)}
-                  style={{
-                    width: 28, height: 28, borderRadius: '50%',
-                    border: subColor === c ? '3px solid var(--color-ink)' : '2px solid transparent',
-                    background: c, cursor: 'pointer', padding: 0, outline: 'none',
-                  }}
-                />
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-              <button
-                className="btn-primary"
-                onClick={addSubscription}
-                disabled={!subUrl || !subName || subSaving}
-                style={{ flex: 1 }}
-              >
-                {subSaving ? t.calSubSyncing : t.calSubSave}
-              </button>
-              <button
-                onClick={() => { setShowSubForm(false); setSubUrl(''); setSubName(''); setSubColor(SUB_COLORS[0]); }}
-                style={{ flex: 1, background: 'var(--color-surface-strong)', border: 'none', borderRadius: 'var(--rounded-sm)', padding: '12px', fontWeight: 600, fontSize: '15px', cursor: 'pointer', color: 'var(--color-ink)' }}
-              >
-                {t.cancel}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* Dragging ghost */}
       {draggingMeta && (

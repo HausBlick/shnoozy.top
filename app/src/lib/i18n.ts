@@ -235,6 +235,9 @@ const en = {
   inviteShare: 'Share',
   inviteError: 'Failed to create invite link',
 
+  // Calendar settings modal
+  calSettingsTitle: 'Calendar Settings',
+
   // Calendar subscriptions (ICS import)
   calSubSection: 'Subscribed Calendars',
   calSubDesc: 'Add public ICS/iCal links from schools, clubs or other services. Syncs every 6 hours.',
@@ -481,6 +484,9 @@ const de: typeof en = {
   inviteCopied: 'Kopiert!',
   inviteShare: 'Teilen',
   inviteError: 'Fehler beim Erstellen des Einladungslinks',
+
+  // Calendar settings modal
+  calSettingsTitle: 'Kalender-Einstellungen',
 
   // Calendar subscriptions (ICS import)
   calSubSection: 'Abonnierte Kalender',
