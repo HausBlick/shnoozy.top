@@ -249,6 +249,29 @@ const en = {
   calSubLastSynced: (s: string) => `Synced: ${s}`,
   calSubNeverSynced: 'Not yet synced',
   calSubSyncing: 'Syncing…',
+
+  // Budget
+  moduleBudget: 'Budget',
+  moduleBudgetDesc: 'Track shared and personal expenses',
+  navBudget: 'Budget',
+  budgetTitle: 'Budget',
+  budgetOverview: 'Overview',
+  budgetEntries: 'Entries',
+  budgetTotal: 'Total this month',
+  budgetAmount: 'Amount',
+  budgetCategory: 'Category',
+  budgetNoCategory: 'Uncategorized',
+  budgetDescription: 'Description',
+  budgetDescPlaceholder: 'What was this for?',
+  budgetDate: 'Date',
+  budgetShared: 'Shared',
+  budgetPersonal: 'Personal',
+  budgetSave: 'Save',
+  budgetConfirmDelete: 'Delete this entry?',
+  budgetEdit: 'Edit Entry',
+  budgetNew: 'New Entry',
+  budgetNoEntries: 'No entries this month',
+  budgetBalance: 'Who Paid',
 };
 
 const de: typeof en = {
@@ -500,6 +523,29 @@ const de: typeof en = {
   calSubLastSynced: (s: string) => `Synchronisiert: ${s}`,
   calSubNeverSynced: 'Noch nicht synchronisiert',
   calSubSyncing: 'Synchronisiere…',
+
+  // Budget
+  moduleBudget: 'Budget',
+  moduleBudgetDesc: 'Gemeinsame und persönliche Ausgaben erfassen',
+  navBudget: 'Budget',
+  budgetTitle: 'Budget',
+  budgetOverview: 'Übersicht',
+  budgetEntries: 'Einträge',
+  budgetTotal: 'Gesamt diesen Monat',
+  budgetAmount: 'Betrag',
+  budgetCategory: 'Kategorie',
+  budgetNoCategory: 'Ohne Kategorie',
+  budgetDescription: 'Beschreibung',
+  budgetDescPlaceholder: 'Wofür war das?',
+  budgetDate: 'Datum',
+  budgetShared: 'Gemeinsam',
+  budgetPersonal: 'Persönlich',
+  budgetSave: 'Speichern',
+  budgetConfirmDelete: 'Eintrag wirklich löschen?',
+  budgetEdit: 'Eintrag bearbeiten',
+  budgetNew: 'Neuer Eintrag',
+  budgetNoEntries: 'Keine Einträge diesen Monat',
+  budgetBalance: 'Wer hat gezahlt',
 };
 
 const translations: Record<Lang, typeof en> = { en, de };

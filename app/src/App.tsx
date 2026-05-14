@@ -9,6 +9,7 @@ import { Calendar } from './Calendar';
 import { Lists } from './Lists';
 import { StickyNotes } from './StickyNotes';
 import { Todos, TodosDashboardWidget } from './Todos';
+import { Budget } from './Budget';
 import {
   HomeSettings,
   type ModuleId,
@@ -94,6 +95,14 @@ const CarIcon = ({ color = 'currentColor', size = 20 }: { color?: string; size?:
   </svg>
 );
 
+const BudgetIcon = ({ color = 'currentColor', size = 20 }: { color?: string; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="5" width="20" height="14" rx="2"/>
+    <line x1="2" y1="10" x2="22" y2="10"/>
+    <circle cx="12" cy="15" r="2"/>
+  </svg>
+);
+
 const CakeIcon = ({ color = 'currentColor', size = 14 }: { color?: string; size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/>
@@ -151,6 +160,7 @@ function NavModuleIcon({ id, active }: { id: ModuleId; active: boolean }) {
     case 'luna':      return <PawIcon active={active} />;
     case 'home-info': return <HouseInfoIcon color={c} size={24} />;
     case 'car':       return <CarIcon color={c} size={24} />;
+    case 'budget':    return <BudgetIcon color={c} size={24} />;
   }
 }
 
@@ -164,6 +174,7 @@ function getNavLabel(id: ModuleId, t: ReturnType<typeof getT>): string {
     case 'luna':      return t.navLuna;
     case 'home-info': return t.moduleHomeInfo;
     case 'car':       return t.moduleCar;
+    case 'budget':    return t.navBudget;
   }
 }
 
@@ -831,6 +842,7 @@ function App() {
     // Module tabs
     if (activeTab === 'calendar') return <Calendar homeId={homeId} language={language} defaultView={defaultCalView} />;
     if (activeTab === 'lists') return <Lists homeId={homeId} language={language} />;
+    if (activeTab === 'budget') return <Budget homeId={homeId} language={language} userId={session.user.id} />;
     if (activeTab === 'todos') return <Todos homeId={homeId} userId={session.user.id} language={language} />;
     if (activeTab === 'luna') return (
       <div>
