@@ -208,6 +208,13 @@ const en = {
   saveChanges: 'Save changes',
   addNoteAction: 'Add note',
 
+  // Calendar views
+  viewAgenda: 'Agenda',
+  viewMonth: 'Month',
+  viewWeek: 'Week',
+  weekLabel: (n: number) => `Week ${n}`,
+  noEventsDay: 'No events',
+
   // Invite
   inviteSection: 'Invite Member',
   generateInvite: 'Create invite link',
@@ -426,6 +433,13 @@ const de: typeof en = {
   visibilityOthers: '→ Nur andere',
   saveChanges: 'Änderungen speichern',
   addNoteAction: 'Notiz hinzufügen',
+
+  // Calendar views
+  viewAgenda: 'Agenda',
+  viewMonth: 'Monat',
+  viewWeek: 'Woche',
+  weekLabel: (n: number) => `KW ${n}`,
+  noEventsDay: 'Keine Termine',
 
   // Invite
   inviteSection: 'Mitglied einladen',
