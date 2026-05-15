@@ -29,13 +29,6 @@ interface ExternalEvent {
 
 type CalView = 'agenda' | 'month' | 'week';
 
-const PlusIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="12" y1="5" x2="12" y2="19"></line>
-    <line x1="5" y1="12" x2="19" y2="12"></line>
-  </svg>
-);
-
 const CloseIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -818,8 +811,8 @@ export function Calendar({ homeId, language, defaultView = 'agenda' }: { homeId:
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
             <button
               onClick={() => setIsModalOpen(true)}
-              style={{ fontSize: '13px', padding: '6px 14px', borderRadius: 'var(--rounded-full)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}
-            >+ {t.newEntry}</button>
+              style={{ fontSize: '13px', padding: '6px 14px', borderRadius: 'var(--rounded-sm)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}
+            >+ {t.calNewEvent}</button>
             <button
               onClick={() => setSettingsOpen(true)}
               title={t.calSettingsTitle}

@@ -221,11 +221,12 @@ interface Props {
   compact?: boolean;
   onSeeAll?: () => void;
   onNewNote?: (note: StickyNote) => void;
+  onBack?: () => void;
   language: Lang;
   memberColors?: Record<string, string>;
 }
 
-export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote, language, memberColors = {} }: Props) {
+export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote, onBack, language, memberColors = {} }: Props) {
   const t = getT(language);
   const [notes, setNotes] = useState<StickyNote[]>([]);
   const [loading, setLoading] = useState(true);
@@ -361,6 +362,18 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote, lan
         />
       ) : (
         <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-lg)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
+              {onBack && (
+                <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: 0 }}>←</button>
+              )}
+              <h1 className="text-display-lg">{t.notes}</h1>
+            </div>
+            <button
+              onClick={openAdd}
+              style={{ fontSize: '13px', padding: '6px 14px', borderRadius: 'var(--rounded-sm)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}
+            >+ {t.addNote}</button>
+          </div>
           {notes.length === 0 && (
             <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>{t.noNotesYet}</p>
           )}
@@ -408,11 +421,6 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote, lan
             })}
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <button onClick={openAdd} style={{ background: 'none', border: '1px dashed var(--color-hairline)', borderRadius: 'var(--rounded-full)', padding: '5px 14px', fontSize: '13px', cursor: 'pointer', color: 'var(--color-muted)' }}>
-              {t.addNote}
-            </button>
-          </div>
         </>
       )}
 

@@ -1595,19 +1595,13 @@ function App() {
 
     // Notes full view
     if (activeTab === 'notes') return (
-      <div style={{ paddingBottom: '120px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
-          <button
-            onClick={() => setActiveTab('home')}
-            style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: 0 }}
-          >←</button>
-          <h1 className="text-display-lg">{t.notes}</h1>
-        </div>
+      <div style={{ paddingBottom: '120px', paddingTop: 'var(--spacing-md)' }}>
         <StickyNotes
           session={session}
           homeId={homeId}
           language={language}
           onNewNote={(note) => showToast(`New note from ${note.user_id.slice(0, 6)}`)}
+          onBack={() => setActiveTab('home')}
           memberColors={memberColors}
         />
       </div>

@@ -430,30 +430,6 @@ body {
 
 
 /* Floating Action Button */
-.fab {
-  position: fixed;
-  bottom: 90px;
-  right: var(--spacing-base);
-  width: 56px;
-  height: 56px;
-  background-color: var(--color-primary);
-  color: var(--color-on-primary);
-  border-radius: var(--rounded-full);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(20, 216, 219, 0.4);
-  border: none;
-  cursor: pointer;
-  z-index: 90;
-  transition: transform 0.2s ease, background-color 0.2s ease;
-}
-
-.fab:active {
-  transform: scale(0.9);
-  background-color: var(--color-primary-active);
-}
-
 /* Event List Enhancements */
 .event-card {
   padding: var(--spacing-base);

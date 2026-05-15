@@ -737,7 +737,7 @@ export function Lists({ homeId, language, userId }: { homeId: string; language: 
                 </span>
                 <button
                   onClick={e => { e.stopPropagation(); clearChecked(); }}
-                  style={{ background: 'none', border: '1px solid var(--color-hairline)', borderRadius: 'var(--rounded-full)', padding: '4px 12px', fontSize: '12px', cursor: 'pointer', color: 'var(--color-muted)' }}
+                  style={{ background: 'none', border: '1px solid var(--color-hairline)', borderRadius: 'var(--rounded-sm)', padding: '4px 12px', fontSize: '12px', cursor: 'pointer', color: 'var(--color-muted)' }}
                 >
                   {t.delete}
                 </button>
@@ -753,7 +753,7 @@ export function Lists({ homeId, language, userId }: { homeId: string; language: 
           <p className="text-body-sm text-muted" style={{ margin: 0, flex: 1 }}>💰 {t.shoppingBudgetPrompt}</p>
           <button
             onClick={() => setShowBudgetExpense(true)}
-            style={{ fontSize: '12px', padding: '6px 16px', borderRadius: 'var(--rounded-full)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', flexShrink: 0 }}
+            style={{ fontSize: '13px', padding: '6px 14px', borderRadius: 'var(--rounded-sm)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', flexShrink: 0 }}
           >{t.shoppingRecordExpense}</button>
         </div>
       )}

@@ -84,6 +84,7 @@ const en = {
 
   // Calendar
   schedule: 'Schedule',
+  calNewEvent: 'Event',
   newEntry: 'New Entry',
   editEntry: 'Edit Entry',
   title: 'Title',
@@ -568,6 +569,7 @@ const de: typeof en = {
 
   // Calendar
   schedule: 'Kalender',
+  calNewEvent: 'Termin',
   newEntry: 'Neuer Eintrag',
   editEntry: 'Eintrag bearbeiten',
   title: 'Titel',

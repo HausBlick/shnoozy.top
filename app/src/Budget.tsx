@@ -759,7 +759,7 @@ function BudgetDashboard({
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
                   <button
                     onClick={() => { setGoalModal(goal); setGoalAddAmount(''); setGoalBudgetCatId(null); }}
-                    style={{ fontSize: '12px', padding: '5px 14px', borderRadius: 'var(--rounded-full)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}
+                    style={{ fontSize: '13px', padding: '6px 14px', borderRadius: 'var(--rounded-sm)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}
                   >+ {t.budgetSavingsGoalAdd}</button>
                 </div>
               </div>
@@ -777,7 +777,7 @@ function BudgetDashboard({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-sm)' }}>
             <h3 className="text-title-sm">{t.budgetRecurring}</h3>
             <button onClick={onNewRecurring}
-              style={{ fontSize: '12px', padding: '5px 14px', borderRadius: 'var(--rounded-full)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
+              style={{ fontSize: '13px', padding: '6px 14px', borderRadius: 'var(--rounded-sm)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
               + {t.budgetRecurringNew}
             </button>
           </div>
@@ -813,7 +813,7 @@ function BudgetDashboard({
                       onClick={() => markAsPaid(item)}
                       disabled={busy}
                       style={{
-                        fontSize: '12px', padding: '5px 10px', borderRadius: 'var(--rounded-full)',
+                        fontSize: '12px', padding: '5px 10px', borderRadius: 'var(--rounded-sm)',
                         border: '1px solid var(--color-primary)', background: 'transparent',
                         color: 'var(--color-primary)', cursor: busy ? 'default' : 'pointer',
                         fontWeight: 600, flexShrink: 0, opacity: busy ? 0.5 : 1,
