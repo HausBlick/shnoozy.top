@@ -196,18 +196,20 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px 8px' }}>
         <h2 className="text-title-md">📸 {t.photoNotesTitle}</h2>
         <div style={{ display: 'flex', gap: 8 }}>
-          <label style={iconBtnStyle} title={t.photoNotesCamera}>
-            📷
-            <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+          <div style={{ ...iconBtnStyle, position: 'relative' }} title={t.photoNotesCamera}>
+            <span style={{ pointerEvents: 'none' }}>📷</span>
+            <input type="file" accept="image/*" capture="environment"
+              style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
               onChange={e => { if (e.target.files?.[0]) { handleFileSelected(e.target.files[0]); e.target.value = ''; } }}
             />
-          </label>
-          <label style={iconBtnStyle} title={t.photoNotesGallery}>
-            🖼️
-            <input type="file" accept="image/*" style={{ display: 'none' }}
+          </div>
+          <div style={{ ...iconBtnStyle, position: 'relative' }} title={t.photoNotesGallery}>
+            <span style={{ pointerEvents: 'none' }}>🖼️</span>
+            <input type="file" accept="image/*"
+              style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
               onChange={e => { if (e.target.files?.[0]) { handleFileSelected(e.target.files[0]); e.target.value = ''; } }}
             />
-          </label>
+          </div>
         </div>
       </div>
 
@@ -235,11 +237,11 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
                     <img
                       src={slot.photo._url}
                       alt={slot.photo.caption ?? ''}
-                      style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block' }}
+                      style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', display: 'block' }}
                     />
                   ) : (
                     <div style={{
-                      height: 220, background: 'var(--color-surface-soft)',
+                      aspectRatio: '1 / 1', background: 'var(--color-surface-soft)',
                       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
                     }}>
                       <div style={{ fontSize: 44 }}>📷</div>

@@ -159,7 +159,8 @@ const en = {
   modulePhotoNotesDesc: 'Share moments with each other',
 
   // Photo Notes
-  photoNotesTitle: 'Photos',
+  photoNotesTitle: 'Snap!',
+  snapWidget: 'Snap!',
   photoNotesNew: '+ Photo',
   photoNotesEmpty: 'No photos yet. Be the first to share a moment!',
   photoNotesCaption: 'Caption (optional)',
@@ -511,7 +512,8 @@ const de: typeof en = {
   modulePhotoNotesDesc: 'Momente miteinander teilen',
 
   // Photo Notes
-  photoNotesTitle: 'Fotos',
+  photoNotesTitle: 'Snap!',
+  snapWidget: 'Snap!',
   photoNotesNew: '+ Foto',
   photoNotesEmpty: 'Noch keine Fotos. Teile einen ersten Moment!',
   photoNotesCaption: 'Beschriftung (optional)',
