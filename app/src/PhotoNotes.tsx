@@ -198,7 +198,7 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
         <div style={{ display: 'flex', gap: 8 }}>
           <div style={{ ...iconBtnStyle, position: 'relative' }} title={t.photoNotesCamera}>
             <span style={{ pointerEvents: 'none' }}>📷</span>
-            <input type="file" accept="image/*" capture="environment"
+            <input type="file" accept="image/*"
               style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
               onChange={e => { if (e.target.files?.[0]) { handleFileSelected(e.target.files[0]); e.target.value = ''; } }}
             />
