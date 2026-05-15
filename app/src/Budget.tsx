@@ -168,6 +168,26 @@ function AvatarDot({ member, size = 28 }: { member: Member; size?: number }) {
   );
 }
 
+// ─── NavArrowBtn ──────────────────────────────────────────────────────────────
+
+const NavArrowBtn = ({ dir, onClick }: { dir: 'prev' | 'next'; onClick: () => void }) => (
+  <button
+    onClick={onClick}
+    style={{
+      width: 34, height: 34, borderRadius: 8,
+      background: 'var(--color-primary)', border: 'none',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      cursor: 'pointer', flexShrink: 0,
+    }}
+  >
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      {dir === 'prev'
+        ? <polyline points="15 18 9 12 15 6" />
+        : <polyline points="9 18 15 12 9 6" />}
+    </svg>
+  </button>
+);
+
 // ─── BudgetWizard ─────────────────────────────────────────────────────────────
 
 const WIZARD_TOTAL_STEPS = 9;
@@ -479,7 +499,7 @@ const defaultCatColors = ['#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6','#f9
 function BudgetDashboard({
   homeId, userId, language, categories, entries, savingsGoals, recurringItems, recurringChanges, homeSettings,
   currentMonth, onPrevMonth, onNextMonth,
-  onAddExpense, onAddExpenseAI, onAddIncome, onGoToEntries, onRefresh, onNewRecurring, onEditRecurring,
+  onGoToEntries, onRefresh, onNewRecurring, onEditRecurring,
 }: {
   homeId: string; userId: string; language: Lang;
   categories: BudgetCategory[]; entries: BudgetEntry[];
@@ -487,18 +507,15 @@ function BudgetDashboard({
   recurringChanges: RecurringChange[]; homeSettings: HomeSettings;
   currentMonth: { year: number; month: number };
   onPrevMonth: () => void; onNextMonth: () => void;
-  onAddExpense: () => void; onAddExpenseAI: () => void; onAddIncome: () => void;
   onGoToEntries: () => void; onRefresh: () => void;
   onNewRecurring: () => void; onEditRecurring: (item: RecurringItem) => void;
 }) {
   const t = getT(language);
-  const [showExpenseMenu, setShowExpenseMenu] = useState(false);
   const [goalModal, setGoalModal] = useState<SavingsGoal | null>(null);
   const [goalAddAmount, setGoalAddAmount] = useState('');
   const [goalBudgetCatId, setGoalBudgetCatId] = useState<string | null>(null);
   const [goalSaving, setGoalSaving] = useState(false);
   const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   const paidRecurringIds = useMemo(() => {
     const ids = new Set<string>();
@@ -598,66 +615,11 @@ function BudgetDashboard({
     <div>
       {/* Month nav */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-md)' }}>
-        <button onClick={onPrevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)', fontSize: '22px', padding: '4px 8px' }}>‹</button>
+        <NavArrowBtn dir="prev" onClick={onPrevMonth} />
         <span className="text-body-md" style={{ fontWeight: 600, minWidth: 120, textAlign: 'center' }}>{monthLabel}</span>
-        <button onClick={onNextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)', fontSize: '22px', padding: '4px 8px' }}>›</button>
+        <NavArrowBtn dir="next" onClick={onNextMonth} />
       </div>
 
-      {/* Quick actions */}
-      <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
-        <div style={{ position: 'relative', flex: 1 }} ref={menuRef}>
-          <button
-            onClick={() => setShowExpenseMenu(v => !v)}
-            style={{
-              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              padding: '10px 14px', borderRadius: 'var(--rounded-md)', border: 'none',
-              background: 'var(--color-primary)', cursor: 'pointer', fontSize: '14px', fontWeight: 600,
-              color: 'white', fontFamily: 'inherit',
-            }}
-          >{t.budgetAddExpense} ▾</button>
-          {showExpenseMenu && (
-            <div style={{
-              position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
-              background: 'var(--color-canvas)', borderRadius: 'var(--rounded-md)',
-              border: '1px solid var(--color-hairline)', zIndex: 100,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.15)', overflow: 'hidden',
-            }}>
-              {homeSettings.budget_ai_receipts === 'yes' && (
-                <button
-                  onClick={() => { setShowExpenseMenu(false); onAddExpenseAI(); }}
-                  style={{
-                    width: '100%', padding: '14px var(--spacing-base)', textAlign: 'left',
-                    background: 'none', border: 'none', borderBottom: '1px solid var(--color-hairline-soft)',
-                    cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: 'var(--color-fg)', fontFamily: 'inherit',
-                  }}
-                >🤖 {t.budgetAiScan}</button>
-              )}
-              <button
-                onClick={() => { setShowExpenseMenu(false); onAddExpense(); }}
-                style={{
-                  width: '100%', padding: '14px var(--spacing-base)', textAlign: 'left',
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontSize: '14px', fontWeight: 500, color: 'var(--color-fg)', fontFamily: 'inherit',
-                }}
-              >✏️ {t.budgetManualEntry}</button>
-            </div>
-          )}
-        </div>
-
-        {homeSettings.budget_shared_account === 'yes' && (
-          <div style={{ flex: 1 }}>
-            <button
-              onClick={onAddIncome}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 14px',
-                borderRadius: 'var(--rounded-md)', border: '1px solid #10b981',
-                background: 'transparent', cursor: 'pointer', fontSize: '14px', fontWeight: 600,
-                color: '#10b981', fontFamily: 'inherit',
-              }}
-            >{t.budgetAddIncome}</button>
-          </div>
-        )}
-      </div>
 
       {/* Totals summary */}
       <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
@@ -1116,6 +1078,7 @@ function AiScanModal({
   const [analysing, setAnalysing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
 
   async function handleFile(file: File) {
     setAnalysing(true);
@@ -1173,6 +1136,14 @@ function AiScanModal({
             </p>
 
             <input
+              ref={cameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              style={{ display: 'none' }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+            />
+            <input
               ref={fileRef}
               type="file"
               accept="image/*"
@@ -1180,14 +1151,24 @@ function AiScanModal({
               onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
             />
 
-            <button
-              onClick={() => fileRef.current?.click()}
-              style={{
-                width: '100%', padding: '14px', borderRadius: 'var(--rounded-md)',
-                background: 'var(--color-primary)', color: 'white', border: 'none',
-                cursor: 'pointer', fontSize: '15px', fontWeight: 600, marginBottom: 'var(--spacing-md)',
-              }}
-            >📷 {t.budgetUploadReceipt}</button>
+            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
+              <button
+                onClick={() => cameraRef.current?.click()}
+                style={{
+                  flex: 1, padding: '14px', borderRadius: 'var(--rounded-md)',
+                  background: 'var(--color-primary)', color: 'white', border: 'none',
+                  cursor: 'pointer', fontSize: '15px', fontWeight: 600,
+                }}
+              >📷 {t.budgetScanCamera}</button>
+              <button
+                onClick={() => fileRef.current?.click()}
+                style={{
+                  flex: 1, padding: '14px', borderRadius: 'var(--rounded-md)',
+                  background: 'var(--color-surface-strong)', color: 'var(--color-ink)', border: 'none',
+                  cursor: 'pointer', fontSize: '15px', fontWeight: 600,
+                }}
+              >🖼 {t.budgetScanGallery}</button>
+            </div>
 
             {error && (
               <div style={{ marginBottom: 'var(--spacing-md)' }}>
@@ -2015,6 +1996,10 @@ export function Budget({ homeId, language, userId, userRole }: {
   const [aiScanOpen, setAiScanOpen] = useState(false);
   const [aiPrefilled, setAiPrefilled] = useState<{ amount: string; description: string; categoryId: string | null } | null>(null);
 
+  // FAB state
+  const [fabOpen, setFabOpen] = useState(false);
+  const [fabExpenseOpen, setFabExpenseOpen] = useState(false);
+
   // Recurring item modal state
   const [recurringToEdit, setRecurringToEdit] = useState<RecurringItem | 'new' | null>(null);
 
@@ -2196,9 +2181,6 @@ export function Budget({ homeId, language, userId, userRole }: {
           currentMonth={currentMonth}
           onPrevMonth={() => setCurrentMonth(({ year, month }) => month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 })}
           onNextMonth={() => setCurrentMonth(({ year, month }) => month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 })}
-          onAddExpense={openAddExpense}
-          onAddExpenseAI={openAddExpenseAI}
-          onAddIncome={openAddIncome}
           onGoToEntries={() => setView('entries')}
           onRefresh={fetchAll}
           onNewRecurring={() => setRecurringToEdit('new')}
@@ -2223,6 +2205,40 @@ export function Budget({ homeId, language, userId, userRole }: {
           onOpenRecurring={(item) => setRecurringToEdit(item)}
         />
       )}
+
+      {/* FAB */}
+      {(fabOpen || fabExpenseOpen) && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 299 }} onClick={() => { setFabOpen(false); setFabExpenseOpen(false); }} />
+      )}
+      {fabExpenseOpen && (
+        <div style={{ position: 'fixed', bottom: 148, right: 16, zIndex: 300, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+          {effectiveSettings.budget_ai_receipts === 'yes' && (
+            <button onClick={() => { setFabOpen(false); setFabExpenseOpen(false); openAddExpenseAI(); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 24, background: 'var(--color-canvas)', border: '1px solid var(--color-hairline)', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: 'var(--color-ink)', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>🤖 {t.budgetAiScan}</button>
+          )}
+          <button onClick={() => { setFabOpen(false); setFabExpenseOpen(false); openAddExpense(); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 24, background: 'var(--color-canvas)', border: '1px solid var(--color-hairline)', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: 'var(--color-ink)', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>✏️ {t.budgetManualEntry}</button>
+        </div>
+      )}
+      {fabOpen && !fabExpenseOpen && (
+        <div style={{ position: 'fixed', bottom: 148, right: 16, zIndex: 300, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+          <button onClick={() => { setFabExpenseOpen(true); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 24, background: 'var(--color-canvas)', border: '1px solid var(--color-hairline)', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: 'var(--color-ink)', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>{t.budgetAddExpense} ›</button>
+          {effectiveSettings.budget_shared_account === 'yes' && (
+            <button onClick={() => { setFabOpen(false); openAddIncome(); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 24, background: 'var(--color-canvas)', border: '1px solid var(--color-hairline)', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: '#10b981', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>{t.budgetAddIncome}</button>
+          )}
+        </div>
+      )}
+      <button
+        onClick={() => { setFabOpen(v => !v); setFabExpenseOpen(false); }}
+        style={{
+          position: 'fixed', bottom: 84, right: 16, zIndex: 300,
+          width: 56, height: 56, borderRadius: '50%',
+          background: 'var(--color-primary)', color: 'white', border: 'none',
+          cursor: 'pointer', fontSize: '28px', fontWeight: 300,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 4px 16px rgba(20,216,219,0.45)',
+          transform: fabOpen || fabExpenseOpen ? 'rotate(45deg)' : 'none',
+          transition: 'transform 0.2s',
+        }}
+      >+</button>
 
       {/* Recurring item modal */}
       {recurringToEdit !== null && (

@@ -60,6 +60,24 @@ const InfoIcon = () => (
   </svg>
 );
 
+const NavArrowBtn = ({ dir, onClick }: { dir: 'prev' | 'next'; onClick: () => void }) => (
+  <button
+    onClick={onClick}
+    style={{
+      width: 34, height: 34, borderRadius: 8,
+      background: 'var(--color-primary)', border: 'none',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      cursor: 'pointer', flexShrink: 0,
+    }}
+  >
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      {dir === 'prev'
+        ? <polyline points="15 18 9 12 15 6" />
+        : <polyline points="9 18 15 12 9 6" />}
+    </svg>
+  </button>
+);
+
 interface CalSub {
   id: string;
   name: string;
@@ -605,15 +623,9 @@ export function Calendar({ homeId, language, defaultView = 'agenda' }: { homeId:
       <div>
         {/* Navigation */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-md)' }}>
-          <button
-            onClick={() => { setCurrentDate(new Date(year, month - 1, 1)); setSelectedDayKey(null); }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)', fontSize: 22, padding: '4px 10px', lineHeight: 1 }}
-          >←</button>
+          <NavArrowBtn dir="prev" onClick={() => { setCurrentDate(new Date(year, month - 1, 1)); setSelectedDayKey(null); }} />
           <span style={{ fontWeight: 700, fontSize: 16 }}>{t.monthNames[month]} {year}</span>
-          <button
-            onClick={() => { setCurrentDate(new Date(year, month + 1, 1)); setSelectedDayKey(null); }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)', fontSize: 22, padding: '4px 10px', lineHeight: 1 }}
-          >→</button>
+          <NavArrowBtn dir="next" onClick={() => { setCurrentDate(new Date(year, month + 1, 1)); setSelectedDayKey(null); }} />
         </div>
 
         {/* Day-of-week headers */}
@@ -709,28 +721,12 @@ export function Calendar({ homeId, language, defaultView = 'agenda' }: { homeId:
       <div>
         {/* Navigation */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-sm)' }}>
-          <button
-            onClick={() => {
-              const prev = new Date(monday);
-              prev.setDate(monday.getDate() - 7);
-              setCurrentDate(prev);
-              setSelectedDayKey(null);
-            }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)', fontSize: 22, padding: '4px 10px', lineHeight: 1 }}
-          >←</button>
+          <NavArrowBtn dir="prev" onClick={() => { const prev = new Date(monday); prev.setDate(monday.getDate() - 7); setCurrentDate(prev); setSelectedDayKey(null); }} />
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontWeight: 700, fontSize: 14 }}>{t.weekLabel(weekNum)}</div>
             <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>{rangeLabel}</div>
           </div>
-          <button
-            onClick={() => {
-              const next = new Date(monday);
-              next.setDate(monday.getDate() + 7);
-              setCurrentDate(next);
-              setSelectedDayKey(null);
-            }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)', fontSize: 22, padding: '4px 10px', lineHeight: 1 }}
-          >→</button>
+          <NavArrowBtn dir="next" onClick={() => { const next = new Date(monday); next.setDate(monday.getDate() + 7); setCurrentDate(next); setSelectedDayKey(null); }} />
         </div>
 
         {/* 7-day strip */}
@@ -808,17 +804,11 @@ export function Calendar({ homeId, language, defaultView = 'agenda' }: { homeId:
       ref={stickyHeaderRef}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-sm)' }}>
           <h1 className="text-display-lg">{t.schedule}</h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              style={{ fontSize: '13px', padding: '6px 14px', borderRadius: 'var(--rounded-sm)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}
-            >+ {t.calNewEvent}</button>
-            <button
-              onClick={() => setSettingsOpen(true)}
-              title={t.calSettingsTitle}
-              style={{ background: 'var(--color-surface-strong)', border: 'none', borderRadius: 'var(--rounded-full)', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--color-muted)', flexShrink: 0 }}
-            ><GearIcon /></button>
-          </div>
+          <button
+            onClick={() => setSettingsOpen(true)}
+            title={t.calSettingsTitle}
+            style={{ background: 'var(--color-surface-strong)', border: 'none', borderRadius: 'var(--rounded-full)', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--color-muted)', flexShrink: 0 }}
+          ><GearIcon /></button>
         </div>
         {renderViewToggle()}
       </div>
@@ -828,6 +818,19 @@ export function Calendar({ homeId, language, defaultView = 'agenda' }: { homeId:
       ) : view === 'agenda' ? renderAgenda()
         : view === 'month' ? renderMonth()
         : renderWeek()}
+
+      {/* FAB */}
+      <button
+        onClick={() => setIsModalOpen(true)}
+        style={{
+          position: 'fixed', bottom: 84, right: 16, zIndex: 200,
+          width: 56, height: 56, borderRadius: '50%',
+          background: 'var(--color-primary)', color: 'white', border: 'none',
+          cursor: 'pointer', fontSize: '28px', fontWeight: 300,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 4px 16px rgba(20,216,219,0.45)',
+        }}
+      >+</button>
 
       {isModalOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }}

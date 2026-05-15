@@ -10,6 +10,7 @@ import { Lists } from './Lists';
 import { StickyNotes } from './StickyNotes';
 import { Todos, TodosDashboardWidget } from './Todos';
 import { Budget } from './Budget';
+import { PhotoNotes, PhotoNotesDashboardWidget } from './PhotoNotes';
 import {
   HomeSettings,
   type ModuleId,
@@ -103,6 +104,13 @@ const BudgetIcon = ({ color = 'currentColor', size = 20 }: { color?: string; siz
   </svg>
 );
 
+const PhotoNotesIcon = ({ color = 'currentColor', size = 20 }: { color?: string; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+    <circle cx="12" cy="13" r="4"/>
+  </svg>
+);
+
 const CakeIcon = ({ color = 'currentColor', size = 14 }: { color?: string; size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/>
@@ -160,7 +168,8 @@ function NavModuleIcon({ id, active }: { id: ModuleId; active: boolean }) {
     case 'luna':      return <PawIcon active={active} />;
     case 'home-info': return <HouseInfoIcon color={c} size={24} />;
     case 'car':       return <CarIcon color={c} size={24} />;
-    case 'budget':    return <BudgetIcon color={c} size={24} />;
+    case 'budget':      return <BudgetIcon color={c} size={24} />;
+    case 'photo-notes': return <PhotoNotesIcon color={c} size={24} />;
   }
 }
 
@@ -174,7 +183,8 @@ function getNavLabel(id: ModuleId, t: ReturnType<typeof getT>): string {
     case 'luna':      return t.moduleLuna;
     case 'home-info': return t.moduleHomeInfo;
     case 'car':       return t.moduleCar;
-    case 'budget':    return t.navBudget;
+    case 'budget':      return t.navBudget;
+    case 'photo-notes': return t.modulePhotoNotes;
   }
 }
 
@@ -717,7 +727,7 @@ function BudgetDashboardWidget({ homeId, language, onNavigate }: { homeId: strin
       )}
 
       <button onClick={onNavigate} style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer', padding: 0 }}>
-        {t.budgetTitle} →
+        {t.goToBudget}
       </button>
     </div>
   );
@@ -1310,6 +1320,20 @@ function App() {
     return () => { supabase.removeChannel(channel); };
   }, [homeId]);
 
+  useEffect(() => {
+    if (!homeId || !session) return;
+    const channel = supabase
+      .channel(`photo_notes_app_${homeId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'photo_notes', filter: `home_id=eq.${homeId}` }, (payload) => {
+        const photo = payload.new as any;
+        if (photo.sender_id !== session.user.id && activeTab !== 'photo-notes') {
+          showToast(getT(language).photoNotesNewToast);
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [homeId, session, activeTab, language]);
+
   async function fetchUserProfile(userId: string) {
     const { data } = await supabase
       .from('profiles')
@@ -1575,6 +1599,15 @@ function App() {
     if (activeTab === 'lists') return <Lists homeId={homeId} language={language} userId={session.user.id} />;
     if (activeTab === 'budget') return <Budget homeId={homeId} language={language} userId={session.user.id} userRole={userRole} />;
     if (activeTab === 'todos') return <Todos homeId={homeId} userId={session.user.id} language={language} />;
+    if (activeTab === 'photo-notes') return (
+      <PhotoNotes
+        homeId={homeId}
+        userId={session.user.id}
+        language={language}
+        memberColors={memberColors}
+        onNewPhoto={() => showToast(t.photoNotesNewToast)}
+      />
+    );
     if (activeTab === 'luna') return (
       <div>
         <h1 className="text-display-lg" style={{ marginTop: 'var(--spacing-md)' }}>Luna Portal</h1>
@@ -1768,9 +1801,15 @@ function App() {
 
         {/* FIXED 1: Sticky Notes */}
         <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
-          <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <NoteIcon color="var(--color-primary)" size={18} /> {t.notes}
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-sm)' }}>
+            <h2 className="text-title-md" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <NoteIcon color="var(--color-primary)" size={18} /> {t.notes}
+            </h2>
+            <button
+              onClick={() => setActiveTab('notes')}
+              style={{ background: 'var(--color-primary)', border: 'none', borderRadius: 'var(--rounded-full)', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white', fontSize: '20px', fontWeight: 300, lineHeight: 1, flexShrink: 0 }}
+            >+</button>
+          </div>
           <StickyNotes
             session={session}
             homeId={homeId}
@@ -1781,6 +1820,17 @@ function App() {
             memberColors={memberColors}
           />
         </div>
+
+        {/* FIXED 1b: Photo Notes widget — only when module active */}
+        {activeModuleIds.includes('photo-notes' as ModuleId) && (
+          <PhotoNotesDashboardWidget
+            homeId={homeId}
+            userId={session.user.id}
+            language={language}
+            memberColors={memberColors}
+            onNavigate={() => setActiveTab('photo-notes')}
+          />
+        )}
 
         {/* FIXED 2: Calendar — next 7 events */}
         <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>

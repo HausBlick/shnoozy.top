@@ -327,7 +327,9 @@ export function Lists({ homeId, language, userId }: { homeId: string; language: 
   const [doneExpanded, setDoneExpanded] = useState(false);
   const [budgetEnabled, setBudgetEnabled] = useState(false);
   const [showBudgetExpense, setShowBudgetExpense] = useState(false);
+  const [recentlyAdded, setRecentlyAdded] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
+  const prevItemIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     fetchCategories();
@@ -376,8 +378,19 @@ export function Lists({ homeId, language, userId }: { homeId: string; language: 
       .eq('home_id', homeId)
       .is('deleted_at', null)
       .order('created_at', { ascending: true });
-    setItems(data || []);
+    const fetched = data || [];
+    const newIds = prevItemIds.current.size > 0
+      ? fetched.filter(i => !prevItemIds.current.has(i.id)).map(i => i.id)
+      : [];
+    prevItemIds.current = new Set(fetched.map(i => i.id));
+    setItems(fetched);
     setLoading(false);
+    if (newIds.length > 0) {
+      setRecentlyAdded(prev => { const s = new Set(prev); newIds.forEach(id => s.add(id)); return s; });
+      setTimeout(() => {
+        setRecentlyAdded(prev => { const s = new Set(prev); newIds.forEach(id => s.delete(id)); return s; });
+      }, 600);
+    }
   }
 
   async function fetchHistory() {
@@ -499,6 +512,7 @@ export function Lists({ homeId, language, userId }: { homeId: string; language: 
     return (
       <div
         key={item.id}
+        className={recentlyAdded.has(item.id) ? 'slide-in-up' : undefined}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -640,68 +654,71 @@ export function Lists({ homeId, language, userId }: { homeId: string; language: 
         </button>
       </div>
 
-      <div style={{ position: 'relative', marginBottom: 'var(--spacing-xl)' }}>
-        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-          <input
-            ref={inputRef}
-            type="text"
-            className="form-input"
-            placeholder={t.addItemPlaceholder}
-            value={inputValue}
-            onChange={e => handleInputChange(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') addItem();
-              if (e.key === 'Escape') setSuggestions([]);
-            }}
-            onBlur={() => setTimeout(() => setSuggestions([]), 150)}
-            style={{ flex: 1 }}
-          />
-          <button
-            onClick={() => addItem()}
-            className="btn-primary"
-            disabled={adding || !inputValue.trim()}
-            style={{ padding: '0 var(--spacing-lg)', width: '52px', flexShrink: 0, fontSize: '22px', fontWeight: 400 }}
-          >
-            {adding ? '…' : '+'}
-          </button>
-        </div>
-        {suggestions.length > 0 && (
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: '60px',
-            background: 'var(--color-surface)',
-            border: '1px solid var(--color-hairline)',
-            borderRadius: 'var(--rounded-lg)',
-            zIndex: 100,
-            overflow: 'hidden',
-            marginTop: '4px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
-          }}>
-            {suggestions.map(s => (
-              <div
-                key={s}
-                onMouseDown={() => addItem(s)}
-                style={{
-                  padding: '10px 14px',
-                  fontSize: '15px',
-                  cursor: 'pointer',
-                  borderBottom: '1px solid var(--color-hairline-soft)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  color: 'var(--color-text)',
-                }}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.51"/>
-                </svg>
-                {s}
-              </div>
-            ))}
+      {/* Fixed bottom input bar */}
+      <div style={{ position: 'fixed', bottom: 70, left: 0, right: 0, background: 'var(--color-canvas)', borderTop: '1px solid var(--color-hairline)', padding: '8px 16px', zIndex: 150, paddingBottom: 'max(8px, env(safe-area-inset-bottom))' }}>
+        <div style={{ position: 'relative' }}>
+          <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+            <input
+              ref={inputRef}
+              type="text"
+              className="form-input"
+              placeholder={t.addItemPlaceholder}
+              value={inputValue}
+              onChange={e => handleInputChange(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') addItem();
+                if (e.key === 'Escape') setSuggestions([]);
+              }}
+              onBlur={() => setTimeout(() => setSuggestions([]), 150)}
+              style={{ flex: 1 }}
+            />
+            <button
+              onClick={() => addItem()}
+              className="btn-primary"
+              disabled={adding || !inputValue.trim()}
+              style={{ padding: '0 var(--spacing-lg)', width: '52px', flexShrink: 0, fontSize: '22px', fontWeight: 400 }}
+            >
+              {adding ? '…' : '+'}
+            </button>
           </div>
-        )}
+          {suggestions.length > 0 && (
+            <div style={{
+              position: 'absolute',
+              bottom: '100%',
+              left: 0,
+              right: '60px',
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-hairline)',
+              borderRadius: 'var(--rounded-lg)',
+              zIndex: 100,
+              overflow: 'hidden',
+              marginBottom: '4px',
+              boxShadow: '0 -4px 12px rgba(0,0,0,0.12)',
+            }}>
+              {suggestions.map(s => (
+                <div
+                  key={s}
+                  onMouseDown={() => addItem(s)}
+                  style={{
+                    padding: '10px 14px',
+                    fontSize: '15px',
+                    cursor: 'pointer',
+                    borderBottom: '1px solid var(--color-hairline-soft)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    color: 'var(--color-text)',
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.51"/>
+                  </svg>
+                  {s}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {loading ? (

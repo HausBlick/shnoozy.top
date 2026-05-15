@@ -448,7 +448,9 @@ function ListDetail({ list, homeId, userId, members, lang, onBack, onListUpdated
   const [showTaskSheet, setShowTaskSheet] = useState(false);
   const [showListSheet, setShowListSheet] = useState(false);
   const [inlineTitle, setInlineTitle] = useState('');
+  const [recentlyAdded, setRecentlyAdded] = useState<Set<string>>(new Set());
   const inlineRef = useRef<HTMLInputElement>(null);
+  const prevItemIds = useRef<Set<string>>(new Set());
 
   // Reset editingItem to null (not auto-open sheet)
   useEffect(() => { setEditingItem(null); }, []);
@@ -470,8 +472,19 @@ function ListDetail({ list, homeId, userId, members, lang, onBack, onListUpdated
       .eq('list_id', list.id)
       .order('sort_order')
       .order('created_at');
-    setItems((data || []) as TodoItem[]);
+    const fetched = (data || []) as TodoItem[];
+    const newIds = prevItemIds.current.size > 0
+      ? fetched.filter(i => !prevItemIds.current.has(i.id)).map(i => i.id)
+      : [];
+    prevItemIds.current = new Set(fetched.map(i => i.id));
+    setItems(fetched);
     setLoading(false);
+    if (newIds.length > 0) {
+      setRecentlyAdded(prev => { const s = new Set(prev); newIds.forEach(id => s.add(id)); return s; });
+      setTimeout(() => {
+        setRecentlyAdded(prev => { const s = new Set(prev); newIds.forEach(id => s.delete(id)); return s; });
+      }, 600);
+    }
   }
 
   async function toggleItem(item: TodoItem) {
@@ -500,12 +513,15 @@ function ListDetail({ list, homeId, userId, members, lang, onBack, onListUpdated
   function ItemRow({ item }: { item: TodoItem }) {
     const assignee = members.find(m => m.user_id === item.assigned_to);
     return (
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)',
-        padding: '10px 0',
-        borderBottom: '1px solid var(--color-hairline-soft)',
-        opacity: item.status === 'done' ? 0.5 : 1,
-      }}>
+      <div
+        className={recentlyAdded.has(item.id) ? 'slide-in-up' : undefined}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)',
+          padding: '10px 0',
+          borderBottom: '1px solid var(--color-hairline-soft)',
+          opacity: item.status === 'done' ? 0.5 : 1,
+        }}
+      >
         <button onClick={() => toggleItem(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
           <CheckIcon checked={item.status === 'done'} color={list.color} />
         </button>
@@ -537,27 +553,29 @@ function ListDetail({ list, homeId, userId, members, lang, onBack, onListUpdated
         </button>
       </div>
 
-      {/* Inline add */}
-      <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-lg)' }}>
-        <input
-          ref={inlineRef}
-          className="form-input"
-          style={{ flex: 1 }}
-          value={inlineTitle}
-          onChange={e => setInlineTitle(e.target.value)}
-          placeholder={t.todoTaskTitlePlaceholder}
-          onKeyDown={e => { if (e.key === 'Enter') handleInlineAdd(); }}
-        />
-        <button
-          onClick={() => { setEditingItem(null); setShowTaskSheet(true); }}
-          style={{
-            padding: '0 16px', borderRadius: 'var(--rounded-sm)',
-            background: list.color, color: 'white', border: 'none',
-            cursor: 'pointer', fontWeight: 600, fontSize: '20px', lineHeight: 1,
-            flexShrink: 0,
-          }}
-          title={t.todoNewTask}
-        >+</button>
+      {/* Fixed bottom input bar */}
+      <div style={{ position: 'fixed', bottom: 70, left: 0, right: 0, background: 'var(--color-canvas)', borderTop: '1px solid var(--color-hairline)', padding: '8px 16px', zIndex: 150, paddingBottom: 'max(8px, env(safe-area-inset-bottom))' }}>
+        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+          <input
+            ref={inlineRef}
+            className="form-input"
+            style={{ flex: 1 }}
+            value={inlineTitle}
+            onChange={e => setInlineTitle(e.target.value)}
+            placeholder={t.todoTaskTitlePlaceholder}
+            onKeyDown={e => { if (e.key === 'Enter') handleInlineAdd(); }}
+          />
+          <button
+            onClick={handleInlineAdd}
+            disabled={!inlineTitle.trim()}
+            style={{
+              padding: '0 16px', borderRadius: 'var(--rounded-sm)',
+              background: list.color, color: 'white', border: 'none',
+              cursor: 'pointer', fontWeight: 600, fontSize: '20px', lineHeight: 1,
+              flexShrink: 0, opacity: inlineTitle.trim() ? 1 : 0.4,
+            }}
+          >+</button>
+        </div>
       </div>
 
       {loading ? (
@@ -630,6 +648,9 @@ export function Todos({ homeId, userId, language }: Props) {
   const [loading, setLoading] = useState(true);
   const [activeList, setActiveList] = useState<TodoList | null>(null);
   const [showNewList, setShowNewList] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
+  const [fabNewTask, setFabNewTask] = useState(false);
+  const [fabTaskList, setFabTaskList] = useState<TodoList | null>(null);
 
   useEffect(() => {
     loadAll();
@@ -728,15 +749,8 @@ export function Todos({ homeId, userId, language }: Props) {
   return (
     <div style={{ paddingBottom: '120px' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
+      <div style={{ marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
         <h1 className="text-display-lg">{t.moduleTodos}</h1>
-        <button
-          className="btn-primary"
-          style={{ padding: '8px 14px', fontSize: '14px', height: 'auto', width: 'auto', flexShrink: 0 }}
-          onClick={() => setShowNewList(true)}
-        >
-          {t.todoNewList}
-        </button>
       </div>
 
       {loading ? (
@@ -809,6 +823,43 @@ export function Todos({ homeId, userId, language }: Props) {
         </>
       )}
 
+      {/* FAB */}
+      {fabOpen && !fabNewTask && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 299 }} onClick={() => setFabOpen(false)} />
+      )}
+      {fabNewTask && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 299 }} onClick={() => { setFabNewTask(false); setFabOpen(false); }} />
+      )}
+      {fabOpen && !fabNewTask && (
+        <div style={{ position: 'fixed', bottom: 148, right: 16, zIndex: 300, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+          <button onClick={() => { setFabOpen(false); setShowNewList(true); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 24, background: 'var(--color-canvas)', border: '1px solid var(--color-hairline)', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: 'var(--color-ink)', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>{t.todoNewList}</button>
+          <button onClick={() => { setFabNewTask(true); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 24, background: 'var(--color-canvas)', border: '1px solid var(--color-hairline)', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: 'var(--color-ink)', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>{t.todoNewTask}</button>
+        </div>
+      )}
+      {fabNewTask && (
+        <div style={{ position: 'fixed', bottom: 148, right: 16, zIndex: 300, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, maxWidth: 220 }}>
+          <p style={{ fontSize: '12px', color: 'var(--color-muted)', textAlign: 'right', margin: '0 4px 4px', whiteSpace: 'nowrap' }}>{t.todoSelectList}</p>
+          {lists.map(l => (
+            <button key={l.id} onClick={() => { setFabTaskList(l); setFabNewTask(false); setFabOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 24, background: 'var(--color-canvas)', border: `1px solid ${l.color}`, boxShadow: '0 2px 8px rgba(0,0,0,0.12)', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: 'var(--color-ink)', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+              <span>{l.icon}</span><span>{l.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <button
+        onClick={() => { setFabOpen(v => !v); setFabNewTask(false); }}
+        style={{
+          position: 'fixed', bottom: 84, right: 16, zIndex: 300,
+          width: 56, height: 56, borderRadius: '50%',
+          background: 'var(--color-primary)', color: 'white', border: 'none',
+          cursor: 'pointer', fontSize: '28px', fontWeight: 300,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 4px 16px rgba(20,216,219,0.45)',
+          transform: fabOpen || fabNewTask ? 'rotate(45deg)' : 'none',
+          transition: 'transform 0.2s',
+        }}
+      >+</button>
+
       {showNewList && (
         <ListSheet
           homeId={homeId}
@@ -816,6 +867,21 @@ export function Todos({ homeId, userId, language }: Props) {
           lang={language}
           onClose={() => setShowNewList(false)}
           onSaved={() => { setShowNewList(false); loadAll(); }}
+        />
+      )}
+
+      {fabTaskList && (
+        <TaskSheet
+          item={null}
+          listId={fabTaskList.id}
+          listColor={fabTaskList.color}
+          homeId={homeId}
+          userId={userId}
+          members={members}
+          lang={language}
+          onClose={() => setFabTaskList(null)}
+          onSaved={() => { setFabTaskList(null); loadAll(); }}
+          onPushAssignment={sendAssignmentPush}
         />
       )}
     </div>

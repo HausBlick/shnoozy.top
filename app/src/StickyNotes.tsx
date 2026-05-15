@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase } from './lib/supabase';
 import { getT, type Lang } from './lib/i18n';
 import { logActivity } from './lib/activityLog';
@@ -45,12 +45,11 @@ interface DeckProps {
   topIndex: number;
   onSwipe: () => void;
   onSeeAll?: () => void;
-  onAdd: () => void;
-  labels: { noNotesYet: string; addNote: string; seeAll: string; showAll: string; notesCount: (n: number) => string };
+  labels: { noNotesYet: string; seeAll: string; showAll: string; notesCount: (n: number) => string };
   memberColors: Record<string, string>;
 }
 
-function NoteDeck({ notes, topIndex, onSwipe, onSeeAll, onAdd, labels, memberColors }: DeckProps) {
+function NoteDeck({ notes, topIndex, onSwipe, onSeeAll, labels, memberColors }: DeckProps) {
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [leaving, setLeaving] = useState<'left' | 'right' | null>(null);
@@ -94,9 +93,6 @@ function NoteDeck({ notes, topIndex, onSwipe, onSeeAll, onAdd, labels, memberCol
         <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-sm)' }}>
           {labels.noNotesYet}
         </p>
-        <button onClick={onAdd} style={{ background: 'none', border: '1px dashed var(--color-hairline)', borderRadius: 'var(--rounded-full)', padding: '5px 14px', fontSize: '13px', cursor: 'pointer', color: 'var(--color-muted)' }}>
-          {labels.addNote}
-        </button>
       </div>
     );
   }
@@ -188,13 +184,7 @@ function NoteDeck({ notes, topIndex, onSwipe, onSeeAll, onAdd, labels, memberCol
         })}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button
-          onClick={onAdd}
-          style={{ background: 'none', border: '1px dashed var(--color-hairline)', borderRadius: 'var(--rounded-full)', padding: '5px 14px', fontSize: '13px', cursor: 'pointer', color: 'var(--color-muted)' }}
-        >
-          {labels.addNote}
-        </button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {notes.length > 1 && (
             <span style={{ fontSize: '12px', color: 'var(--color-muted)' }}>
@@ -237,6 +227,7 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote, onB
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deckTopIndex, setDeckTopIndex] = useState(0);
+  const [fabOpen, setFabOpen] = useState(false);
 
   const myId = session?.user?.id ?? '';
 
@@ -289,12 +280,13 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote, onB
     setLoading(false);
   }
 
-  function openAdd() {
+  const openAdd = useCallback((vis: Visibility = 'all') => {
     setEditNote(null);
     setContent('');
-    setVisibleTo('all');
+    setVisibleTo(vis);
     setShowModal(true);
-  }
+    setFabOpen(false);
+  }, []);
 
   function openEdit(note: StickyNote) {
     setEditNote(note);
@@ -356,27 +348,55 @@ export function StickyNotes({ session, homeId, compact, onSeeAll, onNewNote, onB
           topIndex={deckTopIndex}
           onSwipe={() => setDeckTopIndex(prev => visibleNotes.length > 0 ? (prev + 1) % visibleNotes.length : 0)}
           onSeeAll={onSeeAll}
-          onAdd={openAdd}
-          labels={{ noNotesYet: t.noNotesYet, addNote: t.addNote, seeAll: t.seeAll, showAll: t.showAll, notesCount: t.notesCount }}
+          labels={{ noNotesYet: t.noNotesYet, seeAll: t.seeAll, showAll: t.showAll, notesCount: t.notesCount }}
           memberColors={memberColors}
         />
       ) : (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-lg)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
-              {onBack && (
-                <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: 0 }}>←</button>
-              )}
-              <h1 className="text-display-lg">{t.notes}</h1>
-            </div>
-            <button
-              onClick={openAdd}
-              style={{ fontSize: '13px', padding: '6px 14px', borderRadius: 'var(--rounded-sm)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}
-            >+ {t.addNote}</button>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 'var(--spacing-lg)' }}>
+            {onBack && (
+              <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: 0, marginRight: 'var(--spacing-md)' }}>←</button>
+            )}
+            <h1 className="text-display-lg">{t.notes}</h1>
           </div>
           {notes.length === 0 && (
             <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>{t.noNotesYet}</p>
           )}
+
+          {/* FAB */}
+          {fabOpen && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 299 }} onClick={() => setFabOpen(false)} />
+          )}
+          {fabOpen && (
+            <div style={{ position: 'fixed', bottom: 148, right: 16, zIndex: 300, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+              {(['private', 'all', 'others'] as Visibility[]).map((vis) => {
+                const label = vis === 'private' ? t.forMe : vis === 'all' ? t.forAll : t.forOthers;
+                return (
+                  <button key={vis} onClick={() => openAdd(vis)} style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '10px 16px', borderRadius: 24,
+                    background: 'var(--color-canvas)', border: '1px solid var(--color-hairline)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                    cursor: 'pointer', fontSize: '14px', fontWeight: 500,
+                    color: 'var(--color-ink)', whiteSpace: 'nowrap', fontFamily: 'inherit',
+                  }}>{label}</button>
+                );
+              })}
+            </div>
+          )}
+          <button
+            onClick={() => setFabOpen(v => !v)}
+            style={{
+              position: 'fixed', bottom: 84, right: 16, zIndex: 300,
+              width: 56, height: 56, borderRadius: '50%',
+              background: 'var(--color-primary)', color: 'white', border: 'none',
+              cursor: 'pointer', fontSize: '28px', fontWeight: 300,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 16px rgba(20,216,219,0.45)',
+              transform: fabOpen ? 'rotate(45deg)' : 'none',
+              transition: 'transform 0.2s',
+            }}
+          >+</button>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-sm)' }}>
             {visibleNotes.map(note => {
