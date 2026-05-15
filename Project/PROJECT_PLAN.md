@@ -6,8 +6,8 @@
 
 ## Current Status
 **Live unter:** https://shnoozy.top
-**Phase:** Phase 12 ✅ — Budget v2 abgeschlossen (Session 8, 2026-05-15)
-**Nächste Phase:** Phase 12 KI-Erfassung (analyze-receipt EF) + weitere offene Module
+**Phase:** Phase 16 ✅ — Wiederkehrende Ausgaben + Geplante Änderungen (Session 9, 2026-05-15)
+**Nächste Phase:** Nächste Schritte nach Absprache — offen
 
 ---
 
@@ -264,10 +264,46 @@
 #### 12.7 Einladungs-Hints ✅
 - [x] `HomeOnboarding.tsx`: Admin-Hint (Create Home) + Member-Hint (Join Home) mit Rollen-Erklärung
 
-#### 12.8 KI-Belegerfassung ⬜ OFFEN (nächste Phase)
-- [ ] Edge Function `analyze-receipt` (Gemini Vision, base64-Input → Positionen + Kategorien)
-- [ ] Upload/Camera-Modal in Budget.tsx mit Disclaimer-Texts
-- [ ] Vorausgefülltes Formular nach Analyse, User kann editieren + speichern
+#### 12.8 KI-Belegerfassung ✅ FERTIG (Session 8, 2026-05-15)
+- [x] Edge Function `analyze-receipt` (Gemini 1.5 Flash Vision, base64-Input → amount + description + category_id, JWT-Auth, v2)
+- [x] `AiScanModal`-Komponente in Budget.tsx: Datei/Kamera-Input, base64-Encoding, EF-Aufruf, Analyse-State, Fehler-State
+- [x] Nach Analyse: vorausgefülltes Ausgaben-Formular (amount, description, category_id), User kann bearbeiten + speichern
+- [x] Quick-Action Submenü im Dashboard: "🤖 KI-Scan" öffnet AiScanModal → bei Erfolg weiter in EntryModal
+
+---
+
+### ✅ Phase 14: UX-Polish Budget + Kalender (Session 8, 2026-05-15)
+- [x] Ausgabe/Einnahme Quick-Actions im Budget-Dashboard 50/50 nebeneinander
+- [x] "+ Neuer Eintrag"-Button bei Wiederkehrende Ausgaben im Dashboard (teal pill)
+- [x] "+ Betrag einzahlen"-Button bei Sparzielen (teal pill)
+- [x] `RecurringItemModal` extrahiert als eigenständige Komponente (wiederverwendbar aus Dashboard + Settings)
+- [x] Kalender: FAB (floating) entfernt → "+ Termin"-Pill-Button im Header (vor Gear-Icon)
+- [x] Kalender Event-Modal auf Bottom-Sheet-Pattern umgestellt (war `modal-overlay`/`modal-content`)
+- [x] Gear-Icon vereinheitlicht: Budget, Kalender, Listen — alle 36×36 Kreis, `var(--color-surface-strong)`, SVG 17×17
+
+### ✅ Phase 15: Shopping→Budget Bridge (Session 8, 2026-05-15)
+- [x] `BudgetQuickExpenseModal` exportiert aus Budget.tsx — self-contained, fetcht eigene Kategorien/Mitglieder/Settings
+- [x] Lists.tsx importiert + zeigt "Fertig mit dem Einkauf?"-Card am Ende der Liste (nur wenn `budget_setup_done`)
+- [x] `budgetEnabled` State: liest `home_settings.budget_setup_done` beim Mounten
+- [x] i18n: `shoppingBudgetPrompt` + `shoppingRecordExpense` (DE/EN)
+
+### ✅ Phase 16: Wiederkehrende Ausgaben — Geplante Änderungen (Session 8, 2026-05-15)
+- [x] DB-Migration: `budget_recurring_changes` (recurring_item_id, change_type: 'cancellation'|'price_change', effective_date, new_amount)
+- [x] RLS via `is_home_member` durch JOIN auf `budget_recurring_items`
+- [x] `effectiveRecurring(item, changes, monthStart)` Helper: berechnet effektiven Betrag + cancelled-Status für jeden Monat
+- [x] Auto-Booking respektiert Kündigungen + Preisänderungen historisch korrekt
+- [x] `RecurringItemModal`: "+ Vertrag kündigen" (Datum) + "+ Preisanpassung" (Datum + neuer Betrag) + Löschen einzelner Änderungen
+- [x] Dashboard: Stift-Button ✏️ zum Bearbeiten, effektiver Betrag angezeigt, Upcoming-Change-Badges (⚠️ Kündigung / 📈 Preiserhöhung)
+- [x] Datumsformat in Änderungs-Badges: DD.MM.YYYY (formatDate-Helper)
+
+### ✅ Phase 17: Globale UX — Abgerundete Buttons + Notizen-Header (Session 9, 2026-05-15)
+- [x] Alle Text-Aktionsbuttons: `borderRadius: var(--rounded-full)` → `var(--rounded-sm)` (8px) in Calendar, Budget, Lists, StickyNotes
+- [x] Neuer i18n-Key `calNewEvent` (DE: "Termin", EN: "Event") — Kalender-Header-Button
+- [x] StickyNotes: "+ Notiz"-Button von Board-Unterkante in Modul-Header verschoben; `onBack`-Prop für App.tsx-Navigation
+- [x] App.tsx: Notizen-Tab rendert nur noch `<StickyNotes onBack=.../>` (kein separater Header mehr)
+- [x] Unberührt (korrekte Pill-Form beibehalten): Farbswatches, Icon-Kreis-Buttons (Gear/Close/Add), Chips, AQI/Pollen-Badges, Member-Selector
+- [x] TS6133-Bugfix: `PlusIcon`-Komponente aus Calendar.tsx entfernt (war nach FAB-Entfernung nicht mehr referenziert)
+- [x] `.fab`-CSS-Klasse aus index.css entfernt (Dead Code seit Phase 14)
 
 ---
 
@@ -419,6 +455,7 @@
 | `get-weather` | HTTP (Frontend, JWT-Auth) | OpenWeatherMap + Air Pollution API + Gemini-Tagesempfehlung | ✅ aktiv (braucht `OPENWEATHER_API_KEY` Secret) |
 | `get-daily-quote` | HTTP (Frontend, verify_jwt: false) | Gemini generiert tägl. Quote in DE/EN | ✅ aktiv |
 | `get-pollen` | HTTP (Frontend, verify_jwt: false) | Google Pollen API (GRASS/TREE/WEED, Index 0–5) | ✅ aktiv (braucht `GOOGLE_MAPS_API_KEY` Secret) |
+| `analyze-receipt` | HTTP (Frontend, JWT-Auth) | Gemini 1.5 Flash Vision → Betrag + Beschreibung + Kategorie aus Foto | ✅ aktiv |
 
 ---
 
@@ -456,3 +493,8 @@
 *   **2026-05-14 (Session 7):** Phase 11.6: User-Settings Dashboard-Widget-Sektion komplett überarbeitet: alle 5 mittleren Widgets (Aufgaben, Budget, Wetter, Zitat, Pollen) mit Toggle-Schaltern; Enabled-Widgets in ihrer Reihenfolge gerendert (Bug fix für Reorder-Anzeige); Disabled-Widgets getrennt darunter. Kalender-Label präzisiert.
 *   **2026-05-14 (Session 7):** Phase 11.7: Einmaliger Starter-Guide (Tour Modals). Migration `add_tours_seen_to_profiles` (`profiles.tours_seen` JSONB). `TourModal`-Komponente als Bottom-Sheet-Overlay. `TOURS`-Konstante mit DE+EN-Texten für 6 Tools. Erscheint einmalig beim ersten Besuch jedes Tabs, wird sofort in DB persistiert (geräteübergreifend kein zweites Mal).
 *   **2026-05-14 (Session 7):** Bug fixes: (1) Shopping-Kategorien werden für DE-User übersetzt (`CAT_TRANSLATIONS`-Map in Lists.tsx — DB-Werte bleiben Englisch für Gemini). (2) `handle_new_home()`-Trigger erweitert: seeded ab sofort 5 Default-Kategorien + 9 Groceries-Subkategorien für jedes neue Home (ohne Luna — die ist nur für Home `89cd774f`).
+*   **2026-05-15 (Session 8):** Phase 12.8 (KI-Belegerfassung) abgeschlossen: EF `analyze-receipt` deployed (Gemini 1.5 Flash Vision, base64-Input, JWT-Auth). `AiScanModal`-Komponente in Budget.tsx: Datei/Kamera-Picker, Analyse-State, Fehler-Fallback. Nach Analyse öffnet sich EntryModal mit vorausgefüllten Feldern. Quick-Action-Submenü im Dashboard mit "🤖 KI-Scan" Option.
+*   **2026-05-15 (Session 8):** Phase 14 (UX-Polish): Budget Quick-Actions 50/50, "+ Neuer Eintrag" bei Wiederkehrenden + "+ Betrag einzahlen" bei Sparzielen als teal Buttons. `RecurringItemModal` als eigenständige Komponente extrahiert. Kalender: FAB entfernt → Header-Pill-Button; Event-Modal auf Bottom-Sheet umgestellt. Gear-Icon in Budget + Kalender + Listen vereinheitlicht (36×36, surface-strong Hintergrund).
+*   **2026-05-15 (Session 8):** Phase 15 (Shopping→Budget Bridge): `BudgetQuickExpenseModal` in Budget.tsx exportiert (self-contained). Lists.tsx zeigt "Fertig mit dem Einkauf?"-Card am Listenende (nur wenn Budget aktiviert). i18n: `shoppingBudgetPrompt` + `shoppingRecordExpense`.
+*   **2026-05-15 (Session 8):** Phase 16 (Wiederkehrende Ausgaben — Geplante Änderungen): DB-Tabelle `budget_recurring_changes` (RLS via JOIN auf recurring_items). `effectiveRecurring()`-Helper für monatsgenaue Betrag-/Kündigungs-Logik. `RecurringItemModal` erweitert: Kündigung (Datum) + Preisanpassung (Datum + neuer Betrag) + Löschen. Dashboard: ✏️-Bearbeiten-Button, effektive Beträge, Upcoming-Change-Badges (⚠️/📈). Datumsformat DD.MM.YYYY.
+*   **2026-05-15 (Session 9):** Phase 17 (Globale Button-UX): Alle Text-Aktionsbuttons app-weit von `rounded-full` auf `rounded-sm` (8px) umgestellt (Calendar, Budget, Lists, StickyNotes). Neuer i18n-Key `calNewEvent` (Termin/Event). StickyNotes: "+ Notiz"-Button aus Board-Unterkante in Modul-Header verschoben, `onBack`-Prop für Zurück-Navigation. TS6133-Bugfix (PlusIcon in Calendar.tsx). Dead-Code `.fab`-CSS entfernt.
