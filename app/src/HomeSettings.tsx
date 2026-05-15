@@ -193,8 +193,9 @@ export function HomeSettings({ homeId, language, isAdmin, onBack, onModuleSettin
       if (data) {
         const nav = data.find(r => r.key === 'nav_slots');
         const mods = data.find(r => r.key === 'modules_active');
-        if (nav?.value) { try { setNavSlots(JSON.parse(nav.value)); } catch {} }
-        if (mods?.value) { try { setActiveIds(JSON.parse(mods.value)); } catch {} }
+        const knownIds = new Set(ALL_MODULE_IDS);
+        if (nav?.value) { try { setNavSlots((JSON.parse(nav.value) as ModuleId[]).filter(id => knownIds.has(id))); } catch {} }
+        if (mods?.value) { try { setActiveIds((JSON.parse(mods.value) as ModuleId[]).filter(id => knownIds.has(id))); } catch {} }
       }
     } finally {
       setLoading(false);
