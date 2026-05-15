@@ -10,7 +10,6 @@ import { Lists } from './Lists';
 import { StickyNotes } from './StickyNotes';
 import { Todos, TodosDashboardWidget } from './Todos';
 import { Budget } from './Budget';
-import { PhotoNotesDashboardWidget } from './PhotoNotes';
 import {
   HomeSettings,
   type ModuleId,
@@ -441,10 +440,10 @@ function UserSettingsPage({
 
       {/* Dashboard widget order + visibility */}
       {(() => {
-        const ALL_MIDDLE = ['snap', 'todos', 'budget', 'weather', 'quote', 'pollen'] as const;
-        const labels: Record<string, string> = { snap: t.snapWidget, todos: t.moduleTodos, budget: t.moduleBudget, weather: t.weatherWidget, quote: t.quoteWidget, pollen: t.pollenWidget };
-        const emojis: Record<string, string> = { snap: '📸', todos: '✅', budget: '💰', weather: '🌤️', quote: '💬', pollen: '🤧' };
-        const standaloneW = ['snap', 'weather', 'quote', 'pollen'];
+        const ALL_MIDDLE = ['todos', 'budget', 'weather', 'quote', 'pollen'] as const;
+        const labels: Record<string, string> = { todos: t.moduleTodos, budget: t.moduleBudget, weather: t.weatherWidget, quote: t.quoteWidget, pollen: t.pollenWidget };
+        const emojis: Record<string, string> = { todos: '✅', budget: '💰', weather: '🌤️', quote: '💬', pollen: '🤧' };
+        const standaloneW = ['weather', 'quote', 'pollen'];
         // enabled = in dashboardWidgets AND (standalone OR module active)
         const enabledWidgets = dashboardWidgets.filter(w =>
           ALL_MIDDLE.includes(w as typeof ALL_MIDDLE[number]) &&
@@ -1222,7 +1221,7 @@ function App() {
   const [myAvatarUrl, setMyAvatarUrl] = useState('');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [defaultCalView, setDefaultCalView] = useState<'agenda' | 'month' | 'week'>('agenda');
-  const [dashboardWidgets, setDashboardWidgets] = useState<string[]>(['snap', 'todos', 'budget']);
+  const [dashboardWidgets, setDashboardWidgets] = useState<string[]>(['todos', 'budget']);
   const [toursSeen, setToursSeen] = useState<string[]>([]);
   const [activityEntries, setActivityEntries] = useState<any[]>([]);
   const [showActivityModal, setShowActivityModal] = useState(false);
@@ -1332,10 +1331,7 @@ function App() {
     }
     if (data?.theme === 'dark') setTheme('dark');
     if (data?.default_calendar_view) setDefaultCalView(data.default_calendar_view as 'agenda' | 'month' | 'week');
-    if (Array.isArray(data?.dashboard_widgets)) {
-      const saved = data.dashboard_widgets as string[];
-      setDashboardWidgets(saved.includes('snap') ? saved : ['snap', ...saved]);
-    }
+    if (Array.isArray(data?.dashboard_widgets)) setDashboardWidgets(data.dashboard_widgets as string[]);
     if (Array.isArray(data?.tours_seen)) setToursSeen(data.tours_seen as string[]);
   }
 
@@ -1761,8 +1757,8 @@ function App() {
     );
 
     // Home dashboard
-    const standaloneWidgets = ['snap', 'weather', 'quote', 'pollen'];
-    const middleWidgetIds = ['snap', 'todos', 'budget', ...standaloneWidgets];
+    const standaloneWidgets = ['weather', 'quote', 'pollen'];
+    const middleWidgetIds = ['todos', 'budget', ...standaloneWidgets];
     const orderedMiddleWidgets = dashboardWidgets.filter(w => {
       if (standaloneWidgets.includes(w)) return true;
       return activeModuleIds.includes(w as ModuleId) && middleWidgetIds.includes(w);
@@ -1827,7 +1823,6 @@ function App() {
 
         {/* REORDERABLE MIDDLE */}
         {orderedMiddleWidgets.map(w => {
-          if (w === 'snap') return <PhotoNotesDashboardWidget key="snap" homeId={homeId} userId={session.user.id} language={language} memberColors={memberColors} onNewPhoto={() => showToast(t.photoNotesNewToast)} />;
           if (w === 'todos') return <TodosDashboardWidget key="todos" homeId={homeId} language={language} onNavigate={() => setActiveTab('todos')} />;
           if (w === 'budget') return <BudgetDashboardWidget key="budget" homeId={homeId} language={language} onNavigate={() => setActiveTab('budget')} />;
           if (w === 'weather') return <WeatherWidget key="weather" language={language} />;

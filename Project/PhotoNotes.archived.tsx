@@ -1,3 +1,18 @@
+// ARCHIVED — Snap! / PhotoNotes widget (removed from app due to Android PWA camera issues)
+// DB: photo_notes table + photo-notes storage bucket remain in Supabase.
+// To restore: re-add to App.tsx (import, dashboardWidgets, orderedMiddleWidgets render),
+//             re-add i18n keys (photoNotes*, snapWidget), re-add 'snap' to UserSettings widget list.
+//
+// Root issue: Android Chrome PWA kills the app process while the camera intent is open.
+// When the PWA resumes, the file input's change event never fires regardless of approach:
+//   - display:none + programmatic .click() — blocked
+//   - <label> wrapping — blocked
+//   - opacity:0 overlay — blocked
+//   - capture="environment" — blocked
+//   - native addEventListener + visibilitychange fallback — still blocked
+// Gallery upload (file picker without camera intent) works fine.
+// Fix would require getUserMedia (in-app camera) or a native app wrapper (Capacitor).
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from './lib/supabase';
 import { getT, type Lang } from './lib/i18n';
@@ -49,9 +64,6 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
   const onNewPhotoRef = useRef(onNewPhoto);
   useEffect(() => { onNewPhotoRef.current = onNewPhoto; }, [onNewPhoto]);
 
-  // Camera input: native listener + visibilitychange fallback.
-  // React's synthetic onChange dies when Android PWA is suspended during camera session.
-  // Native addEventListener on the DOM node survives; visibilitychange catches the resume.
   const cameraInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const cam = cameraInputRef.current;
@@ -60,14 +72,13 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
     const onChange = () => { const f = cam.files?.[0]; if (f) apply(f); };
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
-        // Small delay — some Android versions need a tick to populate files after resume
         setTimeout(() => { const f = cam.files?.[0]; if (f) apply(f); }, 200);
       }
     };
     cam.addEventListener('change', onChange);
     document.addEventListener('visibilitychange', onVisible);
     return () => { cam.removeEventListener('change', onChange); document.removeEventListener('visibilitychange', onVisible); };
-  }, []); // stable: setPendingFile/setPendingUrl are stable React state setters
+  }, []);
 
   const fetchPhotos = useCallback(async () => {
     const { data } = await supabase
@@ -78,22 +89,15 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
 
     if (!data) { setLoading(false); return; }
 
-    // Keep only the latest photo per sender
     const seen = new Set<string>();
     const latest: MemberPhoto[] = [];
     for (const row of data) {
-      if (!seen.has(row.sender_id)) {
-        seen.add(row.sender_id);
-        latest.push(row);
-      }
+      if (!seen.has(row.sender_id)) { seen.add(row.sender_id); latest.push(row); }
     }
 
-    // Toast for new photos from others (via stable ref, no dep on onNewPhoto)
     if (prevPhotoIds.current.size > 0) {
       for (const p of latest) {
-        if (p.sender_id !== userId && !prevPhotoIds.current.has(p.id)) {
-          onNewPhotoRef.current?.();
-        }
+        if (p.sender_id !== userId && !prevPhotoIds.current.has(p.id)) { onNewPhotoRef.current?.(); }
       }
     }
     prevPhotoIds.current = new Set(latest.map(p => p.id));
@@ -103,7 +107,7 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
     );
     setPhotos(withUrls);
     setLoading(false);
-  }, [homeId, userId]); // no onNewPhoto — uses ref instead
+  }, [homeId, userId]);
 
   useEffect(() => { fetchPhotos(); }, [fetchPhotos]);
 
@@ -113,7 +117,7 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
       .on('postgres_changes', { event: '*', schema: 'public', table: 'photo_notes', filter: `home_id=eq.${homeId}` }, () => { fetchPhotos(); })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [homeId, fetchPhotos]); // stable now — only changes when homeId changes
+  }, [homeId, fetchPhotos]);
 
   useEffect(() => {
     supabase.from('profiles').select('id, display_name').then(({ data }) => {
@@ -124,7 +128,6 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
     });
   }, []);
 
-  // Slots: my slot always first, then others by most recent
   const myPhoto = photos.find(p => p.sender_id === userId);
   const otherPhotos = photos.filter(p => p.sender_id !== userId);
   const slots: Array<{ isMine: boolean; photo?: MemberPhoto }> = [
@@ -159,13 +162,11 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
     setUploading(true);
     setUploadError(null);
     try {
-      // Delete previous photo for this user
       const old = photos.find(p => p.sender_id === userId);
       if (old) {
         await supabase.storage.from('photo-notes').remove([old.storage_path]);
         await supabase.from('photo_notes').delete().eq('id', old.id);
       }
-
       const mimeToExt: Record<string, string> = {
         'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp',
         'image/heic': 'heic', 'image/heif': 'heif', 'image/gif': 'gif',
@@ -174,18 +175,15 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
       const ext = (extFromName && extFromName.length <= 5 && extFromName !== 'blob')
         ? extFromName : (mimeToExt[pendingFile.type] ?? 'jpg');
       const path = `${homeId}/${userId}_${Date.now()}.${ext}`;
-
       const { error: upErr } = await supabase.storage
         .from('photo-notes')
         .upload(path, pendingFile, { contentType: pendingFile.type || 'image/jpeg' });
       if (upErr) throw new Error(`Upload: ${upErr.message}`);
-
       const { error: dbErr } = await supabase.from('photo_notes').insert({
         home_id: homeId, sender_id: userId,
         storage_path: path, caption: caption.trim() || null,
       });
       if (dbErr) throw new Error(`DB: ${dbErr.message}`);
-
       closePending();
     } catch (err: any) {
       setUploadError(err.message);
@@ -204,18 +202,15 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
 
   return (
     <div className="card" style={{ marginBottom: 'var(--spacing-lg)', padding: 0, overflow: 'hidden' }}>
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px 8px' }}>
         <h2 className="text-title-md">📸 {t.photoNotesTitle}</h2>
         <div style={{ display: 'flex', gap: 8 }}>
-          {/* Camera: capture + native DOM listener (React onChange unreliable on Android PWA resume) */}
           <div style={{ position: 'relative', width: 34, height: 34, borderRadius: 'var(--rounded-full)', background: 'var(--color-surface-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
             <span style={{ pointerEvents: 'none' }}>📷</span>
             <input ref={cameraInputRef} type="file" accept="image/*" capture="environment"
               style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%', borderRadius: 'inherit' }}
             />
           </div>
-          {/* Gallery: standard approach (reliable) */}
           <div style={{ position: 'relative' }}>
             <button style={{ background: 'var(--color-primary)', color: 'var(--color-on-primary)', border: 'none', borderRadius: 'var(--rounded-sm)', padding: '6px 12px', fontWeight: 700, fontSize: 13, cursor: 'pointer', pointerEvents: 'none' }}>+ Snap!</button>
             <input type="file" accept="image/*"
@@ -226,19 +221,13 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
         </div>
       </div>
 
-      {/* Slide area */}
       {loading ? (
         <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <span className="text-body-sm text-muted">…</span>
         </div>
       ) : (
         <div style={{ overflow: 'hidden' }} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-          {/* Slides */}
-          <div style={{
-            display: 'flex',
-            transform: `translateX(-${idx * 100}%)`,
-            transition: 'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
-          }}>
+          <div style={{ display: 'flex', transform: `translateX(-${idx * 100}%)`, transition: 'transform 0.28s cubic-bezier(0.4,0,0.2,1)' }}>
             {slots.map((slot) => {
               const memberId = slot.photo?.sender_id ?? userId;
               const name = slot.isMine ? (de ? 'Ich' : 'Me') : (memberNames[memberId] ?? '?');
@@ -247,72 +236,38 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
               return (
                 <div key={slot.isMine ? 'me' : memberId} style={{ flex: '0 0 100%', minWidth: 0 }}>
                   {slot.photo?._url ? (
-                    <img
-                      src={slot.photo._url}
-                      alt={slot.photo.caption ?? ''}
-                      style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', display: 'block' }}
-                    />
+                    <img src={slot.photo._url} alt={slot.photo.caption ?? ''} style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', display: 'block' }} />
                   ) : (
-                    <div style={{
-                      aspectRatio: '1 / 1', background: 'var(--color-surface-soft)',
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    }}>
+                    <div style={{ aspectRatio: '1 / 1', background: 'var(--color-surface-soft)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                       <div style={{ fontSize: 44 }}>📷</div>
-                      <p className="text-body-sm text-muted">
-                        {slot.isMine
-                          ? (de ? 'Teile einen Moment' : 'Share a moment')
-                          : (de ? 'Noch kein Foto' : 'No photo yet')}
-                      </p>
+                      <p className="text-body-sm text-muted">{slot.isMine ? (de ? 'Teile einen Moment' : 'Share a moment') : (de ? 'Noch kein Foto' : 'No photo yet')}</p>
                     </div>
                   )}
-                  {/* Info bar */}
                   <div style={{ padding: '8px 14px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                      <div style={{
-                        width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
-                        background: color, color: '#fff', fontWeight: 700, fontSize: 10,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>{initials}</div>
+                      <div style={{ width: 26, height: 26, borderRadius: '50%', flexShrink: 0, background: color, color: '#fff', fontWeight: 700, fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{initials}</div>
                       <div style={{ minWidth: 0 }}>
                         <p className="text-body-sm" style={{ fontWeight: 600, margin: 0 }}>{name}</p>
-                        {slot.photo?.caption && (
-                          <p className="text-body-sm text-muted" style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {slot.photo.caption}
-                          </p>
-                        )}
+                        {slot.photo?.caption && <p className="text-body-sm text-muted" style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{slot.photo.caption}</p>}
                       </div>
                     </div>
-                    {slot.photo && (
-                      <span className="text-body-sm text-muted" style={{ flexShrink: 0 }}>
-                        {formatTime(slot.photo.created_at)}
-                      </span>
-                    )}
+                    {slot.photo && <span className="text-body-sm text-muted" style={{ flexShrink: 0 }}>{formatTime(slot.photo.created_at)}</span>}
                   </div>
                 </div>
               );
             })}
           </div>
-
-          {/* Dot indicators */}
           {slots.length > 1 && (
             <div style={{ display: 'flex', justifyContent: 'center', gap: 6, padding: '8px 0 12px' }}>
               {slots.map((_slot, i) => (
-                <div
-                  key={i}
-                  onClick={() => setCurrentIndex(i)}
-                  style={{
-                    width: 6, height: 6, borderRadius: '50%', cursor: 'pointer',
-                    background: i === idx ? 'var(--color-primary)' : 'var(--color-hairline)',
-                    transition: 'background 0.2s',
-                  }}
-                />
+                <div key={i} onClick={() => setCurrentIndex(i)}
+                  style={{ width: 6, height: 6, borderRadius: '50%', cursor: 'pointer', background: i === idx ? 'var(--color-primary)' : 'var(--color-hairline)', transition: 'background 0.2s' }} />
               ))}
             </div>
           )}
         </div>
       )}
 
-      {/* Caption + send sheet — appears after photo is picked */}
       {pendingFile && (
         <div className="modal-overlay" onClick={closePending}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -320,34 +275,12 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
               <h2 className="text-title-md">{t.photoNotesSend}</h2>
               <button className="icon-btn" onClick={closePending}><XIcon /></button>
             </div>
-            {pendingUrl && (
-              <img
-                src={pendingUrl} alt=""
-                style={{ width: '100%', maxHeight: 260, objectFit: 'cover', borderRadius: 'var(--rounded-sm)', marginBottom: 'var(--spacing-md)' }}
-              />
-            )}
-            <input
-              className="input"
-              placeholder={t.photoNotesCaption}
-              value={caption}
-              onChange={e => setCaption(e.target.value)}
-              style={{ marginBottom: uploadError ? 'var(--spacing-xs)' : 'var(--spacing-md)' }}
-            />
-            {uploadError && (
-              <p style={{ color: '#ff453a', fontSize: 13, marginBottom: 'var(--spacing-sm)', wordBreak: 'break-all' }}>
-                ⚠ {uploadError}
-              </p>
-            )}
-            <button
-              onClick={handleSend}
-              disabled={uploading}
-              style={{
-                width: '100%', background: 'var(--color-primary)', color: '#fff', border: 'none',
-                borderRadius: 'var(--rounded-sm)', padding: '12px 0',
-                fontWeight: 700, fontSize: 16,
-                cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.7 : 1,
-              }}
-            >
+            {pendingUrl && <img src={pendingUrl} alt="" style={{ width: '100%', maxHeight: 260, objectFit: 'cover', borderRadius: 'var(--rounded-sm)', marginBottom: 'var(--spacing-md)' }} />}
+            <input className="input" placeholder={t.photoNotesCaption} value={caption} onChange={e => setCaption(e.target.value)}
+              style={{ marginBottom: uploadError ? 'var(--spacing-xs)' : 'var(--spacing-md)' }} />
+            {uploadError && <p style={{ color: '#ff453a', fontSize: 13, marginBottom: 'var(--spacing-sm)', wordBreak: 'break-all' }}>⚠ {uploadError}</p>}
+            <button onClick={handleSend} disabled={uploading}
+              style={{ width: '100%', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--rounded-sm)', padding: '12px 0', fontWeight: 700, fontSize: 16, cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.7 : 1 }}>
               {uploading ? '…' : t.photoNotesSend}
             </button>
           </div>

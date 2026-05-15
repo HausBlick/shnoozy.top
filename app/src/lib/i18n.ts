@@ -155,22 +155,6 @@ const en = {
   moduleHomeInfoDesc: 'Meter readings & contracts',
   moduleCar: 'Car',
   moduleCarDesc: 'Insurance & service history',
-  modulePhotoNotes: 'Photos',
-  modulePhotoNotesDesc: 'Share moments with each other',
-
-  // Photo Notes
-  photoNotesTitle: 'Snap!',
-  snapWidget: 'Snap!',
-  photoNotesNew: '+ Photo',
-  photoNotesEmpty: 'No photos yet. Be the first to share a moment!',
-  photoNotesCaption: 'Caption (optional)',
-  photoNotesSend: 'Send',
-  photoNotesCamera: 'Take photo',
-  photoNotesGallery: 'Choose from gallery',
-  photoNotesDelete: 'Delete',
-  photoNotesDeleteConfirm: 'Delete this photo?',
-  photoNotesNewToast: 'New photo from your partner!',
-
   // Todos
   moduleTodos: 'To-Do',
   moduleTodosDesc: 'Lists & tasks for your home',
@@ -508,22 +492,6 @@ const de: typeof en = {
   moduleHomeInfoDesc: 'Zählerstände & Verträge',
   moduleCar: 'Auto',
   moduleCarDesc: 'Versicherung & Wartung',
-  modulePhotoNotes: 'Fotos',
-  modulePhotoNotesDesc: 'Momente miteinander teilen',
-
-  // Photo Notes
-  photoNotesTitle: 'Snap!',
-  snapWidget: 'Snap!',
-  photoNotesNew: '+ Foto',
-  photoNotesEmpty: 'Noch keine Fotos. Teile einen ersten Moment!',
-  photoNotesCaption: 'Beschriftung (optional)',
-  photoNotesSend: 'Senden',
-  photoNotesCamera: 'Foto aufnehmen',
-  photoNotesGallery: 'Aus Galerie wählen',
-  photoNotesDelete: 'Löschen',
-  photoNotesDeleteConfirm: 'Dieses Foto löschen?',
-  photoNotesNewToast: 'Neues Foto von deinem Partner!',
-
   // Navigation
   navCalendar: 'Kalender',
   navLists: 'Einkauf',
