@@ -76,8 +76,8 @@ interface RecurringChange {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatAmt(n: number, lang: Lang) {
-  return n.toLocaleString(lang === 'de' ? 'de-DE' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function formatAmt(n: number, _lang?: Lang) {
+  return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function todayStr() {
@@ -241,7 +241,7 @@ function BudgetWizard({ homeId, language, onDone }: { homeId: string; language: 
         name,
         icon: defaultCatIcons[name] ?? '💰',
         color: defaultCatColors[i % defaultCatColors.length],
-        budget_limit: w.catLimits[name] ? parseFloat(w.catLimits[name]) : null,
+        budget_limit: w.catLimits[name] ? parseFloat(w.catLimits[name].replace(',', '.')) : null,
         period,
         category_type: 'expense' as const,
         sort_order: i,
@@ -255,7 +255,7 @@ function BudgetWizard({ homeId, language, onDone }: { homeId: string; language: 
         await supabase.from('budget_savings_goals').insert({
           home_id: homeId,
           name: w.goalName.trim(),
-          target_amount: parseFloat(w.goalAmount),
+          target_amount: parseFloat(w.goalAmount.replace(',', '.')),
           current_amount: 0,
         });
       }
@@ -347,9 +347,9 @@ function BudgetWizard({ homeId, language, onDone }: { homeId: string; language: 
                 <span style={{ fontSize: '18px' }}>{defaultCatIcons[name] ?? '💰'}</span>
                 <span className="text-body-md" style={{ flex: 1 }}>{name}</span>
                 <input
-                  type="number" inputMode="decimal" placeholder="0"
+                  type="text" inputMode="decimal" placeholder="0"
                   value={w.catLimits[name] ?? ''}
-                  onChange={e => setW(p => ({ ...p, catLimits: { ...p.catLimits, [name]: e.target.value } }))}
+                  onChange={e => setW(p => ({ ...p, catLimits: { ...p.catLimits, [name]: e.target.value.replace('.', ',') } }))}
                   style={{
                     width: 90, padding: '8px 10px', borderRadius: 'var(--rounded-md)',
                     border: '1px solid var(--color-hairline)', background: 'var(--color-surface)',
@@ -391,8 +391,8 @@ function BudgetWizard({ homeId, language, onDone }: { homeId: string; language: 
               <div style={{ marginBottom: 'var(--spacing-lg)' }}>
                 <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetSetupQ7Amount}</label>
                 <input
-                  type="number" inputMode="decimal" className="form-input"
-                  value={w.goalAmount} onChange={e => setW(p => ({ ...p, goalAmount: e.target.value }))}
+                  type="text" inputMode="decimal" className="form-input"
+                  value={w.goalAmount} onChange={e => setW(p => ({ ...p, goalAmount: e.target.value.replace('.', ',') }))}
                   placeholder="1200"
                 />
               </div>
@@ -585,7 +585,7 @@ function BudgetDashboard({
 
   async function addToGoal() {
     if (!goalModal || !goalAddAmount) return;
-    const amount = parseFloat(goalAddAmount);
+    const amount = parseFloat(goalAddAmount.replace(',', '.'));
     if (isNaN(amount) || amount <= 0) return;
     setGoalSaving(true);
     try {
@@ -825,8 +825,8 @@ function BudgetDashboard({
             </h2>
             <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetSavingsGoalAddAmount}</label>
             <input
-              type="number" inputMode="decimal" className="form-input" autoFocus
-              value={goalAddAmount} onChange={e => setGoalAddAmount(e.target.value)}
+              type="text" inputMode="decimal" className="form-input" autoFocus
+              value={goalAddAmount} onChange={e => setGoalAddAmount(e.target.value.replace('.', ','))}
               placeholder="50"
             />
             <div style={{ marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-md)' }}>
@@ -871,7 +871,7 @@ interface EntryFormProps {
 
 function EntryForm({ homeId, language, userId, categories, members, homeSettings, entryType, editingEntry, prefilled, onSave, onCancel, onDelete }: EntryFormProps) {
   const t = getT(language);
-  const [amount, setAmount] = useState(prefilled?.amount ?? (editingEntry ? String(editingEntry.amount) : ''));
+  const [amount, setAmount] = useState((prefilled?.amount ?? (editingEntry ? String(editingEntry.amount) : '')).replace('.', ','));
   const [categoryId, setCategoryId] = useState<string | null>(
     prefilled?.categoryId !== undefined ? prefilled.categoryId :
     editingEntry?.category_id ?? (categories.filter(c => c.category_type === entryType)[0]?.id ?? null)
@@ -898,7 +898,7 @@ function EntryForm({ homeId, language, userId, categories, members, homeSettings
         split_mode: splitMode, entry_type: entryType,
         paid_by: isExpense ? paidBy : null,
       };
-      const label = `${parsedAmount.toFixed(2)} € ${description.trim() ? '· ' + description.trim().slice(0, 40) : ''}`.trim();
+      const label = `${formatAmt(parsedAmount)} € ${description.trim() ? '· ' + description.trim().slice(0, 40) : ''}`.trim();
       if (editingEntry) {
         await supabase.from('budget_entries').update(payload).eq('id', editingEntry.id);
         logActivity(homeId, userId, 'edited', 'budget_entry', label);
@@ -915,7 +915,7 @@ function EntryForm({ homeId, language, userId, categories, members, homeSettings
   async function handleDelete() {
     if (!editingEntry || !onDelete) return;
     await supabase.from('budget_entries').delete().eq('id', editingEntry.id);
-    logActivity(homeId, userId, 'deleted', 'budget_entry', `${Number(editingEntry.amount).toFixed(2)} €`);
+    logActivity(homeId, userId, 'deleted', 'budget_entry', `${formatAmt(Number(editingEntry.amount))} €`);
     onDelete(editingEntry.id);
   }
 
@@ -933,8 +933,8 @@ function EntryForm({ homeId, language, userId, categories, members, homeSettings
       <div style={{ marginBottom: 'var(--spacing-md)' }}>
         <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetAmount}</label>
         <input
-          type="number" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)}
-          placeholder="0.00" autoFocus
+          type="text" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value.replace('.', ','))}
+          placeholder="0,00" autoFocus
           style={{
             width: '100%', boxSizing: 'border-box', padding: '12px var(--spacing-base)',
             fontSize: '28px', fontWeight: 700, borderRadius: 'var(--rounded-md)',
@@ -1103,7 +1103,7 @@ function AiScanModal({
       if (data?.error) throw new Error(data.error);
 
       onAnalysed({
-        amount: data.amount != null ? String(data.amount) : '',
+        amount: data.amount != null ? String(data.amount).replace('.', ',') : '',
         description: data.description ?? '',
         categoryId: data.suggested_category_id ?? null,
       });
@@ -1210,7 +1210,7 @@ function RecurringItemModal({
 }) {
   const t = getT(language);
   const [riName, setRiName] = useState(item === 'new' ? '' : item.name);
-  const [riAmount, setRiAmount] = useState(item === 'new' ? '' : String(item.amount));
+  const [riAmount, setRiAmount] = useState(item === 'new' ? '' : String(item.amount).replace('.', ','));
   const [riDay, setRiDay] = useState(item === 'new' ? '1' : String(item.billing_day));
   const [riCategoryId, setRiCategoryId] = useState<string | null>(item === 'new' ? null : item.category_id);
   const [riActive, setRiActive] = useState(item === 'new' ? true : item.active);
@@ -1254,7 +1254,7 @@ function RecurringItemModal({
     if (!itemId || !priceDate || !priceAmountStr) return;
     setChangeSaving(true);
     try {
-      await supabase.from('budget_recurring_changes').insert({ recurring_item_id: itemId, change_type: 'price_change', effective_date: priceDate, new_amount: parseFloat(priceAmountStr) });
+      await supabase.from('budget_recurring_changes').insert({ recurring_item_id: itemId, change_type: 'price_change', effective_date: priceDate, new_amount: parseFloat(priceAmountStr.replace(',', '.')) });
       await refreshChanges();
       setShowPriceForm(false); setPriceDate(''); setPriceAmountStr('');
     } finally { setChangeSaving(false); }
@@ -1271,7 +1271,7 @@ function RecurringItemModal({
     try {
       const payload = {
         home_id: homeId, name: riName.trim(),
-        amount: parseFloat(riAmount), billing_day: Math.min(28, Math.max(1, parseInt(riDay) || 1)),
+        amount: parseFloat(riAmount.replace(',', '.')), billing_day: Math.min(28, Math.max(1, parseInt(riDay) || 1)),
         category_id: riCategoryId, active: riActive, auto_book: riAutoBook,
       };
       if (item === 'new') {
@@ -1307,7 +1307,7 @@ function RecurringItemModal({
           <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
             <div style={{ flex: 2 }}>
               <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetRecurringAmountLabel}</label>
-              <input type="number" inputMode="decimal" value={riAmount} onChange={e => setRiAmount(e.target.value)} className="form-input" placeholder="12.99" />
+              <input type="text" inputMode="decimal" value={riAmount} onChange={e => setRiAmount(e.target.value.replace('.', ','))} className="form-input" placeholder="12,99" />
             </div>
             <div style={{ flex: 1 }}>
               <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetRecurringDayLabel}</label>
@@ -1398,8 +1398,8 @@ function RecurringItemModal({
                     </div>
                     <div style={{ flex: 1 }}>
                       <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetRecurringNewPrice}</label>
-                      <input type="number" inputMode="decimal" value={priceAmountStr} onChange={e => setPriceAmountStr(e.target.value)}
-                        placeholder="15.99"
+                      <input type="text" inputMode="decimal" value={priceAmountStr} onChange={e => setPriceAmountStr(e.target.value.replace('.', ','))}
+                        placeholder="15,99"
                         style={{ width: '100%', boxSizing: 'border-box', padding: '10px var(--spacing-base)', borderRadius: 'var(--rounded-md)', border: '1px solid var(--color-hairline)', background: 'var(--color-surface)', color: 'var(--color-fg)', fontSize: '14px' }} />
                     </div>
                   </div>
@@ -1502,7 +1502,7 @@ function BudgetSettingsView({
       setCatLimit(''); setCatPeriod('monthly'); setCatType('expense'); setCatDesc('');
     } else {
       setCatName(cat.name); setCatIcon(cat.icon); setCatColor(cat.color);
-      setCatLimit(cat.budget_limit != null ? String(cat.budget_limit) : '');
+      setCatLimit(cat.budget_limit != null ? String(cat.budget_limit).replace('.', ',') : '');
       setCatPeriod(cat.period); setCatType(cat.category_type);
       setCatDesc(cat.description ?? '');
     }
@@ -1515,7 +1515,7 @@ function BudgetSettingsView({
       setGoalTarget(''); setGoalCurrent('');
     } else {
       setGoalName(goal.name); setGoalIcon(goal.icon); setGoalColor(goal.color);
-      setGoalTarget(String(goal.target_amount)); setGoalCurrent(String(goal.current_amount));
+      setGoalTarget(String(goal.target_amount).replace('.', ',')); setGoalCurrent(String(goal.current_amount).replace('.', ','));
     }
     setGoalModal(goal);
   }
@@ -1553,7 +1553,7 @@ function BudgetSettingsView({
     try {
       const payload = {
         home_id: homeId, name: catName.trim(), icon: catIcon, color: catColor,
-        budget_limit: catLimit ? parseFloat(catLimit) : null,
+        budget_limit: catLimit ? parseFloat(catLimit.replace(',', '.')) : null,
         period: catPeriod, category_type: catType,
         description: catDesc.trim() || null,
       };
@@ -1577,8 +1577,8 @@ function BudgetSettingsView({
     try {
       const payload = {
         home_id: homeId, name: goalName.trim(), icon: goalIcon, color: goalColor,
-        target_amount: parseFloat(goalTarget),
-        current_amount: goalCurrent ? parseFloat(goalCurrent) : 0,
+        target_amount: parseFloat(goalTarget.replace(',', '.')),
+        current_amount: goalCurrent ? parseFloat(goalCurrent.replace(',', '.')) : 0,
       };
       if (goalModal === 'new') {
         await supabase.from('budget_savings_goals').insert(payload);
@@ -1783,7 +1783,7 @@ function BudgetSettingsView({
             </div>
             <div style={{ marginBottom: 'var(--spacing-md)' }}>
               <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetCategoryBudget}</label>
-              <input type="number" inputMode="decimal" value={catLimit} onChange={e => setCatLimit(e.target.value)}
+              <input type="text" inputMode="decimal" value={catLimit} onChange={e => setCatLimit(e.target.value.replace('.', ','))}
                 placeholder="0"
                 style={{ width: '100%', boxSizing: 'border-box', padding: '10px var(--spacing-base)', borderRadius: 'var(--rounded-md)', border: '1px solid var(--color-hairline)', background: 'var(--color-surface)', color: 'var(--color-fg)', fontSize: '15px' }}
               />
@@ -1856,11 +1856,11 @@ function BudgetSettingsView({
             </div>
             <div style={{ marginBottom: 'var(--spacing-md)' }}>
               <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetSavingsGoalTarget}</label>
-              <input type="number" inputMode="decimal" value={goalTarget} onChange={e => setGoalTarget(e.target.value)} className="form-input" placeholder="1200" />
+              <input type="text" inputMode="decimal" value={goalTarget} onChange={e => setGoalTarget(e.target.value.replace('.', ','))} className="form-input" placeholder="1200" />
             </div>
             <div style={{ marginBottom: 'var(--spacing-lg)' }}>
               <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetSavingsGoalCurrent}</label>
-              <input type="number" inputMode="decimal" value={goalCurrent} onChange={e => setGoalCurrent(e.target.value)} className="form-input" placeholder="0" />
+              <input type="text" inputMode="decimal" value={goalCurrent} onChange={e => setGoalCurrent(e.target.value.replace('.', ','))} className="form-input" placeholder="0" />
             </div>
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
               {goalModal !== 'new' && (
@@ -1958,7 +1958,7 @@ function EntriesView({ entries, members, language, onEdit, onBack }: {
                 </div>
                 {member && <div style={{ width: 20, height: 20, borderRadius: '50%', background: member.avatar_color, flexShrink: 0 }} />}
                 <div className="text-body-md" style={{ fontWeight: 700, minWidth: 60, textAlign: 'right', flexShrink: 0, color: isIncome ? '#10b981' : 'var(--color-fg)' }}>
-                  {isIncome ? '+' : ''}{Number(entry.amount).toFixed(2)} €
+                  {isIncome ? '+' : ''}{formatAmt(Number(entry.amount))} €
                 </div>
               </button>
             );
