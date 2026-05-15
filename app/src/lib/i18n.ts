@@ -274,7 +274,7 @@ const en = {
   budgetNewExpense: 'New Expense',
   budgetNewIncome: 'New Income',
   budgetNoEntries: 'No entries this month',
-  budgetBalance: 'Who Paid',
+  budgetBalance: 'Available',
   budgetAddExpense: '+ Expense',
   budgetAddIncome: '+ Income',
   budgetManualEntry: 'Manual Entry',
@@ -373,6 +373,7 @@ const en = {
   budgetRecurringTotal: (n: string) => `Total: ${n} € / month`,
   budgetRecurringThisMonth: 'This month',
   budgetRecurringActive: 'Active',
+  budgetRecurringAutoBook: 'Debited automatically',
 
   // Budget — home settings edit
   budgetHomeSettings: 'Budget Setup',
@@ -380,6 +381,10 @@ const en = {
   // Budget — category AI hint
   budgetCategoryAiHint: 'AI hint (optional)',
   budgetCategoryAiHintPlaceholder: 'e.g. Netflix, Spotify, Amazon Prime',
+
+  // Budget — savings deduction
+  budgetDeductFromBudget: 'Deduct from budget category (optional)',
+  budgetTransferToGoal: (name: string) => `Transfer to savings goal: ${name}`,
 
   // Activity Log
   activityLog: 'Activity',
@@ -705,7 +710,7 @@ const de: typeof en = {
   budgetNewExpense: 'Neue Ausgabe',
   budgetNewIncome: 'Neue Einnahme',
   budgetNoEntries: 'Keine Einträge diesen Monat',
-  budgetBalance: 'Wer hat gezahlt',
+  budgetBalance: 'Verfügbar',
   budgetAddExpense: '+ Ausgabe',
   budgetAddIncome: '+ Einnahme',
   budgetManualEntry: 'Manuelle Eingabe',
@@ -804,6 +809,7 @@ const de: typeof en = {
   budgetRecurringTotal: (n: string) => `Gesamt: ${n} € / Monat`,
   budgetRecurringThisMonth: 'Diesen Monat',
   budgetRecurringActive: 'Aktiv',
+  budgetRecurringAutoBook: 'Wird automatisch abgebucht',
 
   // Budget — Home-Einstellungen bearbeiten
   budgetHomeSettings: 'Budget-Einstellungen',
@@ -811,6 +817,10 @@ const de: typeof en = {
   // Budget — KI-Hinweis für Kategorien
   budgetCategoryAiHint: 'KI-Hinweis (optional)',
   budgetCategoryAiHintPlaceholder: 'z.B. Netflix, Spotify, Amazon Prime',
+
+  // Budget — Sparziel-Umbuchung
+  budgetDeductFromBudget: 'Aus Budget-Kategorie entnehmen (optional)',
+  budgetTransferToGoal: (name: string) => `Umbuchung Sparziel: ${name}`,
 
   // Activity Log
   activityLog: 'Aktivitäten',

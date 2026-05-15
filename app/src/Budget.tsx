@@ -24,6 +24,7 @@ interface RecurringItem {
   billing_day: number;
   category_id: string | null;
   active: boolean;
+  auto_book: boolean;
   sort_order: number;
 }
 
@@ -452,7 +453,7 @@ const defaultCatColors = ['#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6','#f9
 function BudgetDashboard({
   homeId, userId, language, categories, entries, savingsGoals, recurringItems, homeSettings,
   currentMonth, onPrevMonth, onNextMonth,
-  onAddExpense, onAddExpenseAI, onAddIncome, onGoToEntries, onGoToSettings, onRefresh,
+  onAddExpense, onAddExpenseAI, onAddIncome, onGoToEntries, onRefresh,
 }: {
   homeId: string; userId: string; language: Lang;
   categories: BudgetCategory[]; entries: BudgetEntry[];
@@ -460,12 +461,13 @@ function BudgetDashboard({
   currentMonth: { year: number; month: number };
   onPrevMonth: () => void; onNextMonth: () => void;
   onAddExpense: () => void; onAddExpenseAI: () => void; onAddIncome: () => void;
-  onGoToEntries: () => void; onGoToSettings: () => void; onRefresh: () => void;
+  onGoToEntries: () => void; onRefresh: () => void;
 }) {
   const t = getT(language);
   const [showExpenseMenu, setShowExpenseMenu] = useState(false);
   const [goalModal, setGoalModal] = useState<SavingsGoal | null>(null);
   const [goalAddAmount, setGoalAddAmount] = useState('');
+  const [goalBudgetCatId, setGoalBudgetCatId] = useState<string | null>(null);
   const [goalSaving, setGoalSaving] = useState(false);
   const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -539,9 +541,20 @@ function BudgetDashboard({
       await supabase.from('budget_savings_goals')
         .update({ current_amount: goalModal.current_amount + amount })
         .eq('id', goalModal.id);
+      if (goalBudgetCatId) {
+        await supabase.from('budget_entries').insert({
+          home_id: homeId, user_id: userId,
+          amount, category_id: goalBudgetCatId,
+          description: t.budgetTransferToGoal(goalModal.name),
+          date: todayStr(),
+          split_mode: homeSettings.budget_split_mode === 'none' ? 'personal' : 'shared',
+          entry_type: 'expense',
+        });
+      }
       onRefresh();
       setGoalModal(null);
       setGoalAddAmount('');
+      setGoalBudgetCatId(null);
     } finally {
       setGoalSaving(false);
     }
@@ -558,16 +571,6 @@ function BudgetDashboard({
 
       {/* Quick actions */}
       <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
-        <button
-          onClick={onGoToSettings}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px',
-            borderRadius: 'var(--rounded-md)', border: '1px solid var(--color-hairline)',
-            background: 'transparent', cursor: 'pointer', fontSize: '14px', fontWeight: 500,
-            color: 'var(--color-fg)', fontFamily: 'inherit',
-          }}
-        >⚙ {t.budgetSettings}</button>
-
         <div style={{ position: 'relative', flex: 1 }} ref={menuRef}>
           <button
             onClick={() => setShowExpenseMenu(v => !v)}
@@ -612,11 +615,33 @@ function BudgetDashboard({
             onClick={onAddIncome}
             style={{
               display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px',
-              borderRadius: 'var(--rounded-md)', border: '1px solid var(--color-hairline)',
-              background: 'transparent', cursor: 'pointer', fontSize: '14px', fontWeight: 500,
+              borderRadius: 'var(--rounded-md)', border: '1px solid #10b981',
+              background: 'transparent', cursor: 'pointer', fontSize: '14px', fontWeight: 600,
               color: '#10b981', fontFamily: 'inherit',
             }}
           >{t.budgetAddIncome}</button>
+        )}
+      </div>
+
+      {/* Totals summary */}
+      <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
+        <div className="card" style={{ flex: 1, textAlign: 'center', padding: 'var(--spacing-md)' }}>
+          <div className="text-body-sm text-muted" style={{ marginBottom: 4 }}>{t.budgetExpense}</div>
+          <div style={{ fontSize: '18px', fontWeight: 700, color: '#ef4444' }}>{formatAmt(totalExpenses, language)} €</div>
+        </div>
+        {homeSettings.budget_shared_account === 'yes' && (
+          <>
+            <div className="card" style={{ flex: 1, textAlign: 'center', padding: 'var(--spacing-md)' }}>
+              <div className="text-body-sm text-muted" style={{ marginBottom: 4 }}>{t.budgetIncome}</div>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: '#10b981' }}>{formatAmt(totalIncome, language)} €</div>
+            </div>
+            <div className="card" style={{ flex: 1, textAlign: 'center', padding: 'var(--spacing-md)' }}>
+              <div className="text-body-sm text-muted" style={{ marginBottom: 4 }}>{t.budgetBalance}</div>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: totalIncome - totalExpenses >= 0 ? '#10b981' : '#ef4444' }}>
+                {formatAmt(totalIncome - totalExpenses, language)} €
+              </div>
+            </div>
+          </>
         )}
       </div>
 
@@ -668,20 +693,6 @@ function BudgetDashboard({
         </div>
       )}
 
-      {/* Totals summary */}
-      <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
-        <div className="card" style={{ flex: 1, textAlign: 'center', padding: 'var(--spacing-md)' }}>
-          <div className="text-body-sm text-muted" style={{ marginBottom: 4 }}>{t.budgetExpense}</div>
-          <div style={{ fontSize: '20px', fontWeight: 700, color: '#ef4444' }}>{formatAmt(totalExpenses, language)} €</div>
-        </div>
-        {homeSettings.budget_shared_account === 'yes' && (
-          <div className="card" style={{ flex: 1, textAlign: 'center', padding: 'var(--spacing-md)' }}>
-            <div className="text-body-sm text-muted" style={{ marginBottom: 4 }}>{t.budgetIncome}</div>
-            <div style={{ fontSize: '20px', fontWeight: 700, color: '#10b981' }}>{formatAmt(totalIncome, language)} €</div>
-          </div>
-        )}
-      </div>
-
       {/* Savings goals */}
       {savingsGoals.length > 0 && (
         <div className="card" style={{ marginBottom: 'var(--spacing-md)' }}>
@@ -710,7 +721,7 @@ function BudgetDashboard({
                   <div style={{ width: `${pct}%`, height: '100%', background: goal.color, borderRadius: 4, transition: 'width 0.4s' }} />
                 </div>
                 <button
-                  onClick={() => { setGoalModal(goal); setGoalAddAmount(''); }}
+                  onClick={() => { setGoalModal(goal); setGoalAddAmount(''); setGoalBudgetCatId(null); }}
                   style={{ fontSize: '13px', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                 >+ {t.budgetSavingsGoalAdd}</button>
               </div>
@@ -732,6 +743,7 @@ function BudgetDashboard({
           {activeRecurring.map(item => {
             const paid = paidRecurringIds.has(item.id);
             const busy = markingPaidId === item.id;
+            const cat = categories.find(c => c.id === item.category_id);
             return (
               <div key={item.id} style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -739,7 +751,10 @@ function BudgetDashboard({
               }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="text-body-md" style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
-                  <div className="text-body-sm text-muted">{formatAmt(item.amount, language)} €</div>
+                  <div className="text-body-sm text-muted">
+                    {cat && <span style={{ marginRight: 4 }}>{cat.icon} {cat.name} ·</span>}
+                    {formatAmt(item.amount, language)} €
+                  </div>
                 </div>
                 {paid ? (
                   <span style={{ fontSize: '13px', color: '#10b981', fontWeight: 600, flexShrink: 0 }}>{t.budgetRecurringPaid}</span>
@@ -787,11 +802,23 @@ function BudgetDashboard({
               value={goalAddAmount} onChange={e => setGoalAddAmount(e.target.value)}
               placeholder="50"
             />
-            <div style={{ fontSize: '13px', color: 'var(--color-muted)', margin: '10px 0 var(--spacing-md)' }}>
+            <div style={{ marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-md)' }}>
+              <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 6 }}>{t.budgetDeductFromBudget}</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-xs)' }}>
+                <Chip label="–" active={goalBudgetCatId === null} onClick={() => setGoalBudgetCatId(null)} />
+                {categories.filter(c => c.category_type === 'expense').map(cat => (
+                  <Chip key={cat.id} label={`${cat.icon} ${cat.name}`}
+                    active={goalBudgetCatId === cat.id}
+                    onClick={() => setGoalBudgetCatId(goalBudgetCatId === cat.id ? null : cat.id)}
+                    color={cat.color} />
+                ))}
+              </div>
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginBottom: 'var(--spacing-md)' }}>
               ℹ️ {t.budgetSavingsGoalBankingHint}
             </div>
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setGoalModal(null)}>{t.cancel}</button>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setGoalModal(null); setGoalBudgetCatId(null); }}>{t.cancel}</button>
               <button className="btn-primary" style={{ flex: 1 }} onClick={addToGoal} disabled={goalSaving || !goalAddAmount}>
                 {goalSaving ? '…' : t.budgetSavingsGoalAdd}
               </button>
@@ -1167,6 +1194,7 @@ function BudgetSettingsView({
   const [riDay, setRiDay] = useState('1');
   const [riCategoryId, setRiCategoryId] = useState<string | null>(null);
   const [riActive, setRiActive] = useState(true);
+  const [riAutoBook, setRiAutoBook] = useState(false);
   const [confirmDeleteRiId, setConfirmDeleteRiId] = useState<string | null>(null);
 
   // Home settings form state
@@ -1203,10 +1231,10 @@ function BudgetSettingsView({
 
   function openRecurringModal(item: RecurringItem | 'new') {
     if (item === 'new') {
-      setRiName(''); setRiAmount(''); setRiDay('1'); setRiCategoryId(null); setRiActive(true);
+      setRiName(''); setRiAmount(''); setRiDay('1'); setRiCategoryId(null); setRiActive(true); setRiAutoBook(false);
     } else {
       setRiName(item.name); setRiAmount(String(item.amount)); setRiDay(String(item.billing_day));
-      setRiCategoryId(item.category_id); setRiActive(item.active);
+      setRiCategoryId(item.category_id); setRiActive(item.active); setRiAutoBook(item.auto_book);
     }
     setRecurringModal(item);
   }
@@ -1292,7 +1320,7 @@ function BudgetSettingsView({
       const payload = {
         home_id: homeId, name: riName.trim(),
         amount: parseFloat(riAmount), billing_day: Math.min(28, Math.max(1, parseInt(riDay) || 1)),
-        category_id: riCategoryId, active: riActive,
+        category_id: riCategoryId, active: riActive, auto_book: riAutoBook,
       };
       if (recurringModal === 'new') {
         await supabase.from('budget_recurring_items').insert({ ...payload, sort_order: recurringItems.length });
@@ -1633,9 +1661,18 @@ function BudgetSettingsView({
                 <Chip label={t.budgetNoCategory} active={riCategoryId === null} onClick={() => setRiCategoryId(null)} />
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-lg)', padding: '10px var(--spacing-base)', background: 'var(--color-surface)', borderRadius: 'var(--rounded-md)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-sm)', padding: '10px var(--spacing-base)', background: 'var(--color-surface)', borderRadius: 'var(--rounded-md)' }}>
               <span className="text-body-md">{t.budgetRecurringActive}</span>
               <Toggle value={riActive} onChange={setRiActive} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-lg)', padding: '10px var(--spacing-base)', background: 'var(--color-surface)', borderRadius: 'var(--rounded-md)' }}>
+              <div>
+                <div className="text-body-md">{t.budgetRecurringAutoBook}</div>
+                <div className="text-body-sm text-muted" style={{ fontSize: '12px' }}>
+                  {language === 'de' ? 'Wird monatlich automatisch als bezahlt erfasst' : 'Automatically booked as paid each month'}
+                </div>
+              </div>
+              <Toggle value={riAutoBook} onChange={setRiAutoBook} />
             </div>
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
               {recurringModal !== 'new' && (
@@ -1807,9 +1844,39 @@ export function Budget({ homeId, language, userId, userRole }: {
     ]);
 
     setCategories(catsRes.data ?? []);
-    setEntries(entriesRes.data ?? []);
     setSavingsGoals(goalsRes.data ?? []);
     setRecurringItems(recurringRes.data ?? []);
+
+    // Auto-book recurring items marked as auto_book — only for the current real month
+    const realNow = new Date();
+    const isCurrentMonth = year === realNow.getFullYear() && month === realNow.getMonth();
+    let finalEntries = entriesRes.data ?? [];
+    if (isCurrentMonth) {
+      const rawSettings = settingsRes.data ?? [];
+      const splitModeSetting = rawSettings.find(r => r.key === 'budget_split_mode')?.value ?? 'none';
+      const paidIds = new Set(finalEntries.filter(e => e.recurring_item_id).map((e: any) => e.recurring_item_id as string));
+      const autoItems = (recurringRes.data ?? []).filter((r: RecurringItem) => r.active && r.auto_book && !paidIds.has(r.id));
+      if (autoItems.length > 0) {
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        await Promise.all(autoItems.map((item: RecurringItem) => {
+          const day = Math.min(item.billing_day, daysInMonth);
+          const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          return supabase.from('budget_entries').insert({
+            home_id: homeId, user_id: userId,
+            amount: item.amount, category_id: item.category_id,
+            description: item.name, date,
+            split_mode: splitModeSetting === 'none' ? 'personal' : 'shared',
+            entry_type: 'expense', recurring_item_id: item.id,
+          });
+        }));
+        const refetch = await supabase.from('budget_entries')
+          .select('*, budget_categories(name,icon,color)')
+          .eq('home_id', homeId).gte('date', startDate).lt('date', endDate)
+          .order('date', { ascending: false });
+        finalEntries = refetch.data ?? [];
+      }
+    }
+    setEntries(finalEntries);
     setMembers(
       (membersRes.data ?? []).map((m: any) => ({
         user_id: m.user_id,
@@ -1884,6 +1951,13 @@ export function Budget({ homeId, language, userId, userRole }: {
     <div style={{ paddingBottom: '120px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-md)' }}>
         <h1 className="text-display-lg">{t.budgetTitle}</h1>
+        {view !== 'settings' && homeSettings?.budget_setup_done && (
+          <button
+            onClick={() => setView('settings')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '22px', color: 'var(--color-muted)', padding: '4px 8px' }}
+            aria-label={t.budgetSettings}
+          >⚙</button>
+        )}
       </div>
 
       {view === 'dashboard' && (
@@ -1900,7 +1974,6 @@ export function Budget({ homeId, language, userId, userRole }: {
           onAddExpenseAI={openAddExpenseAI}
           onAddIncome={openAddIncome}
           onGoToEntries={() => setView('entries')}
-          onGoToSettings={() => setView('settings')}
           onRefresh={fetchAll}
         />
       )}
