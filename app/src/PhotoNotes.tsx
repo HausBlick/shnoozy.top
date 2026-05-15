@@ -46,9 +46,28 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
   const [uploadError, setUploadError] = useState<string | null>(null);
   const touchStartX = useRef(0);
   const prevPhotoIds = useRef<Set<string>>(new Set());
-  // Stable ref for onNewPhoto — prevents fetchPhotos from changing on every App render
   const onNewPhotoRef = useRef(onNewPhoto);
   useEffect(() => { onNewPhotoRef.current = onNewPhoto; }, [onNewPhoto]);
+
+  // Camera input: native listener + visibilitychange fallback.
+  // React's synthetic onChange dies when Android PWA is suspended during camera session.
+  // Native addEventListener on the DOM node survives; visibilitychange catches the resume.
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const cam = cameraInputRef.current;
+    if (!cam) return;
+    const apply = (f: File) => { setPendingFile(f); setPendingUrl(URL.createObjectURL(f)); cam.value = ''; };
+    const onChange = () => { const f = cam.files?.[0]; if (f) apply(f); };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        // Small delay — some Android versions need a tick to populate files after resume
+        setTimeout(() => { const f = cam.files?.[0]; if (f) apply(f); }, 200);
+      }
+    };
+    cam.addEventListener('change', onChange);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { cam.removeEventListener('change', onChange); document.removeEventListener('visibilitychange', onVisible); };
+  }, []); // stable: setPendingFile/setPendingUrl are stable React state setters
 
   const fetchPhotos = useCallback(async () => {
     const { data } = await supabase
@@ -188,16 +207,22 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px 8px' }}>
         <h2 className="text-title-md">📸 {t.photoNotesTitle}</h2>
-        <div style={{ position: 'relative' }}>
-          <button style={{
-            background: 'var(--color-primary)', color: '#fff', border: 'none',
-            borderRadius: 'var(--rounded-sm)', padding: '6px 12px',
-            fontWeight: 700, fontSize: 13, cursor: 'pointer', pointerEvents: 'none',
-          }}>+ Snap!</button>
-          <input type="file" accept="image/*"
-            style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
-            onChange={e => { if (e.target.files?.[0]) { handleFileSelected(e.target.files[0]); e.target.value = ''; } }}
-          />
+        <div style={{ display: 'flex', gap: 8 }}>
+          {/* Camera: capture + native DOM listener (React onChange unreliable on Android PWA resume) */}
+          <div style={{ position: 'relative', width: 34, height: 34, borderRadius: 'var(--rounded-full)', background: 'var(--color-surface-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
+            <span style={{ pointerEvents: 'none' }}>📷</span>
+            <input ref={cameraInputRef} type="file" accept="image/*" capture="environment"
+              style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%', borderRadius: 'inherit' }}
+            />
+          </div>
+          {/* Gallery: standard approach (reliable) */}
+          <div style={{ position: 'relative' }}>
+            <button style={{ background: 'var(--color-primary)', color: 'var(--color-on-primary)', border: 'none', borderRadius: 'var(--rounded-sm)', padding: '6px 12px', fontWeight: 700, fontSize: 13, cursor: 'pointer', pointerEvents: 'none' }}>+ Snap!</button>
+            <input type="file" accept="image/*"
+              style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
+              onChange={e => { if (e.target.files?.[0]) { handleFileSelected(e.target.files[0]); e.target.value = ''; } }}
+            />
+          </div>
         </div>
       </div>
 
