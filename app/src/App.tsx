@@ -717,9 +717,14 @@ function BudgetDashboardWidget({ homeId, language, onNavigate }: { homeId: strin
         </>
       )}
 
-      <button onClick={onNavigate} style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer', padding: 0 }}>
-        {t.goToBudget}
-      </button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button onClick={onNavigate} style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 2 }}>
+          {t.goToBudget}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }
@@ -1813,12 +1818,17 @@ function App() {
               ))}
             </div>
           )}
-          <button
-            onClick={() => setActiveTab('calendar')}
-            style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontWeight: 600, marginTop: 'var(--spacing-sm)', cursor: 'pointer', padding: 0 }}
-          >
-            {t.goToCalendar}
-          </button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--spacing-sm)' }}>
+            <button
+              onClick={() => setActiveTab('calendar')}
+              style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 2 }}
+            >
+              {t.goToCalendar}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* REORDERABLE MIDDLE */}
@@ -1866,12 +1876,17 @@ function App() {
             ))
           )}
           {activityEntries.length > 0 && (
-            <button
-              onClick={() => setShowActivityModal(true)}
-              style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontWeight: 600, marginTop: 'var(--spacing-sm)', cursor: 'pointer', padding: 0 }}
-            >
-              {t.activityLogSeeAll}
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--spacing-sm)' }}>
+              <button
+                onClick={() => setShowActivityModal(true)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 2 }}
+              >
+                {t.activityLogSeeAll}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
+            </div>
           )}
         </div>
 

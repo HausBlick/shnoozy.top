@@ -11,8 +11,8 @@ const en = {
   dashboard: 'Dashboard',
   upcoming14Days: 'Upcoming 14 Days',
   noUpcomingEvents: 'No upcoming events.',
-  goToCalendar: 'To Calendar >',
-  goToBudget: 'To Budget >',
+  goToCalendar: 'To Calendar',
+  goToBudget: 'To Budget',
   enableNotifications: 'Enable Notifications',
   enableNotificationsDesc: 'Get daily reminders for upcoming events and birthdays.',
   enable: 'Enable',
@@ -400,7 +400,7 @@ const en = {
 
   // Activity Log
   activityLog: 'Activity',
-  activityLogSeeAll: 'See all >',
+  activityLogSeeAll: 'See all',
   budgetScanCamera: 'Take Photo',
   budgetScanGallery: 'From Gallery',
   todoSelectList: 'Select list',
@@ -502,8 +502,8 @@ const de: typeof en = {
   dashboard: 'Übersicht',
   upcoming14Days: 'Nächste 14 Tage',
   noUpcomingEvents: 'Keine bevorstehenden Termine.',
-  goToCalendar: 'Zu Kalender >',
-  goToBudget: 'Zu Budget >',
+  goToCalendar: 'Zu Kalender',
+  goToBudget: 'Zu Budget',
   enableNotifications: 'Benachrichtigungen aktivieren',
   enableNotificationsDesc: 'Tägliche Erinnerungen für Termine und Geburtstage.',
   enable: 'Aktivieren',
@@ -855,7 +855,7 @@ const de: typeof en = {
 
   // Activity Log
   activityLog: 'Aktivitäten',
-  activityLogSeeAll: 'Alle anzeigen >',
+  activityLogSeeAll: 'Alle anzeigen',
   budgetScanCamera: 'Foto aufnehmen',
   budgetScanGallery: 'Aus Galerie',
   todoSelectList: 'Liste auswählen',
