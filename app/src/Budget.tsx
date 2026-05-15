@@ -440,14 +440,14 @@ const defaultCatColors = ['#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6','#f9
 function BudgetDashboard({
   language, categories, entries, savingsGoals, homeSettings,
   currentMonth, onPrevMonth, onNextMonth,
-  onAddExpense, onAddIncome, onGoToEntries, onGoToSettings, onRefresh,
+  onAddExpense, onAddExpenseAI, onAddIncome, onGoToEntries, onGoToSettings, onRefresh,
 }: {
   language: Lang;
   categories: BudgetCategory[]; entries: BudgetEntry[];
   savingsGoals: SavingsGoal[]; homeSettings: HomeSettings;
   currentMonth: { year: number; month: number };
   onPrevMonth: () => void; onNextMonth: () => void;
-  onAddExpense: () => void; onAddIncome: () => void;
+  onAddExpense: () => void; onAddExpenseAI: () => void; onAddIncome: () => void;
   onGoToEntries: () => void; onGoToSettings: () => void; onRefresh: () => void;
 }) {
   const t = getT(language);
@@ -544,7 +544,7 @@ function BudgetDashboard({
             }}>
               {homeSettings.budget_ai_receipts === 'yes' && (
                 <button
-                  onClick={() => { setShowExpenseMenu(false); onAddExpense(); /* AI mode set by parent */ }}
+                  onClick={() => { setShowExpenseMenu(false); onAddExpenseAI(); }}
                   style={{
                     width: '100%', padding: '14px var(--spacing-base)', textAlign: 'left',
                     background: 'none', border: 'none', borderBottom: '1px solid var(--color-hairline-soft)',
@@ -919,6 +919,124 @@ function EntryForm({ homeId, language, userId, categories, members, homeSettings
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── AiScanModal ─────────────────────────────────────────────────────────────
+
+function AiScanModal({
+  language, categories,
+  onAnalysed, onFallback, onCancel,
+}: {
+  language: Lang;
+  categories: BudgetCategory[];
+  onAnalysed: (prefilled: { amount: string; description: string; categoryId: string | null }) => void;
+  onFallback: () => void;
+  onCancel: () => void;
+}) {
+  const t = getT(language);
+  const [analysing, setAnalysing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function handleFile(file: File) {
+    setAnalysing(true);
+    setError(null);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const catList = categories
+        .filter(c => c.category_type === 'expense')
+        .map(c => ({ id: c.id, name: c.name }));
+
+      const { data, error: fnErr } = await supabase.functions.invoke('analyze-receipt', {
+        body: { imageBase64: base64, mimeType: file.type, categories: catList },
+      });
+
+      if (fnErr) throw fnErr;
+      if (data?.error) throw new Error(data.error);
+
+      onAnalysed({
+        amount: data.amount != null ? String(data.amount) : '',
+        description: data.description ?? '',
+        categoryId: data.suggested_category_id ?? null,
+      });
+    } catch {
+      setError(t.budgetAnalysisError);
+      setAnalysing(false);
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }}
+      onClick={onCancel}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: 'var(--color-canvas)', borderRadius: 'var(--rounded-lg) var(--rounded-lg) 0 0',
+        padding: 'var(--spacing-lg)', width: '100%', maxWidth: 560,
+      }}>
+        <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-sm)' }}>
+          🤖 {t.budgetAiScan}
+        </h2>
+
+        {analysing ? (
+          <div style={{ textAlign: 'center', padding: 'var(--spacing-xl) 0' }}>
+            <div style={{ fontSize: '32px', marginBottom: 'var(--spacing-md)' }}>⏳</div>
+            <p className="text-body-md text-muted">{t.budgetAnalysing}</p>
+          </div>
+        ) : (
+          <>
+            <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-lg)' }}>
+              {t.budgetAiScanHint}
+            </p>
+
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+            />
+
+            <button
+              onClick={() => fileRef.current?.click()}
+              style={{
+                width: '100%', padding: '14px', borderRadius: 'var(--rounded-md)',
+                background: 'var(--color-primary)', color: 'white', border: 'none',
+                cursor: 'pointer', fontSize: '15px', fontWeight: 600, marginBottom: 'var(--spacing-md)',
+              }}
+            >📷 {t.budgetUploadReceipt}</button>
+
+            {error && (
+              <div style={{ marginBottom: 'var(--spacing-md)' }}>
+                <p style={{ color: '#ef4444', fontSize: '14px', marginBottom: 8 }}>{error}</p>
+                <button
+                  onClick={onFallback}
+                  style={{ fontSize: '14px', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                >✏️ {t.budgetManualEntry}</button>
+              </div>
+            )}
+
+            <div style={{
+              background: 'rgba(99,102,241,0.08)', borderRadius: 'var(--rounded-md)',
+              padding: '10px var(--spacing-base)', fontSize: '12px',
+              color: 'var(--color-muted)', lineHeight: 1.5, marginBottom: 'var(--spacing-md)',
+            }}>
+              ℹ️ {t.budgetAiScanDisclaimer}
+            </div>
+
+            <button onClick={onCancel}
+              style={{ background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', fontSize: '14px', padding: 0 }}>
+              {t.cancel}
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -1334,6 +1452,10 @@ export function Budget({ homeId, language, userId, userRole }: {
     open: false, type: 'expense', editing: null,
   });
 
+  // AI scan modal state
+  const [aiScanOpen, setAiScanOpen] = useState(false);
+  const [aiPrefilled, setAiPrefilled] = useState<{ amount: string; description: string; categoryId: string | null } | null>(null);
+
   useEffect(() => { fetchAll(); }, [homeId, currentMonth]);
 
   async function fetchAll() {
@@ -1381,7 +1503,12 @@ export function Budget({ homeId, language, userId, userRole }: {
   }
 
   function openAddExpense() {
+    setAiPrefilled(null);
     setEntryModal({ open: true, type: 'expense', editing: null });
+  }
+
+  function openAddExpenseAI() {
+    setAiScanOpen(true);
   }
 
   function openAddIncome() {
@@ -1440,6 +1567,7 @@ export function Budget({ homeId, language, userId, userRole }: {
           onPrevMonth={() => setCurrentMonth(({ year, month }) => month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 })}
           onNextMonth={() => setCurrentMonth(({ year, month }) => month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 })}
           onAddExpense={openAddExpense}
+          onAddExpenseAI={openAddExpenseAI}
           onAddIncome={openAddIncome}
           onGoToEntries={() => setView('entries')}
           onGoToSettings={() => setView('settings')}
@@ -1463,19 +1591,39 @@ export function Budget({ homeId, language, userId, userRole }: {
         />
       )}
 
+      {/* AI scan modal */}
+      {aiScanOpen && (
+        <AiScanModal
+          language={language}
+          categories={categories}
+          onAnalysed={(pf) => {
+            setAiScanOpen(false);
+            setAiPrefilled(pf);
+            setEntryModal({ open: true, type: 'expense', editing: null });
+          }}
+          onFallback={() => {
+            setAiScanOpen(false);
+            setAiPrefilled(null);
+            setEntryModal({ open: true, type: 'expense', editing: null });
+          }}
+          onCancel={() => setAiScanOpen(false)}
+        />
+      )}
+
       {/* Entry form modal */}
       {entryModal.open && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }}
-          onClick={() => setEntryModal(p => ({ ...p, open: false }))}>
+          onClick={() => { setEntryModal(p => ({ ...p, open: false })); setAiPrefilled(null); }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 560 }}>
             <EntryForm
               homeId={homeId} language={language} userId={userId}
               categories={categories} members={members} homeSettings={effectiveSettings}
               entryType={entryModal.type}
               editingEntry={entryModal.editing}
-              onSave={() => { setEntryModal(p => ({ ...p, open: false })); fetchAll(); }}
-              onCancel={() => setEntryModal(p => ({ ...p, open: false }))}
-              onDelete={() => { setEntryModal(p => ({ ...p, open: false })); fetchAll(); }}
+              prefilled={aiPrefilled ?? undefined}
+              onSave={() => { setEntryModal(p => ({ ...p, open: false })); setAiPrefilled(null); fetchAll(); }}
+              onCancel={() => { setEntryModal(p => ({ ...p, open: false })); setAiPrefilled(null); }}
+              onDelete={() => { setEntryModal(p => ({ ...p, open: false })); setAiPrefilled(null); fetchAll(); }}
             />
           </div>
         </div>
