@@ -56,6 +56,7 @@ export function PhotoNotes({ homeId, userId, language, memberColors, onNewPhoto 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState<PhotoNote | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PhotoNote | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const prevPhotoIds = useRef<Set<string>>(new Set());
@@ -109,13 +110,23 @@ export function PhotoNotes({ homeId, userId, language, memberColors, onNewPhoto 
   async function handleUpload() {
     if (!selectedFile) return;
     setUploading(true);
+    setUploadError(null);
     try {
-      const ext = selectedFile.name.split('.').pop()?.toLowerCase() || 'jpg';
+      // Derive extension from MIME type as fallback (handles iOS HEIC blobs with generic names)
+      const mimeToExt: Record<string, string> = {
+        'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp',
+        'image/heic': 'heic', 'image/heif': 'heif', 'image/gif': 'gif',
+      };
+      const extFromName = selectedFile.name.split('.').pop()?.toLowerCase();
+      const ext = (extFromName && extFromName.length <= 5 && extFromName !== 'blob')
+        ? extFromName
+        : (mimeToExt[selectedFile.type] ?? 'jpg');
+
       const path = `${homeId}/${userId}_${Date.now()}.${ext}`;
       const { error: uploadErr } = await supabase.storage
         .from('photo-notes')
         .upload(path, selectedFile, { contentType: selectedFile.type });
-      if (uploadErr) throw uploadErr;
+      if (uploadErr) throw new Error(`Upload: ${uploadErr.message}`);
 
       const { error: insertErr } = await supabase.from('photo_notes').insert({
         home_id: homeId,
@@ -123,9 +134,11 @@ export function PhotoNotes({ homeId, userId, language, memberColors, onNewPhoto 
         storage_path: path,
         caption: caption.trim() || null,
       });
-      if (insertErr) throw insertErr;
+      if (insertErr) throw new Error(`DB: ${insertErr.message}`);
 
       closeUpload();
+    } catch (err: any) {
+      setUploadError(err.message ?? 'Unknown error');
     } finally {
       setUploading(false);
     }
@@ -135,6 +148,7 @@ export function PhotoNotes({ homeId, userId, language, memberColors, onNewPhoto 
     setShowUpload(false);
     setSelectedFile(null);
     setCaption('');
+    setUploadError(null);
     if (previewUrl) { URL.revokeObjectURL(previewUrl); setPreviewUrl(null); }
   }
 
@@ -271,6 +285,11 @@ export function PhotoNotes({ homeId, userId, language, memberColors, onNewPhoto 
               style={{ marginBottom: 'var(--spacing-md)' }}
               autoFocus
             />
+            {uploadError && (
+              <p style={{ color: '#ff453a', fontSize: 13, marginBottom: 'var(--spacing-sm)', wordBreak: 'break-all' }}>
+                ⚠ {uploadError}
+              </p>
+            )}
             <button
               onClick={handleUpload}
               disabled={uploading}
