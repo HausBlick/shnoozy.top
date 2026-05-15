@@ -44,10 +44,11 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
   const [caption, setCaption] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
-  const galleryRef = useRef<HTMLInputElement>(null);
   const touchStartX = useRef(0);
   const prevPhotoIds = useRef<Set<string>>(new Set());
+  // Stable ref for onNewPhoto — prevents fetchPhotos from changing on every App render
+  const onNewPhotoRef = useRef(onNewPhoto);
+  useEffect(() => { onNewPhotoRef.current = onNewPhoto; }, [onNewPhoto]);
 
   const fetchPhotos = useCallback(async () => {
     const { data } = await supabase
@@ -68,11 +69,11 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
       }
     }
 
-    // Toast for new photos from others
+    // Toast for new photos from others (via stable ref, no dep on onNewPhoto)
     if (prevPhotoIds.current.size > 0) {
       for (const p of latest) {
         if (p.sender_id !== userId && !prevPhotoIds.current.has(p.id)) {
-          onNewPhoto?.();
+          onNewPhotoRef.current?.();
         }
       }
     }
@@ -83,7 +84,7 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
     );
     setPhotos(withUrls);
     setLoading(false);
-  }, [homeId, userId, onNewPhoto]);
+  }, [homeId, userId]); // no onNewPhoto — uses ref instead
 
   useEffect(() => { fetchPhotos(); }, [fetchPhotos]);
 
@@ -93,7 +94,7 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
       .on('postgres_changes', { event: '*', schema: 'public', table: 'photo_notes', filter: `home_id=eq.${homeId}` }, () => { fetchPhotos(); })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [homeId, fetchPhotos]);
+  }, [homeId, fetchPhotos]); // stable now — only changes when homeId changes
 
   useEffect(() => {
     supabase.from('profiles').select('id, display_name').then(({ data }) => {
@@ -195,8 +196,18 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px 8px' }}>
         <h2 className="text-title-md">📸 {t.photoNotesTitle}</h2>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button style={iconBtnStyle} onClick={() => cameraRef.current?.click()} title={t.photoNotesCamera}>📷</button>
-          <button style={iconBtnStyle} onClick={() => galleryRef.current?.click()} title={t.photoNotesGallery}>🖼️</button>
+          <label style={iconBtnStyle} title={t.photoNotesCamera}>
+            📷
+            <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+              onChange={e => { if (e.target.files?.[0]) { handleFileSelected(e.target.files[0]); e.target.value = ''; } }}
+            />
+          </label>
+          <label style={iconBtnStyle} title={t.photoNotesGallery}>
+            🖼️
+            <input type="file" accept="image/*" style={{ display: 'none' }}
+              onChange={e => { if (e.target.files?.[0]) { handleFileSelected(e.target.files[0]); e.target.value = ''; } }}
+            />
+          </label>
         </div>
       </div>
 
@@ -285,18 +296,6 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
           )}
         </div>
       )}
-
-      {/* File inputs — NOT inside a modal to avoid onChange issues on mobile */}
-      <input
-        ref={cameraRef} type="file" accept="image/*" capture="environment"
-        style={{ display: 'none' }}
-        onChange={e => { if (e.target.files?.[0]) { handleFileSelected(e.target.files[0]); e.target.value = ''; } }}
-      />
-      <input
-        ref={galleryRef} type="file" accept="image/*"
-        style={{ display: 'none' }}
-        onChange={e => { if (e.target.files?.[0]) { handleFileSelected(e.target.files[0]); e.target.value = ''; } }}
-      />
 
       {/* Caption + send sheet — appears after photo is picked */}
       {pendingFile && (
