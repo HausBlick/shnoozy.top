@@ -446,6 +446,10 @@ const en = {
   pollenModerate: 'Moderate',
   pollenHigh: 'High',
   pollenVeryHigh: 'Very High',
+
+  // iOS install banner
+  iosInstallHint: 'Install Shnoozy: tap',
+  iosInstallHintThen: 'then "Add to Home Screen"',
 };
 
 const de: typeof en = {
@@ -894,6 +898,10 @@ const de: typeof en = {
   pollenModerate: 'Mäßig',
   pollenHigh: 'Hoch',
   pollenVeryHigh: 'Sehr hoch',
+
+  // iOS install banner
+  iosInstallHint: 'Shnoozy installieren: tippe auf',
+  iosInstallHintThen: 'und dann „Zum Home-Bildschirm"',
 };
 
 const translations: Record<Lang, typeof en> = { en, de };

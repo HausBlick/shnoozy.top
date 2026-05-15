@@ -1226,6 +1226,7 @@ function App() {
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [memberDisplayNames, setMemberDisplayNames] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<string | null>(null);
+  const [showIOSBanner, setShowIOSBanner] = useState(false);
   const [wifiSsid, setWifiSsid] = useState('');
   const [wifiPassword, setWifiPassword] = useState('');
   const [wifiSecurity, setWifiSecurity] = useState('WPA');
@@ -1243,6 +1244,14 @@ function App() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(null), 4000);
   }
+
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    const isIOS = /iPhone|iPad|iPod/.test(ua);
+    const isStandalone = (navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+    const dismissed = localStorage.getItem('shnoozy_ios_install_dismissed');
+    if (isIOS && !isStandalone && !dismissed) setShowIOSBanner(true);
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -1982,6 +1991,43 @@ function App() {
               </>
             )}
           </div>
+        </div>
+      )}
+
+      {/* iOS install banner */}
+      {showIOSBanner && (
+        <div style={{
+          position: 'fixed',
+          bottom: 'calc(70px + env(safe-area-inset-bottom))',
+          left: 0, right: 0,
+          background: 'var(--color-canvas)',
+          borderTop: '2px solid var(--color-primary)',
+          boxShadow: '0 -2px 12px rgba(0,0,0,0.12)',
+          padding: '10px 16px',
+          display: 'flex', alignItems: 'center', gap: '10px',
+          zIndex: 95,
+        }}>
+          <div style={{ fontSize: '28px', flexShrink: 0 }}>📲</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p className="text-body-sm" style={{ fontWeight: 600, margin: 0 }}>{t.iosInstallHint}</p>
+            <p className="text-body-sm text-muted" style={{ margin: 0 }}>
+              <svg style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                <polyline points="16 6 12 2 8 6"/>
+                <line x1="12" y1="2" x2="12" y2="15"/>
+              </svg>
+              {t.iosInstallHintThen}
+            </p>
+          </div>
+          <button
+            onClick={() => { localStorage.setItem('shnoozy_ios_install_dismissed', '1'); setShowIOSBanner(false); }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', flexShrink: 0, padding: '4px', lineHeight: 1 }}
+            aria-label="Schließen"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
         </div>
       )}
 
