@@ -183,8 +183,6 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
     return d.toLocaleDateString(de ? 'de-DE' : 'en-US', { day: 'numeric', month: 'short' });
   }
 
-  const accent = '#e91e8c';
-
   return (
     <div className="card" style={{ marginBottom: 'var(--spacing-lg)', padding: 0, overflow: 'hidden' }}>
       {/* Header */}
@@ -192,7 +190,7 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
         <h2 className="text-title-md">📸 {t.photoNotesTitle}</h2>
         <div style={{ position: 'relative' }}>
           <button style={{
-            background: accent, color: '#fff', border: 'none',
+            background: 'var(--color-primary)', color: '#fff', border: 'none',
             borderRadius: 'var(--rounded-sm)', padding: '6px 12px',
             fontWeight: 700, fontSize: 13, cursor: 'pointer', pointerEvents: 'none',
           }}>+ Snap!</button>
@@ -219,7 +217,7 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
             {slots.map((slot) => {
               const memberId = slot.photo?.sender_id ?? userId;
               const name = slot.isMine ? (de ? 'Ich' : 'Me') : (memberNames[memberId] ?? '?');
-              const color = memberColors[memberId] ?? accent;
+              const color = memberColors[memberId] ?? 'var(--color-primary)';
               const initials = name.slice(0, 2).toUpperCase();
               return (
                 <div key={slot.isMine ? 'me' : memberId} style={{ flex: '0 0 100%', minWidth: 0 }}>
@@ -279,7 +277,7 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
                   onClick={() => setCurrentIndex(i)}
                   style={{
                     width: 6, height: 6, borderRadius: '50%', cursor: 'pointer',
-                    background: i === idx ? accent : 'var(--color-hairline)',
+                    background: i === idx ? 'var(--color-primary)' : 'var(--color-hairline)',
                     transition: 'background 0.2s',
                   }}
                 />
@@ -319,7 +317,7 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
               onClick={handleSend}
               disabled={uploading}
               style={{
-                width: '100%', background: accent, color: '#fff', border: 'none',
+                width: '100%', background: 'var(--color-primary)', color: '#fff', border: 'none',
                 borderRadius: 'var(--rounded-sm)', padding: '12px 0',
                 fontWeight: 700, fontSize: 16,
                 cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.7 : 1,
