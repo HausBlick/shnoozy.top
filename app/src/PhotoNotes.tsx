@@ -184,32 +184,22 @@ export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColo
   }
 
   const accent = '#e91e8c';
-  const iconBtnStyle: React.CSSProperties = {
-    background: 'var(--color-surface-strong)', border: 'none', borderRadius: 'var(--rounded-sm)',
-    width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    cursor: 'pointer', fontSize: 16,
-  };
 
   return (
     <div className="card" style={{ marginBottom: 'var(--spacing-lg)', padding: 0, overflow: 'hidden' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px 8px' }}>
         <h2 className="text-title-md">📸 {t.photoNotesTitle}</h2>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <div style={{ ...iconBtnStyle, position: 'relative' }} title={t.photoNotesCamera}>
-            <span style={{ pointerEvents: 'none' }}>📷</span>
-            <input type="file" accept="image/*"
-              style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
-              onChange={e => { if (e.target.files?.[0]) { handleFileSelected(e.target.files[0]); e.target.value = ''; } }}
-            />
-          </div>
-          <div style={{ ...iconBtnStyle, position: 'relative' }} title={t.photoNotesGallery}>
-            <span style={{ pointerEvents: 'none' }}>🖼️</span>
-            <input type="file" accept="image/*"
-              style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
-              onChange={e => { if (e.target.files?.[0]) { handleFileSelected(e.target.files[0]); e.target.value = ''; } }}
-            />
-          </div>
+        <div style={{ position: 'relative' }}>
+          <button style={{
+            background: accent, color: '#fff', border: 'none',
+            borderRadius: 'var(--rounded-sm)', padding: '6px 12px',
+            fontWeight: 700, fontSize: 13, cursor: 'pointer', pointerEvents: 'none',
+          }}>+ Snap!</button>
+          <input type="file" accept="image/*"
+            style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
+            onChange={e => { if (e.target.files?.[0]) { handleFileSelected(e.target.files[0]); e.target.value = ''; } }}
+          />
         </div>
       </div>
 
