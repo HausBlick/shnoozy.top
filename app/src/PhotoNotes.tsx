@@ -2,9 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from './lib/supabase';
 import { getT, type Lang } from './lib/i18n';
 
-interface PhotoNote {
+interface MemberPhoto {
   id: string;
-  home_id: string;
   sender_id: string;
   storage_path: string;
   caption: string | null;
@@ -12,53 +11,42 @@ interface PhotoNote {
   _url?: string;
 }
 
-interface Props {
-  homeId: string;
-  userId: string;
-  language: Lang;
-  memberColors: Record<string, string>;
-  onNewPhoto?: (photo: PhotoNote) => void;
-}
-
-function TrashIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="3 6 5 6 21 6"/>
-      <path d="M19 6l-1 14H6L5 6"/>
-      <path d="M10 11v6M14 11v6"/>
-      <path d="M9 6V4h6v2"/>
-    </svg>
-  );
-}
-
-function XIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-      <line x1="18" y1="6" x2="6" y2="18"/>
-      <line x1="6" y1="6" x2="18" y2="18"/>
-    </svg>
-  );
-}
-
 async function getSignedUrl(path: string): Promise<string> {
   const { data } = await supabase.storage.from('photo-notes').createSignedUrl(path, 3600);
   return data?.signedUrl ?? '';
 }
 
-export function PhotoNotes({ homeId, userId, language, memberColors, onNewPhoto }: Props) {
+function XIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+interface WidgetProps {
+  homeId: string;
+  userId: string;
+  language: Lang;
+  memberColors: Record<string, string>;
+  onNewPhoto?: () => void;
+}
+
+export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColors, onNewPhoto }: WidgetProps) {
   const t = getT(language);
-  const [photos, setPhotos] = useState<PhotoNote[]>([]);
+  const de = language === 'de';
+  const [photos, setPhotos] = useState<MemberPhoto[]>([]);
+  const [memberNames, setMemberNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [showUpload, setShowUpload] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [fullscreen, setFullscreen] = useState<PhotoNote | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<PhotoNote | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
+  const touchStartX = useRef(0);
   const prevPhotoIds = useRef<Set<string>>(new Set());
 
   const fetchPhotos = useCallback(async () => {
@@ -70,220 +58,266 @@ export function PhotoNotes({ homeId, userId, language, memberColors, onNewPhoto 
 
     if (!data) { setLoading(false); return; }
 
-    const withUrls = await Promise.all(
-      data.map(async (p) => ({ ...p, _url: await getSignedUrl(p.storage_path) }))
-    );
-
-    // detect new photos for realtime
-    if (prevPhotoIds.current.size > 0) {
-      const newOnes = withUrls.filter(p => !prevPhotoIds.current.has(p.id));
-      newOnes.forEach(p => onNewPhoto?.(p));
+    // Keep only the latest photo per sender
+    const seen = new Set<string>();
+    const latest: MemberPhoto[] = [];
+    for (const row of data) {
+      if (!seen.has(row.sender_id)) {
+        seen.add(row.sender_id);
+        latest.push(row);
+      }
     }
-    prevPhotoIds.current = new Set(withUrls.map(p => p.id));
 
+    // Toast for new photos from others
+    if (prevPhotoIds.current.size > 0) {
+      for (const p of latest) {
+        if (p.sender_id !== userId && !prevPhotoIds.current.has(p.id)) {
+          onNewPhoto?.();
+        }
+      }
+    }
+    prevPhotoIds.current = new Set(latest.map(p => p.id));
+
+    const withUrls = await Promise.all(
+      latest.map(async p => ({ ...p, _url: await getSignedUrl(p.storage_path) }))
+    );
     setPhotos(withUrls);
     setLoading(false);
-  }, [homeId, onNewPhoto]);
+  }, [homeId, userId, onNewPhoto]);
 
   useEffect(() => { fetchPhotos(); }, [fetchPhotos]);
 
   useEffect(() => {
-    const channel = supabase
-      .channel(`photo_notes_${homeId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'photo_notes', filter: `home_id=eq.${homeId}` }, () => {
-        fetchPhotos();
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'photo_notes', filter: `home_id=eq.${homeId}` }, (payload) => {
-        setPhotos(prev => prev.filter(p => p.id !== (payload.old as any).id));
-        prevPhotoIds.current.delete((payload.old as any).id);
-      })
+    const ch = supabase
+      .channel(`photo_notes_widget_${homeId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'photo_notes', filter: `home_id=eq.${homeId}` }, () => { fetchPhotos(); })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { supabase.removeChannel(ch); };
   }, [homeId, fetchPhotos]);
 
-  function handleFileSelected(file: File) {
-    setSelectedFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
-    setShowUpload(true);
+  useEffect(() => {
+    supabase.from('profiles').select('id, display_name').then(({ data }) => {
+      if (!data) return;
+      const names: Record<string, string> = {};
+      data.forEach((p: any) => { names[p.id] = p.display_name || '?'; });
+      setMemberNames(names);
+    });
+  }, []);
+
+  // Slots: my slot always first, then others by most recent
+  const myPhoto = photos.find(p => p.sender_id === userId);
+  const otherPhotos = photos.filter(p => p.sender_id !== userId);
+  const slots: Array<{ isMine: boolean; photo?: MemberPhoto }> = [
+    { isMine: true, photo: myPhoto },
+    ...otherPhotos.map(p => ({ isMine: false, photo: p })),
+  ];
+  const idx = Math.min(currentIndex, slots.length - 1);
+
+  function onTouchStart(e: React.TouchEvent) { touchStartX.current = e.touches[0].clientX; }
+  function onTouchEnd(e: React.TouchEvent) {
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(dx) > 40) {
+      if (dx < 0 && idx < slots.length - 1) setCurrentIndex(idx + 1);
+      if (dx > 0 && idx > 0) setCurrentIndex(idx - 1);
+    }
   }
 
-  async function handleUpload() {
-    if (!selectedFile) return;
+  function handleFileSelected(file: File) {
+    setPendingFile(file);
+    setPendingUrl(URL.createObjectURL(file));
+  }
+
+  function closePending() {
+    setPendingFile(null);
+    if (pendingUrl) { URL.revokeObjectURL(pendingUrl); setPendingUrl(null); }
+    setCaption('');
+    setUploadError(null);
+  }
+
+  async function handleSend() {
+    if (!pendingFile) return;
     setUploading(true);
     setUploadError(null);
     try {
-      // Derive extension from MIME type as fallback (handles iOS HEIC blobs with generic names)
+      // Delete previous photo for this user
+      const old = photos.find(p => p.sender_id === userId);
+      if (old) {
+        await supabase.storage.from('photo-notes').remove([old.storage_path]);
+        await supabase.from('photo_notes').delete().eq('id', old.id);
+      }
+
       const mimeToExt: Record<string, string> = {
         'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp',
         'image/heic': 'heic', 'image/heif': 'heif', 'image/gif': 'gif',
       };
-      const extFromName = selectedFile.name.split('.').pop()?.toLowerCase();
+      const extFromName = pendingFile.name.split('.').pop()?.toLowerCase();
       const ext = (extFromName && extFromName.length <= 5 && extFromName !== 'blob')
-        ? extFromName
-        : (mimeToExt[selectedFile.type] ?? 'jpg');
-
+        ? extFromName : (mimeToExt[pendingFile.type] ?? 'jpg');
       const path = `${homeId}/${userId}_${Date.now()}.${ext}`;
-      const { error: uploadErr } = await supabase.storage
+
+      const { error: upErr } = await supabase.storage
         .from('photo-notes')
-        .upload(path, selectedFile, { contentType: selectedFile.type });
-      if (uploadErr) throw new Error(`Upload: ${uploadErr.message}`);
+        .upload(path, pendingFile, { contentType: pendingFile.type || 'image/jpeg' });
+      if (upErr) throw new Error(`Upload: ${upErr.message}`);
 
-      const { error: insertErr } = await supabase.from('photo_notes').insert({
-        home_id: homeId,
-        sender_id: userId,
-        storage_path: path,
-        caption: caption.trim() || null,
+      const { error: dbErr } = await supabase.from('photo_notes').insert({
+        home_id: homeId, sender_id: userId,
+        storage_path: path, caption: caption.trim() || null,
       });
-      if (insertErr) throw new Error(`DB: ${insertErr.message}`);
+      if (dbErr) throw new Error(`DB: ${dbErr.message}`);
 
-      closeUpload();
+      closePending();
     } catch (err: any) {
-      setUploadError(err.message ?? 'Unknown error');
+      setUploadError(err.message);
     } finally {
       setUploading(false);
     }
   }
 
-  function closeUpload() {
-    setShowUpload(false);
-    setSelectedFile(null);
-    setCaption('');
-    setUploadError(null);
-    if (previewUrl) { URL.revokeObjectURL(previewUrl); setPreviewUrl(null); }
-  }
-
-  async function handleDelete(photo: PhotoNote) {
-    await supabase.storage.from('photo-notes').remove([photo.storage_path]);
-    await supabase.from('photo_notes').delete().eq('id', photo.id);
-    setDeleteTarget(null);
-    setFullscreen(null);
-  }
-
   function formatTime(iso: string) {
     const d = new Date(iso);
-    const now = new Date();
-    const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
-    if (diffDays === 0) return d.toLocaleTimeString(language === 'de' ? 'de-DE' : 'en-US', { hour: '2-digit', minute: '2-digit' });
-    if (diffDays === 1) return language === 'de' ? 'Gestern' : 'Yesterday';
-    return d.toLocaleDateString(language === 'de' ? 'de-DE' : 'en-US', { day: 'numeric', month: 'short' });
+    const diffDays = Math.floor((Date.now() - d.getTime()) / 86400000);
+    if (diffDays === 0) return d.toLocaleTimeString(de ? 'de-DE' : 'en-US', { hour: '2-digit', minute: '2-digit' });
+    if (diffDays === 1) return de ? 'Gestern' : 'Yesterday';
+    return d.toLocaleDateString(de ? 'de-DE' : 'en-US', { day: 'numeric', month: 'short' });
   }
 
-  const accentColor = '#e91e8c';
+  const accent = '#e91e8c';
+  const iconBtnStyle: React.CSSProperties = {
+    background: 'var(--color-surface-strong)', border: 'none', borderRadius: 'var(--rounded-sm)',
+    width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', fontSize: 16,
+  };
 
   return (
-    <div style={{ paddingBottom: 120, paddingTop: 'var(--spacing-md)' }}>
+    <div className="card" style={{ marginBottom: 'var(--spacing-lg)', padding: 0, overflow: 'hidden' }}>
       {/* Header */}
-      <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-        <h1 className="text-display-lg">{t.photoNotesTitle}</h1>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px 8px' }}>
+        <h2 className="text-title-md">📸 {t.photoNotesTitle}</h2>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button style={iconBtnStyle} onClick={() => cameraRef.current?.click()} title={t.photoNotesCamera}>📷</button>
+          <button style={iconBtnStyle} onClick={() => galleryRef.current?.click()} title={t.photoNotesGallery}>🖼️</button>
+        </div>
       </div>
 
-      {/* Feed */}
+      {/* Slide area */}
       {loading ? (
-        <p className="text-body text-muted" style={{ textAlign: 'center', marginTop: 60 }}>…</p>
-      ) : photos.length === 0 ? (
-        <div style={{ textAlign: 'center', marginTop: 80, padding: '0 var(--spacing-xl)' }}>
-          <div style={{ fontSize: 56, marginBottom: 16 }}>📸</div>
-          <p className="text-body text-muted">{t.photoNotesEmpty}</p>
+        <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span className="text-body-sm text-muted">…</span>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-          {photos.map(photo => (
-            <div
-              key={photo.id}
-              className="card"
-              style={{ padding: 0, overflow: 'hidden', cursor: 'pointer' }}
-              onClick={() => setFullscreen(photo)}
-            >
-              {photo._url && (
-                <img
-                  src={photo._url}
-                  alt={photo.caption ?? ''}
-                  style={{ width: '100%', maxHeight: 360, objectFit: 'cover', display: 'block' }}
-                />
-              )}
-              <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                  <div style={{
-                    width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                    background: memberColors[photo.sender_id] ?? 'var(--color-primary)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#fff', fontWeight: 700, fontSize: 12,
-                  }}>
-                    {photo.sender_id === userId ? 'Me' : '?'}
-                  </div>
-                  {photo.caption && (
-                    <span className="text-body-sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{photo.caption}</span>
+        <div style={{ overflow: 'hidden' }} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+          {/* Slides */}
+          <div style={{
+            display: 'flex',
+            transform: `translateX(-${idx * 100}%)`,
+            transition: 'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
+          }}>
+            {slots.map((slot) => {
+              const memberId = slot.photo?.sender_id ?? userId;
+              const name = slot.isMine ? (de ? 'Ich' : 'Me') : (memberNames[memberId] ?? '?');
+              const color = memberColors[memberId] ?? accent;
+              const initials = name.slice(0, 2).toUpperCase();
+              return (
+                <div key={slot.isMine ? 'me' : memberId} style={{ flex: '0 0 100%', minWidth: 0 }}>
+                  {slot.photo?._url ? (
+                    <img
+                      src={slot.photo._url}
+                      alt={slot.photo.caption ?? ''}
+                      style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block' }}
+                    />
+                  ) : (
+                    <div style={{
+                      height: 220, background: 'var(--color-surface-soft)',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    }}>
+                      <div style={{ fontSize: 44 }}>📷</div>
+                      <p className="text-body-sm text-muted">
+                        {slot.isMine
+                          ? (de ? 'Teile einen Moment' : 'Share a moment')
+                          : (de ? 'Noch kein Foto' : 'No photo yet')}
+                      </p>
+                    </div>
                   )}
+                  {/* Info bar */}
+                  <div style={{ padding: '8px 14px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                      <div style={{
+                        width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                        background: color, color: '#fff', fontWeight: 700, fontSize: 10,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>{initials}</div>
+                      <div style={{ minWidth: 0 }}>
+                        <p className="text-body-sm" style={{ fontWeight: 600, margin: 0 }}>{name}</p>
+                        {slot.photo?.caption && (
+                          <p className="text-body-sm text-muted" style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {slot.photo.caption}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {slot.photo && (
+                      <span className="text-body-sm text-muted" style={{ flexShrink: 0 }}>
+                        {formatTime(slot.photo.created_at)}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <span className="text-body-sm text-muted" style={{ flexShrink: 0 }}>{formatTime(photo.created_at)}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* FAB */}
-      <button
-        onClick={() => setShowUpload(true)}
-        style={{
-          position: 'fixed', bottom: 84, right: 16, zIndex: 300,
-          width: 52, height: 52, borderRadius: '50%',
-          background: accentColor, color: '#fff', border: 'none',
-          fontSize: 26, fontWeight: 300, lineHeight: 1,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 16px rgba(233,30,140,0.4)', cursor: 'pointer',
-        }}
-        aria-label={t.photoNotesNew}
-      >+</button>
-
-      {/* Hidden file inputs */}
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handleFileSelected(e.target.files[0])} />
-      <input ref={galleryRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handleFileSelected(e.target.files[0])} />
-
-      {/* Upload Sheet — choose source if no file yet */}
-      {showUpload && !selectedFile && (
-        <div className="modal-overlay" onClick={closeUpload}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2 className="text-title-md">{t.photoNotesNew}</h2>
-              <button className="icon-btn" onClick={closeUpload}><XIcon /></button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-md)' }}>
-              <button
-                onClick={() => cameraRef.current?.click()}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: 'var(--color-surface-soft)', border: 'none', borderRadius: 'var(--rounded-sm)', cursor: 'pointer', fontSize: 15, fontWeight: 600 }}
-              >
-                <span style={{ fontSize: 22 }}>📷</span> {t.photoNotesCamera}
-              </button>
-              <button
-                onClick={() => galleryRef.current?.click()}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: 'var(--color-surface-soft)', border: 'none', borderRadius: 'var(--rounded-sm)', cursor: 'pointer', fontSize: 15, fontWeight: 600 }}
-              >
-                <span style={{ fontSize: 22 }}>🖼️</span> {t.photoNotesGallery}
-              </button>
-            </div>
+              );
+            })}
           </div>
+
+          {/* Dot indicators */}
+          {slots.length > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 6, padding: '8px 0 12px' }}>
+              {slots.map((_slot, i) => (
+                <div
+                  key={i}
+                  onClick={() => setCurrentIndex(i)}
+                  style={{
+                    width: 6, height: 6, borderRadius: '50%', cursor: 'pointer',
+                    background: i === idx ? accent : 'var(--color-hairline)',
+                    transition: 'background 0.2s',
+                  }}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Upload Sheet — preview + caption */}
-      {showUpload && selectedFile && (
-        <div className="modal-overlay" onClick={closeUpload}>
+      {/* File inputs — NOT inside a modal to avoid onChange issues on mobile */}
+      <input
+        ref={cameraRef} type="file" accept="image/*" capture="environment"
+        style={{ display: 'none' }}
+        onChange={e => { if (e.target.files?.[0]) { handleFileSelected(e.target.files[0]); e.target.value = ''; } }}
+      />
+      <input
+        ref={galleryRef} type="file" accept="image/*"
+        style={{ display: 'none' }}
+        onChange={e => { if (e.target.files?.[0]) { handleFileSelected(e.target.files[0]); e.target.value = ''; } }}
+      />
+
+      {/* Caption + send sheet — appears after photo is picked */}
+      {pendingFile && (
+        <div className="modal-overlay" onClick={closePending}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="text-title-md">{t.photoNotesSend}</h2>
-              <button className="icon-btn" onClick={closeUpload}><XIcon /></button>
+              <button className="icon-btn" onClick={closePending}><XIcon /></button>
             </div>
-            {previewUrl && (
-              <img src={previewUrl} alt="" style={{ width: '100%', maxHeight: 280, objectFit: 'cover', borderRadius: 'var(--rounded-sm)', marginBottom: 'var(--spacing-md)' }} />
+            {pendingUrl && (
+              <img
+                src={pendingUrl} alt=""
+                style={{ width: '100%', maxHeight: 260, objectFit: 'cover', borderRadius: 'var(--rounded-sm)', marginBottom: 'var(--spacing-md)' }}
+              />
             )}
             <input
               className="input"
               placeholder={t.photoNotesCaption}
               value={caption}
               onChange={e => setCaption(e.target.value)}
-              style={{ marginBottom: 'var(--spacing-md)' }}
-              autoFocus
+              style={{ marginBottom: uploadError ? 'var(--spacing-xs)' : 'var(--spacing-md)' }}
             />
             {uploadError && (
               <p style={{ color: '#ff453a', fontSize: 13, marginBottom: 'var(--spacing-sm)', wordBreak: 'break-all' }}>
@@ -291,192 +325,20 @@ export function PhotoNotes({ homeId, userId, language, memberColors, onNewPhoto 
               </p>
             )}
             <button
-              onClick={handleUpload}
+              onClick={handleSend}
               disabled={uploading}
-              style={{ width: '100%', background: accentColor, color: '#fff', border: 'none', borderRadius: 'var(--rounded-sm)', padding: '12px 0', fontWeight: 700, fontSize: 16, cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.7 : 1 }}
+              style={{
+                width: '100%', background: accent, color: '#fff', border: 'none',
+                borderRadius: 'var(--rounded-sm)', padding: '12px 0',
+                fontWeight: 700, fontSize: 16,
+                cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.7 : 1,
+              }}
             >
               {uploading ? '…' : t.photoNotesSend}
             </button>
           </div>
         </div>
       )}
-
-      {/* Fullscreen viewer */}
-      {fullscreen && (
-        <div
-          style={{ position: 'fixed', inset: 0, background: '#000', zIndex: 2000, display: 'flex', flexDirection: 'column' }}
-          onClick={() => setFullscreen(null)}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 16px 8px', position: 'relative', zIndex: 1 }} onClick={e => e.stopPropagation()}>
-            <button className="icon-btn" style={{ color: '#fff' }} onClick={() => setFullscreen(null)}><XIcon /></button>
-            {fullscreen.sender_id === userId && (
-              <button
-                className="icon-btn"
-                style={{ color: '#ff453a' }}
-                onClick={() => setDeleteTarget(fullscreen)}
-              ><TrashIcon /></button>
-            )}
-          </div>
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-            {fullscreen._url && (
-              <img
-                src={fullscreen._url}
-                alt={fullscreen.caption ?? ''}
-                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                onClick={e => e.stopPropagation()}
-              />
-            )}
-          </div>
-          {fullscreen.caption && (
-            <div style={{ padding: '12px 20px 32px', color: '#fff', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-              <span className="text-body">{fullscreen.caption}</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Delete confirm */}
-      {deleteTarget && (
-        <div className="modal-overlay" onClick={() => setDeleteTarget(null)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-md)' }}>{t.photoNotesDeleteConfirm}</h2>
-            <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-              <button
-                onClick={() => setDeleteTarget(null)}
-                style={{ flex: 1, background: 'var(--color-surface-strong)', border: 'none', borderRadius: 'var(--rounded-sm)', padding: '10px 0', fontWeight: 600, cursor: 'pointer' }}
-              >
-                {language === 'de' ? 'Abbrechen' : 'Cancel'}
-              </button>
-              <button
-                onClick={() => handleDelete(deleteTarget)}
-                style={{ flex: 1, background: '#ff453a', color: '#fff', border: 'none', borderRadius: 'var(--rounded-sm)', padding: '10px 0', fontWeight: 700, cursor: 'pointer' }}
-              >
-                {t.photoNotesDelete}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-
-// ─── Dashboard Widget ─────────────────────────────────────────────────────────
-
-interface WidgetProps {
-  homeId: string;
-  userId: string;
-  language: Lang;
-  memberColors: Record<string, string>;
-  onNavigate: () => void;
-}
-
-export function PhotoNotesDashboardWidget({ homeId, userId, language, memberColors, onNavigate }: WidgetProps) {
-  const t = getT(language);
-  const [latest, setLatest] = useState<PhotoNote | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const fetchLatest = useCallback(async () => {
-    const { data } = await supabase
-      .from('photo_notes')
-      .select('*')
-      .eq('home_id', homeId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (data) {
-      const url = await getSignedUrl(data.storage_path);
-      setLatest({ ...data, _url: url });
-    } else {
-      setLatest(null);
-    }
-    setLoading(false);
-  }, [homeId]);
-
-  useEffect(() => { fetchLatest(); }, [fetchLatest]);
-
-  useEffect(() => {
-    const channel = supabase
-      .channel(`photo_notes_widget_${homeId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'photo_notes', filter: `home_id=eq.${homeId}` }, () => {
-        fetchLatest();
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [homeId, fetchLatest]);
-
-  function formatTime(iso: string) {
-    const d = new Date(iso);
-    const now = new Date();
-    const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
-    if (diffDays === 0) return d.toLocaleTimeString(language === 'de' ? 'de-DE' : 'en-US', { hour: '2-digit', minute: '2-digit' });
-    if (diffDays === 1) return language === 'de' ? 'Gestern' : 'Yesterday';
-    return d.toLocaleDateString(language === 'de' ? 'de-DE' : 'en-US', { day: 'numeric', month: 'short' });
-  }
-
-  const accentColor = '#e91e8c';
-  const isFromMe = latest?.sender_id === userId;
-
-  return (
-    <div className="card" style={{ marginBottom: 'var(--spacing-lg)', padding: 0, overflow: 'hidden' }}>
-      {/* Widget header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px 10px' }}>
-        <h2 className="text-title-md" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <PhotoNotesWidgetIcon color={accentColor} size={18} /> {t.photoNotesTitle}
-        </h2>
-        <button
-          onClick={onNavigate}
-          style={{ background: 'none', border: 'none', color: accentColor, fontWeight: 600, fontSize: 13, cursor: 'pointer', padding: 0 }}
-        >
-          {language === 'de' ? 'Zu Fotos >' : 'To Photos >'}
-        </button>
-      </div>
-
-      {loading ? (
-        <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span className="text-body-sm text-muted">…</span>
-        </div>
-      ) : !latest ? (
-        <div style={{ padding: '8px 14px 14px', textAlign: 'center' }}>
-          <p className="text-body-sm text-muted">{t.photoNotesEmpty}</p>
-        </div>
-      ) : (
-        <div style={{ cursor: 'pointer' }} onClick={onNavigate}>
-          {latest._url && (
-            <img
-              src={latest._url}
-              alt={latest.caption ?? ''}
-              style={{ width: '100%', maxHeight: 220, objectFit: 'cover', display: 'block' }}
-            />
-          )}
-          <div style={{ padding: '10px 14px 14px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-            <div style={{
-              width: 30, height: 30, borderRadius: '50%', flexShrink: 0, marginTop: 1,
-              background: memberColors[latest.sender_id] ?? accentColor,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#fff', fontWeight: 700, fontSize: 12,
-            }}>
-              {isFromMe ? (language === 'de' ? 'Ich' : 'Me') : '♥'}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {latest.caption && (
-                <p className="text-body-sm" style={{ margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {latest.caption}
-                </p>
-              )}
-              <span className="text-body-sm text-muted">{formatTime(latest.created_at)}</span>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-const PhotoNotesWidgetIcon = ({ color = 'currentColor', size = 18 }: { color?: string; size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-    <circle cx="12" cy="13" r="4"/>
-  </svg>
-);
