@@ -6,7 +6,7 @@
 
 ## Current Status
 **Live unter:** https://shnoozy.top
-**Phase:** Phase 17 ✅ — Globale Button-UX + iOS Install Banner (Session 9, 2026-05-15)
+**Phase:** Session 11 ✅ — Snap! cancelled, Dashboard nav-links UX (2026-05-15)
 **Nächste Phase:** Nächste Schritte nach Absprache — offen
 
 ---
@@ -509,3 +509,5 @@
 *   **2026-05-15 (Session 8):** Phase 16 (Wiederkehrende Ausgaben — Geplante Änderungen): DB-Tabelle `budget_recurring_changes` (RLS via JOIN auf recurring_items). `effectiveRecurring()`-Helper für monatsgenaue Betrag-/Kündigungs-Logik. `RecurringItemModal` erweitert: Kündigung (Datum) + Preisanpassung (Datum + neuer Betrag) + Löschen. Dashboard: ✏️-Bearbeiten-Button, effektive Beträge, Upcoming-Change-Badges (⚠️/📈). Datumsformat DD.MM.YYYY.
 *   **2026-05-15 (Session 9):** Phase 17.1 (Globale Button-UX): Alle Text-Aktionsbuttons app-weit von `rounded-full` auf `rounded-sm` (8px) umgestellt (Calendar, Budget, Lists, StickyNotes). Neuer i18n-Key `calNewEvent` (Termin/Event). StickyNotes: "+ Notiz"-Button aus Board-Unterkante in Modul-Header verschoben, `onBack`-Prop für Zurück-Navigation. TS6133-Bugfix (PlusIcon in Calendar.tsx). Dead-Code `.fab`-CSS entfernt.
 *   **2026-05-15 (Session 9):** Phase 17.2 (iOS PWA Install Banner): iOS Safari unterstützt kein `beforeinstallprompt`. Eigener Banner in App.tsx: detektiert iOS + nicht-Standalone + nicht-dismissed; zeigt Share-Icon + Anleitung „Zum Home-Bildschirm"; × schließt permanent via localStorage. i18n DE/EN.
+*   **2026-05-15 (Session 10/11):** Phase 18 CANCELLED — Snap!/PhotoNotes Widget entfernt. Android Chrome PWA killt den Prozess während Camera-Intent; file-input `change`-Event feuert nach Resume nie — weder native addEventListener noch visibilitychange-Fallback funktionieren. Gallery-Upload war OK, Kamera nicht. Fix würde getUserMedia (In-App-Kamera) oder Capacitor erfordern. Code archiviert in `Project/PhotoNotes.archived.tsx`. DB-Tabelle `photo_notes` + Bucket `photo-notes` bleiben in Supabase. `photo-notes` ModuleId aus App entfernt; `fetchHomeConfig` filtert unbekannte IDs via `knownIds`-Guard.
+*   **2026-05-15 (Session 11):** Dashboard Nav-Link UX: "To Calendar >", "To Budget >" und "See all >" Activity-Links auf bottom-right aligned umgestellt. ">" aus i18n-Strings entfernt; stattdessen inline SVG Chevron (gleiche Polyline wie NavArrowBtn in Calendar, nur ohne Border/Button-Rahmen, 16×16, strokeWidth 2.5).
