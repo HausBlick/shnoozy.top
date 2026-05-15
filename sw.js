@@ -12,9 +12,32 @@ self.addEventListener('activate', e => {
   );
 });
 
+// ─── Web Share Target ─────────────────────────────────────────────────────────
+
+async function handleShareTarget(request) {
+  const formData = await request.formData();
+  const file = formData.get('document');
+  const title = formData.get('title') ?? '';
+  if (file instanceof File) {
+    const cache = await caches.open('shnoozy-shared-file');
+    await cache.put('/shared-file-meta', new Response(
+      JSON.stringify({ name: file.name, type: file.type, title: String(title) }),
+      { headers: { 'Content-Type': 'application/json' } }
+    ));
+    await cache.put('/shared-file-data', new Response(file, { headers: { 'Content-Type': file.type } }));
+  }
+  return Response.redirect('/?share-target=pending', 303);
+}
+
 // Cache strategy
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+
+  // Web Share Target — must come first (POST to /?share-target)
+  if (e.request.method === 'POST' && url.searchParams.has('share-target')) {
+    e.respondWith(handleShareTarget(e.request));
+    return;
+  }
 
   // Pass through all external requests (Supabase, etc.)
   if (url.origin !== location.origin) return;
