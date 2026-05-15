@@ -114,6 +114,13 @@ export function HomeOnboarding({ onHomeReady }: Props) {
                 autoFocus
               />
             </div>
+            <div style={{
+              background: 'rgba(20,216,219,0.08)', borderRadius: '10px',
+              padding: '12px 14px', marginBottom: 'var(--spacing-lg)', fontSize: '13px',
+              color: 'var(--color-muted)', lineHeight: 1.5,
+            }}>
+              👑 <strong>You will be the admin</strong> of this home. As admin you can invite members, configure settings (navigation, modules, budget setup) and manage all home-wide options. Members have access to all tools but cannot change home-wide settings.
+            </div>
             <button
               className="btn-primary"
               style={{ width: '100%' }}
@@ -136,6 +143,13 @@ export function HomeOnboarding({ onHomeReady }: Props) {
                 onKeyDown={e => e.key === 'Enter' && joinByToken()}
                 autoFocus
               />
+            </div>
+            <div style={{
+              background: 'rgba(99,102,241,0.08)', borderRadius: '10px',
+              padding: '12px 14px', marginBottom: 'var(--spacing-lg)', fontSize: '13px',
+              color: 'var(--color-muted)', lineHeight: 1.5,
+            }}>
+              👤 You are joining as a <strong>member</strong>. The home admin manages settings (navigation, modules, budget setup). You have full access to all tools — some configuration options are admin-only.
             </div>
             <button
               className="btn-primary"

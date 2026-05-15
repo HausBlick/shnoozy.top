@@ -633,25 +633,89 @@ function ActivityLogRow({ entry, memberColors, memberDisplayNames, t, language }
 
 // ─── BudgetDashboardWidget ────────────────────────────────────────────────────
 
+interface MiniCat { id: string; name: string; icon: string; color: string; budget_limit: number | null; period: string; }
+
+function monthlyLimitMini(cat: MiniCat): number | null {
+  if (cat.budget_limit == null) return null;
+  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+  if (cat.period === 'weekly') return (cat.budget_limit / 7) * daysInMonth;
+  if (cat.period === 'yearly') return cat.budget_limit / 12;
+  return cat.budget_limit;
+}
+
 function BudgetDashboardWidget({ homeId, language, onNavigate }: { homeId: string; language: Lang; onNavigate: () => void }) {
   const t = getT(language);
-  const [total, setTotal] = useState<number | null>(null);
+  const [cats, setCats] = useState<MiniCat[]>([]);
+  const [spend, setSpend] = useState<Record<string, number>>({});
+  const [totalExpenses, setTotalExpenses] = useState<number | null>(null);
+  const [setupDone, setSetupDone] = useState<boolean | null>(null);
+
   useEffect(() => {
     const now = new Date();
-    const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const to = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-    supabase.from('budget_entries').select('amount').eq('home_id', homeId).gte('date', from).lte('date', to)
-      .then(({ data }) => { if (data) setTotal(data.reduce((s, e) => s + Number(e.amount), 0)); });
+    const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const nextMonth = now.getMonth() === 11 ? `${now.getFullYear() + 1}-01-01` : `${now.getFullYear()}-${String(now.getMonth() + 2).padStart(2, '0')}-01`;
+
+    Promise.all([
+      supabase.from('home_settings').select('value').eq('home_id', homeId).eq('key', 'budget_setup_done').maybeSingle(),
+      supabase.from('budget_categories').select('id,name,icon,color,budget_limit,period').eq('home_id', homeId).eq('category_type', 'expense').order('sort_order').limit(5),
+      supabase.from('budget_entries').select('amount,category_id').eq('home_id', homeId).neq('entry_type', 'income').gte('date', from).lt('date', nextMonth),
+    ]).then(([settingsRes, catsRes, entriesRes]) => {
+      setSetupDone(settingsRes.data?.value === 'true');
+      setCats(catsRes.data ?? []);
+      const map: Record<string, number> = {};
+      let tot = 0;
+      for (const e of entriesRes.data ?? []) {
+        if (e.category_id) map[e.category_id] = (map[e.category_id] ?? 0) + Number(e.amount);
+        tot += Number(e.amount);
+      }
+      setSpend(map);
+      setTotalExpenses(tot);
+    });
   }, [homeId]);
+
+  const displayCats = cats.slice(0, 5);
+
   return (
     <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
       <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-xs)', display: 'flex', alignItems: 'center', gap: '6px' }}>
         <BudgetIcon color="#10b981" size={18} /> {t.moduleBudget}
       </h2>
-      <p className="text-body-sm text-muted" style={{ marginBottom: '4px' }}>{t.budgetTotal}</p>
-      <p style={{ fontSize: '22px', fontWeight: 700, marginBottom: 'var(--spacing-sm)' }}>
-        {total === null ? '…' : `${total.toFixed(2)} €`}
-      </p>
+
+      {setupDone === false ? (
+        <p className="text-body-sm text-muted" style={{ marginBottom: 'var(--spacing-sm)' }}>{t.budgetSetupPending}</p>
+      ) : displayCats.length > 0 ? (
+        <div style={{ marginBottom: 'var(--spacing-sm)' }}>
+          {displayCats.map(cat => {
+            const spent = spend[cat.id] ?? 0;
+            const limit = monthlyLimitMini(cat);
+            const pct = limit ? Math.min((spent / limit) * 100, 100) : null;
+            const barColor = pct != null ? (pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : '#10b981') : cat.color;
+            return (
+              <div key={cat.id} style={{ marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                  <span style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span>{cat.icon}</span><span className="text-muted">{cat.name}</span>
+                  </span>
+                  <span style={{ fontSize: '12px', fontWeight: 600 }}>
+                    {spent.toFixed(0)} {limit != null ? `/ ${limit.toFixed(0)} €` : '€'}
+                  </span>
+                </div>
+                <div style={{ height: 5, borderRadius: 3, background: 'var(--color-surface-strong)', overflow: 'hidden' }}>
+                  <div style={{ width: `${pct ?? Math.min((spent / (spent + 1)) * 100, 30)}%`, height: '100%', background: barColor, borderRadius: 3 }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <>
+          <p className="text-body-sm text-muted" style={{ marginBottom: '4px' }}>{t.budgetTotal}</p>
+          <p style={{ fontSize: '22px', fontWeight: 700, marginBottom: 'var(--spacing-sm)' }}>
+            {totalExpenses === null ? '…' : `${totalExpenses.toFixed(2)} €`}
+          </p>
+        </>
+      )}
+
       <button onClick={onNavigate} style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer', padding: 0 }}>
         {t.budgetTitle} →
       </button>
@@ -1500,7 +1564,7 @@ function App() {
     // Module tabs
     if (activeTab === 'calendar') return <Calendar homeId={homeId} language={language} defaultView={defaultCalView} />;
     if (activeTab === 'lists') return <Lists homeId={homeId} language={language} userId={session.user.id} />;
-    if (activeTab === 'budget') return <Budget homeId={homeId} language={language} userId={session.user.id} />;
+    if (activeTab === 'budget') return <Budget homeId={homeId} language={language} userId={session.user.id} userRole={userRole} />;
     if (activeTab === 'todos') return <Todos homeId={homeId} userId={session.user.id} language={language} />;
     if (activeTab === 'luna') return (
       <div>
