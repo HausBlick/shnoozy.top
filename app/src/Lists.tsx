@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from './lib/supabase';
 import { getT, type Lang } from './lib/i18n';
 import { logActivity } from './lib/activityLog';
+import { BudgetQuickExpenseModal } from './Budget';
 
 interface ShoppingItem {
   id: string;
@@ -324,12 +325,16 @@ export function Lists({ homeId, language, userId }: { homeId: string; language: 
   const [history, setHistory] = useState<{ name: string; category: string }[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [doneExpanded, setDoneExpanded] = useState(false);
+  const [budgetEnabled, setBudgetEnabled] = useState(false);
+  const [showBudgetExpense, setShowBudgetExpense] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchCategories();
     fetchItems();
     fetchHistory();
+    supabase.from('home_settings').select('value').eq('home_id', homeId).eq('key', 'budget_setup_done').maybeSingle()
+      .then(({ data }) => setBudgetEnabled(data?.value === 'true'));
 
     const channel = supabase
       .channel(`shopping_items_${homeId}`)
@@ -741,6 +746,23 @@ export function Lists({ homeId, language, userId }: { homeId: string; language: 
             </div>
           )}
         </>
+      )}
+
+      {budgetEnabled && (
+        <div className="card" style={{ marginTop: 'var(--spacing-lg)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)' }}>
+          <p className="text-body-sm text-muted" style={{ margin: 0, flex: 1 }}>💰 {t.shoppingBudgetPrompt}</p>
+          <button
+            onClick={() => setShowBudgetExpense(true)}
+            style={{ fontSize: '12px', padding: '6px 16px', borderRadius: 'var(--rounded-full)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', flexShrink: 0 }}
+          >{t.shoppingRecordExpense}</button>
+        </div>
+      )}
+
+      {showBudgetExpense && (
+        <BudgetQuickExpenseModal
+          homeId={homeId} language={language} userId={userId}
+          onClose={() => setShowBudgetExpense(false)}
+        />
       )}
     </div>
   );

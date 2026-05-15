@@ -815,7 +815,17 @@ export function Calendar({ homeId, language, defaultView = 'agenda' }: { homeId:
       ref={stickyHeaderRef}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-sm)' }}>
           <h1 className="text-display-lg">{t.schedule}</h1>
-          <button className="icon-button-circle" onClick={() => setSettingsOpen(true)} title={t.calSettingsTitle}><GearIcon /></button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              style={{ fontSize: '13px', padding: '6px 14px', borderRadius: 'var(--rounded-full)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}
+            >+ {t.newEntry}</button>
+            <button
+              onClick={() => setSettingsOpen(true)}
+              title={t.calSettingsTitle}
+              style={{ background: 'var(--color-surface-strong)', border: 'none', borderRadius: 'var(--rounded-full)', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--color-muted)', flexShrink: 0 }}
+            ><GearIcon /></button>
+          </div>
         </div>
         {renderViewToggle()}
       </div>
@@ -826,13 +836,15 @@ export function Calendar({ homeId, language, defaultView = 'agenda' }: { homeId:
         : view === 'month' ? renderMonth()
         : renderWeek()}
 
-      <button className="fab" onClick={() => setIsModalOpen(true)}><PlusIcon /></button>
-
       {isModalOpen && (
-        <div className="modal-overlay" onClick={closePortal}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ padding: 'var(--spacing-lg)' }}>
-            <div className="modal-header">
-              <h2 className="text-title-md" style={{ fontSize: '20px' }}>{editingEvent ? t.editEntry : t.newEntry}</h2>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }}
+          onClick={closePortal}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--color-canvas)', borderRadius: 'var(--rounded-lg) var(--rounded-lg) 0 0',
+            padding: 'var(--spacing-lg)', width: '100%', maxWidth: 560, maxHeight: '90dvh', overflowY: 'auto',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-md)' }}>
+              <h2 className="text-title-md">{editingEvent ? t.editEntry : t.newEntry}</h2>
               <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
                 {editingEvent && !confirmDelete && (
                   <button onClick={() => setConfirmDelete(true)} className="icon-button-circle" style={{ color: '#c13515' }} title="Delete"><TrashIcon /></button>

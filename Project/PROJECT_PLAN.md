@@ -6,8 +6,8 @@
 
 ## Current Status
 **Live unter:** https://shnoozy.top
-**Phase:** Phase 11 ✅ — Dashboard-Redesign + Widgets abgeschlossen (Session 7, 2026-05-14)
-**Nächste Phase:** Budget-Konzept ausarbeiten / Phase 12 (TBD)
+**Phase:** Phase 12 ✅ — Budget v2 abgeschlossen (Session 8, 2026-05-15)
+**Nächste Phase:** Phase 12 KI-Erfassung (analyze-receipt EF) + weitere offene Module
 
 ---
 
@@ -220,20 +220,54 @@
 
 ---
 
-### ✅ Phase 10: Budgeting-Tool (MITTELPRIO)
+### ✅ Phase 10: Budgeting-Tool MVP (abgeschlossen 2026-05-14)
 
-#### 10.1 Haushaltsbuch — Manuelle Eingabe (MVP) ✅ FERTIG (2026-05-14)
-- [x] SQL-Migration: `budget_categories` + `budget_entries` (amount, category_id, description, date, is_shared), RLS, Default-Kategorien eingefügt
-- [x] `Budget.tsx`: Overview-Tab (Gesamtsumme, Kategorie-Balken, Mitglieder-Bilanz) + Entries-Tab (Liste chronologisch)
-- [x] Monat-Navigation (‹ / ›), Modul `budget` in HomeSettings.tsx + MODULE_META
-- [x] Add/Edit-Modal: Betrag (Numberpad), Kategorie-Chips, Beschreibung, Datum, Shared/Personal-Toggle
-- [x] Löschen mit 2-Tap-Bestätigung
-- [x] i18n en/de für alle Budget-Strings
+#### 10.1 Haushaltsbuch — Manuelle Eingabe (MVP) ✅
+- [x] SQL-Migration: `budget_categories` + `budget_entries`, RLS, Default-Kategorien eingefügt
+- [x] `Budget.tsx` MVP: Overview + Entries Tabs, Monat-Navigation, Add/Edit-Modal, i18n
 
-#### 10.2 Foto-Scan (KI-gestützt) — Konzept ausstehend ⬜ OFFEN
-- [ ] Konzept mit Gemini Vision API abstimmen (Datenschutz, Genauigkeit, Flow)
-- [ ] Upload von Kassenbon-Foto → Gemini extrahiert Betrag, Händler, Datum
-- [ ] Vorausgefülltes Formular → 1-Tap-Speichern
+### ✅ Phase 12: Budget v2 (abgeschlossen Session 8, 2026-05-15)
+
+#### 12.1 DB-Migration ✅
+- [x] `budget_categories`: + `budget_limit`, `period` ('weekly'|'monthly'|'yearly'), `category_type` ('expense'|'income')
+- [x] `budget_entries`: + `entry_type` ('expense'|'income'), `paid_by uuid → profiles`, `receipt_url text`; `split_mode` Default auf 'shared' gesetzt
+- [x] Neue Tabelle `budget_entry_splits` (entry_id, home_id, user_id, amount, is_settled) + RLS
+- [x] Neue Tabelle `budget_savings_goals` (home_id, name, icon, color, target_amount, current_amount, sort_order) + RLS
+
+#### 12.2 Setup-Wizard ✅
+- [x] `BudgetWizard`-Komponente: 9 Schritte (shared account → split mode → Kategorien → Periode → Budget-Limits → Sparziel → KI-Belege → Summary)
+- [x] Erkennung via `home_settings.budget_setup_done`
+- [x] Admin-only: Members sehen "Setup ausstehend"-Karte
+- [x] Wizard schreibt alle Settings (`budget_shared_account`, `budget_split_mode`, `budget_default_period`, `budget_ai_receipts`) + legt Kategorien + Sparziel an
+
+#### 12.3 Budget Dashboard ✅
+- [x] Horizontale Kategorie-Bars mit monatsnormierten Limits (wöchentlich×Tage/7, jährlich/12)
+- [x] Farbkodierung: grün (<80%), gelb (80–100%), rot (>100%)
+- [x] Quick-Actions: ⚙ Einstellungen | + Ausgabe ▾ (Submenü: KI/Manuell) | + Einnahme (wenn shared account)
+- [x] Savings Goals: Fortschrittsbalken + manuelle Einzahlung (mit Banking-Disclaimer) + Surplus-Vorschlag
+- [x] Einnahmen/Ausgaben-Totals
+
+#### 12.4 Expense/Income Entry Form ✅
+- [x] Betrag (großes Eingabefeld, rot bei Ausgabe / grün bei Einnahme)
+- [x] Kategorie-Chips nach `entry_type` gefiltert
+- [x] Datum, Beschreibung, Paid-By-Picker (Avatare), Shared/Personal-Toggle
+- [x] Behebt Silent-Save-Bug: war `is_shared boolean`, korrekt ist `split_mode 'shared'|'personal'`
+
+#### 12.5 Budget-Settings ✅
+- [x] CRUD für Budget-Kategorien: Name, Icon, Farbe, Limit, Periode, Typ (Ausgabe/Einnahme)
+- [x] CRUD für Sparziele: Name, Icon, Farbe, Zielbetrag, aktueller Betrag
+
+#### 12.6 Dashboard Mini-Widget ✅
+- [x] `BudgetDashboardWidget` in App.tsx: zeigt bis zu 5 Kategorie-Bars mit period-normierten Limits + Farbkodierung
+- [x] Setup-Pending-State wenn Wizard noch nicht abgeschlossen
+
+#### 12.7 Einladungs-Hints ✅
+- [x] `HomeOnboarding.tsx`: Admin-Hint (Create Home) + Member-Hint (Join Home) mit Rollen-Erklärung
+
+#### 12.8 KI-Belegerfassung ⬜ OFFEN (nächste Phase)
+- [ ] Edge Function `analyze-receipt` (Gemini Vision, base64-Input → Positionen + Kategorien)
+- [ ] Upload/Camera-Modal in Budget.tsx mit Disclaimer-Texts
+- [ ] Vorausgefülltes Formular nach Analyse, User kann editieren + speichern
 
 ---
 

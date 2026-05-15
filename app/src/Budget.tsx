@@ -65,6 +65,15 @@ interface HomeSettings {
   budget_ai_receipts: 'yes' | 'no';
 }
 
+interface RecurringChange {
+  id: string;
+  recurring_item_id: string;
+  change_type: 'cancellation' | 'price_change';
+  effective_date: string;
+  new_amount: number | null;
+  created_at: string;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatAmt(n: number, lang: Lang) {
@@ -82,6 +91,23 @@ function monthlyLimit(cat: BudgetCategory): number | null {
   if (cat.period === 'weekly') return (cat.budget_limit / 7) * daysInMonth;
   if (cat.period === 'yearly') return cat.budget_limit / 12;
   return cat.budget_limit;
+}
+
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+}
+
+function effectiveRecurring(item: RecurringItem, changes: RecurringChange[], monthStart: string): { amount: number; cancelled: boolean } {
+  const itemChanges = changes.filter(c => c.recurring_item_id === item.id);
+  const cancelled = itemChanges
+    .filter(c => c.change_type === 'cancellation' && c.effective_date <= monthStart)
+    .length > 0;
+  if (cancelled) return { amount: 0, cancelled: true };
+  const latestPrice = itemChanges
+    .filter(c => c.change_type === 'price_change' && c.effective_date <= monthStart)
+    .sort((a, b) => b.effective_date.localeCompare(a.effective_date))[0];
+  return { amount: latestPrice ? Number(latestPrice.new_amount) : Number(item.amount), cancelled: false };
 }
 
 function pctColor(pct: number) {
@@ -451,17 +477,19 @@ const defaultCatColors = ['#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6','#f9
 // ─── BudgetDashboard ──────────────────────────────────────────────────────────
 
 function BudgetDashboard({
-  homeId, userId, language, categories, entries, savingsGoals, recurringItems, homeSettings,
+  homeId, userId, language, categories, entries, savingsGoals, recurringItems, recurringChanges, homeSettings,
   currentMonth, onPrevMonth, onNextMonth,
-  onAddExpense, onAddExpenseAI, onAddIncome, onGoToEntries, onRefresh,
+  onAddExpense, onAddExpenseAI, onAddIncome, onGoToEntries, onRefresh, onNewRecurring, onEditRecurring,
 }: {
   homeId: string; userId: string; language: Lang;
   categories: BudgetCategory[]; entries: BudgetEntry[];
-  savingsGoals: SavingsGoal[]; recurringItems: RecurringItem[]; homeSettings: HomeSettings;
+  savingsGoals: SavingsGoal[]; recurringItems: RecurringItem[];
+  recurringChanges: RecurringChange[]; homeSettings: HomeSettings;
   currentMonth: { year: number; month: number };
   onPrevMonth: () => void; onNextMonth: () => void;
   onAddExpense: () => void; onAddExpenseAI: () => void; onAddIncome: () => void;
   onGoToEntries: () => void; onRefresh: () => void;
+  onNewRecurring: () => void; onEditRecurring: (item: RecurringItem) => void;
 }) {
   const t = getT(language);
   const [showExpenseMenu, setShowExpenseMenu] = useState(false);
@@ -480,8 +508,13 @@ function BudgetDashboard({
     return ids;
   }, [entries]);
 
-  const activeRecurring = recurringItems.filter(r => r.active);
-  const recurringTotal = activeRecurring.reduce((s, r) => s + Number(r.amount), 0);
+  const monthStart = `${currentMonth.year}-${String(currentMonth.month + 1).padStart(2, '0')}-01`;
+
+  const activeRecurring = recurringItems.filter(r => {
+    if (!r.active) return false;
+    return !effectiveRecurring(r, recurringChanges, monthStart).cancelled;
+  });
+  const recurringTotal = activeRecurring.reduce((s, r) => s + effectiveRecurring(r, recurringChanges, monthStart).amount, 0);
 
   async function markAsPaid(item: RecurringItem) {
     setMarkingPaidId(item.id);
@@ -489,9 +522,10 @@ function BudgetDashboard({
       const daysInMonth = new Date(currentMonth.year, currentMonth.month + 1, 0).getDate();
       const day = Math.min(item.billing_day, daysInMonth);
       const date = `${currentMonth.year}-${String(currentMonth.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const eff = effectiveRecurring(item, recurringChanges, monthStart);
       await supabase.from('budget_entries').insert({
         home_id: homeId, user_id: userId,
-        amount: item.amount, category_id: item.category_id,
+        amount: eff.amount, category_id: item.category_id,
         description: item.name, date,
         split_mode: homeSettings.budget_split_mode === 'none' ? 'personal' : 'shared',
         entry_type: 'expense', recurring_item_id: item.id,
@@ -611,15 +645,17 @@ function BudgetDashboard({
         </div>
 
         {homeSettings.budget_shared_account === 'yes' && (
-          <button
-            onClick={onAddIncome}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px',
-              borderRadius: 'var(--rounded-md)', border: '1px solid #10b981',
-              background: 'transparent', cursor: 'pointer', fontSize: '14px', fontWeight: 600,
-              color: '#10b981', fontFamily: 'inherit',
-            }}
-          >{t.budgetAddIncome}</button>
+          <div style={{ flex: 1 }}>
+            <button
+              onClick={onAddIncome}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 14px',
+                borderRadius: 'var(--rounded-md)', border: '1px solid #10b981',
+                background: 'transparent', cursor: 'pointer', fontSize: '14px', fontWeight: 600,
+                color: '#10b981', fontFamily: 'inherit',
+              }}
+            >{t.budgetAddIncome}</button>
+          </div>
         )}
       </div>
 
@@ -720,10 +756,12 @@ function BudgetDashboard({
                 <div style={{ height: 8, borderRadius: 4, background: 'var(--color-surface-strong)', overflow: 'hidden', marginBottom: 4 }}>
                   <div style={{ width: `${pct}%`, height: '100%', background: goal.color, borderRadius: 4, transition: 'width 0.4s' }} />
                 </div>
-                <button
-                  onClick={() => { setGoalModal(goal); setGoalAddAmount(''); setGoalBudgetCatId(null); }}
-                  style={{ fontSize: '13px', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                >+ {t.budgetSavingsGoalAdd}</button>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+                  <button
+                    onClick={() => { setGoalModal(goal); setGoalAddAmount(''); setGoalBudgetCatId(null); }}
+                    style={{ fontSize: '12px', padding: '5px 14px', borderRadius: 'var(--rounded-full)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}
+                  >+ {t.budgetSavingsGoalAdd}</button>
+                </div>
               </div>
             );
           })}
@@ -738,37 +776,64 @@ function BudgetDashboard({
         <div className="card" style={{ marginBottom: 'var(--spacing-md)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-sm)' }}>
             <h3 className="text-title-sm">{t.budgetRecurring}</h3>
-            <span className="text-body-sm text-muted">{t.budgetRecurringThisMonth}</span>
+            <button onClick={onNewRecurring}
+              style={{ fontSize: '12px', padding: '5px 14px', borderRadius: 'var(--rounded-full)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
+              + {t.budgetRecurringNew}
+            </button>
           </div>
           {activeRecurring.map(item => {
             const paid = paidRecurringIds.has(item.id);
             const busy = markingPaidId === item.id;
             const cat = categories.find(c => c.id === item.category_id);
+            const eff = effectiveRecurring(item, recurringChanges, monthStart);
+            const itemChanges = recurringChanges.filter(c => c.recurring_item_id === item.id);
+            const upcomingCancel = itemChanges.find(c => c.change_type === 'cancellation' && c.effective_date > monthStart);
+            const upcomingPrice = itemChanges
+              .filter(c => c.change_type === 'price_change' && c.effective_date > monthStart)
+              .sort((a, b) => a.effective_date.localeCompare(b.effective_date))[0];
             return (
               <div key={item.id} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '8px 0', borderBottom: '1px solid var(--color-hairline-soft)',
               }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="text-body-md" style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
-                  <div className="text-body-sm text-muted">
-                    {cat && <span style={{ marginRight: 4 }}>{cat.icon} {cat.name} ·</span>}
-                    {formatAmt(item.amount, language)} €
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span className="text-body-md" style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
+                      <button onClick={() => onEditRecurring(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', color: 'var(--color-muted)', fontSize: '13px', flexShrink: 0, lineHeight: 1 }}>✏️</button>
+                    </div>
+                    <div className="text-body-sm text-muted">
+                      {cat && <span style={{ marginRight: 4 }}>{cat.icon} {cat.name} ·</span>}
+                      {formatAmt(eff.amount, language)} €
+                    </div>
                   </div>
+                  {paid ? (
+                    <span style={{ fontSize: '13px', color: '#10b981', fontWeight: 600, flexShrink: 0 }}>{t.budgetRecurringPaid}</span>
+                  ) : (
+                    <button
+                      onClick={() => markAsPaid(item)}
+                      disabled={busy}
+                      style={{
+                        fontSize: '12px', padding: '5px 10px', borderRadius: 'var(--rounded-full)',
+                        border: '1px solid var(--color-primary)', background: 'transparent',
+                        color: 'var(--color-primary)', cursor: busy ? 'default' : 'pointer',
+                        fontWeight: 600, flexShrink: 0, opacity: busy ? 0.5 : 1,
+                      }}
+                    >{busy ? '…' : t.budgetRecurringMarkPaid}</button>
+                  )}
                 </div>
-                {paid ? (
-                  <span style={{ fontSize: '13px', color: '#10b981', fontWeight: 600, flexShrink: 0 }}>{t.budgetRecurringPaid}</span>
-                ) : (
-                  <button
-                    onClick={() => markAsPaid(item)}
-                    disabled={busy}
-                    style={{
-                      fontSize: '12px', padding: '5px 10px', borderRadius: 'var(--rounded-full)',
-                      border: '1px solid var(--color-primary)', background: 'transparent',
-                      color: 'var(--color-primary)', cursor: busy ? 'default' : 'pointer',
-                      fontWeight: 600, flexShrink: 0, opacity: busy ? 0.5 : 1,
-                    }}
-                  >{busy ? '…' : t.budgetRecurringMarkPaid}</button>
+                {(upcomingCancel || upcomingPrice) && (
+                  <div style={{ marginTop: 3 }}>
+                    {upcomingCancel && (
+                      <span style={{ fontSize: '11px', color: '#ef4444', background: 'rgba(239,68,68,0.1)', borderRadius: 4, padding: '2px 6px', marginRight: 4 }}>
+                        {t.budgetRecurringUpcomingCancel(formatDate(upcomingCancel.effective_date))}
+                      </span>
+                    )}
+                    {upcomingPrice && (
+                      <span style={{ fontSize: '11px', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', borderRadius: 4, padding: '2px 6px' }}>
+                        {t.budgetRecurringUpcomingPrice(formatDate(upcomingPrice.effective_date), formatAmt(Number(upcomingPrice.new_amount), language))}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             );
@@ -1153,21 +1218,275 @@ function AiScanModal({
   );
 }
 
+// ─── RecurringItemModal ───────────────────────────────────────────────────────
+
+function RecurringItemModal({
+  homeId, language, categories, recurringItems, item, onClose, onSave,
+}: {
+  homeId: string; language: Lang; categories: BudgetCategory[];
+  recurringItems: RecurringItem[]; item: RecurringItem | 'new';
+  onClose: () => void; onSave: () => void;
+}) {
+  const t = getT(language);
+  const [riName, setRiName] = useState(item === 'new' ? '' : item.name);
+  const [riAmount, setRiAmount] = useState(item === 'new' ? '' : String(item.amount));
+  const [riDay, setRiDay] = useState(item === 'new' ? '1' : String(item.billing_day));
+  const [riCategoryId, setRiCategoryId] = useState<string | null>(item === 'new' ? null : item.category_id);
+  const [riActive, setRiActive] = useState(item === 'new' ? true : item.active);
+  const [riAutoBook, setRiAutoBook] = useState(item === 'new' ? false : item.auto_book);
+  const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Planned changes (edit mode only)
+  const itemId = item === 'new' ? null : item.id;
+  const [changes, setChanges] = useState<RecurringChange[]>([]);
+  const [showCancelForm, setShowCancelForm] = useState(false);
+  const [showPriceForm, setShowPriceForm] = useState(false);
+  const [cancelDate, setCancelDate] = useState('');
+  const [priceDate, setPriceDate] = useState('');
+  const [priceAmountStr, setPriceAmountStr] = useState('');
+  const [changeSaving, setChangeSaving] = useState(false);
+
+  useEffect(() => {
+    if (!itemId) return;
+    supabase.from('budget_recurring_changes').select('*').eq('recurring_item_id', itemId).order('effective_date')
+      .then(({ data }) => setChanges(data ?? []));
+  }, [itemId]);
+
+  async function refreshChanges() {
+    if (!itemId) return;
+    const { data } = await supabase.from('budget_recurring_changes').select('*').eq('recurring_item_id', itemId).order('effective_date');
+    setChanges(data ?? []);
+  }
+
+  async function addCancellation() {
+    if (!itemId || !cancelDate) return;
+    setChangeSaving(true);
+    try {
+      await supabase.from('budget_recurring_changes').insert({ recurring_item_id: itemId, change_type: 'cancellation', effective_date: cancelDate });
+      await refreshChanges();
+      setShowCancelForm(false); setCancelDate('');
+    } finally { setChangeSaving(false); }
+  }
+
+  async function addPriceChange() {
+    if (!itemId || !priceDate || !priceAmountStr) return;
+    setChangeSaving(true);
+    try {
+      await supabase.from('budget_recurring_changes').insert({ recurring_item_id: itemId, change_type: 'price_change', effective_date: priceDate, new_amount: parseFloat(priceAmountStr) });
+      await refreshChanges();
+      setShowPriceForm(false); setPriceDate(''); setPriceAmountStr('');
+    } finally { setChangeSaving(false); }
+  }
+
+  async function deleteChange(id: string) {
+    await supabase.from('budget_recurring_changes').delete().eq('id', id);
+    setChanges(prev => prev.filter(c => c.id !== id));
+  }
+
+  async function save() {
+    if (!riName.trim() || !riAmount) return;
+    setSaving(true);
+    try {
+      const payload = {
+        home_id: homeId, name: riName.trim(),
+        amount: parseFloat(riAmount), billing_day: Math.min(28, Math.max(1, parseInt(riDay) || 1)),
+        category_id: riCategoryId, active: riActive, auto_book: riAutoBook,
+      };
+      if (item === 'new') {
+        await supabase.from('budget_recurring_items').insert({ ...payload, sort_order: recurringItems.length });
+      } else {
+        await supabase.from('budget_recurring_items').update(payload).eq('id', item.id);
+      }
+      onSave();
+    } finally { setSaving(false); }
+  }
+
+  async function deleteItem() {
+    if (item === 'new') return;
+    await supabase.from('budget_recurring_items').delete().eq('id', item.id);
+    onSave();
+  }
+
+  return (
+    <>
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }}
+        onClick={onClose}>
+        <div onClick={e => e.stopPropagation()} style={{
+          background: 'var(--color-canvas)', borderRadius: 'var(--rounded-lg) var(--rounded-lg) 0 0',
+          padding: 'var(--spacing-lg)', width: '100%', maxWidth: 560, maxHeight: '90dvh', overflowY: 'auto',
+        }}>
+          <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-md)' }}>
+            {item === 'new' ? t.budgetRecurringNew : t.budgetRecurring}
+          </h2>
+          <div style={{ marginBottom: 'var(--spacing-md)' }}>
+            <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetRecurringName}</label>
+            <input type="text" value={riName} onChange={e => setRiName(e.target.value)} className="form-input" autoFocus placeholder="Netflix" />
+          </div>
+          <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
+            <div style={{ flex: 2 }}>
+              <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetRecurringAmountLabel}</label>
+              <input type="number" inputMode="decimal" value={riAmount} onChange={e => setRiAmount(e.target.value)} className="form-input" placeholder="12.99" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetRecurringDayLabel}</label>
+              <input type="number" inputMode="numeric" value={riDay} onChange={e => setRiDay(e.target.value)} min="1" max="28" className="form-input" placeholder="1" />
+            </div>
+          </div>
+          <div style={{ marginBottom: 'var(--spacing-md)' }}>
+            <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 6 }}>{t.budgetCategory}</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-xs)' }}>
+              {categories.filter(c => c.category_type === 'expense').map(cat => (
+                <Chip key={cat.id} label={`${cat.icon} ${cat.name}`} active={riCategoryId === cat.id}
+                  onClick={() => setRiCategoryId(riCategoryId === cat.id ? null : cat.id)} color={cat.color} />
+              ))}
+              <Chip label={t.budgetNoCategory} active={riCategoryId === null} onClick={() => setRiCategoryId(null)} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-sm)', padding: '10px var(--spacing-base)', background: 'var(--color-surface)', borderRadius: 'var(--rounded-md)' }}>
+            <span className="text-body-md">{t.budgetRecurringActive}</span>
+            <Toggle value={riActive} onChange={setRiActive} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-lg)', padding: '10px var(--spacing-base)', background: 'var(--color-surface)', borderRadius: 'var(--rounded-md)' }}>
+            <div>
+              <div className="text-body-md">{t.budgetRecurringAutoBook}</div>
+              <div className="text-body-sm text-muted" style={{ fontSize: '12px' }}>
+                {language === 'de' ? 'Wird monatlich automatisch als bezahlt erfasst' : 'Automatically booked as paid each month'}
+              </div>
+            </div>
+            <Toggle value={riAutoBook} onChange={setRiAutoBook} />
+          </div>
+
+          {/* Planned changes — edit mode only */}
+          {item !== 'new' && (
+            <div style={{ borderTop: '1px solid var(--color-hairline-soft)', paddingTop: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
+              <div className="text-body-sm" style={{ fontWeight: 600, marginBottom: 'var(--spacing-sm)' }}>{t.budgetRecurringPlanChanges}</div>
+
+              {/* Existing changes list */}
+              {changes.length > 0 && (
+                <div style={{ marginBottom: 'var(--spacing-sm)' }}>
+                  {changes.map(c => (
+                    <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--color-hairline-soft)' }}>
+                      <div>
+                        <span style={{ fontSize: '12px', fontWeight: 600, marginRight: 6, color: c.change_type === 'cancellation' ? '#ef4444' : '#f59e0b' }}>
+                          {c.change_type === 'cancellation' ? '🚫' : '💱'}
+                        </span>
+                        <span className="text-body-sm">
+                          {c.change_type === 'cancellation'
+                            ? `${t.budgetRecurringCancelFrom}: ${formatDate(c.effective_date)}`
+                            : `${t.budgetRecurringPriceAdjust}: ${formatDate(c.effective_date)} → ${formatAmt(Number(c.new_amount), language)} €`}
+                        </span>
+                      </div>
+                      <button onClick={() => deleteChange(c.id)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: '16px', padding: '0 4px', lineHeight: 1 }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Cancel contract form */}
+              {showCancelForm ? (
+                <div style={{ background: 'var(--color-surface)', borderRadius: 'var(--rounded-md)', padding: 'var(--spacing-md)', marginBottom: 'var(--spacing-sm)' }}>
+                  <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetRecurringEffectiveFrom}</label>
+                  <input type="date" value={cancelDate} onChange={e => setCancelDate(e.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '10px var(--spacing-base)', borderRadius: 'var(--rounded-md)', border: '1px solid var(--color-hairline)', background: 'var(--color-surface)', color: 'var(--color-fg)', fontSize: '14px', marginBottom: 'var(--spacing-sm)' }} />
+                  <div style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>
+                    <button onClick={() => { setShowCancelForm(false); setCancelDate(''); }}
+                      style={{ flex: 1, padding: '8px', borderRadius: 'var(--rounded-md)', border: '1px solid var(--color-hairline)', background: 'transparent', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: 'var(--color-muted)' }}>{t.cancel}</button>
+                    <button onClick={addCancellation} disabled={changeSaving || !cancelDate}
+                      style={{ flex: 1, padding: '8px', borderRadius: 'var(--rounded-md)', border: 'none', background: '#ef4444', color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: 600, opacity: changeSaving || !cancelDate ? 0.5 : 1 }}>
+                      {changeSaving ? '…' : t.save}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => { setShowCancelForm(true); setShowPriceForm(false); }}
+                  style={{ fontSize: '13px', padding: '6px 12px', borderRadius: 'var(--rounded-md)', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontWeight: 600, marginRight: 'var(--spacing-xs)' }}>
+                  🚫 {t.budgetRecurringCancelContract}
+                </button>
+              )}
+
+              {/* Price change form */}
+              {showPriceForm ? (
+                <div style={{ background: 'var(--color-surface)', borderRadius: 'var(--rounded-md)', padding: 'var(--spacing-md)', marginTop: 'var(--spacing-xs)' }}>
+                  <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-sm)' }}>
+                    <div style={{ flex: 1 }}>
+                      <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetRecurringEffectiveFrom}</label>
+                      <input type="date" value={priceDate} onChange={e => setPriceDate(e.target.value)}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px var(--spacing-base)', borderRadius: 'var(--rounded-md)', border: '1px solid var(--color-hairline)', background: 'var(--color-surface)', color: 'var(--color-fg)', fontSize: '14px' }} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetRecurringNewPrice}</label>
+                      <input type="number" inputMode="decimal" value={priceAmountStr} onChange={e => setPriceAmountStr(e.target.value)}
+                        placeholder="15.99"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px var(--spacing-base)', borderRadius: 'var(--rounded-md)', border: '1px solid var(--color-hairline)', background: 'var(--color-surface)', color: 'var(--color-fg)', fontSize: '14px' }} />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>
+                    <button onClick={() => { setShowPriceForm(false); setPriceDate(''); setPriceAmountStr(''); }}
+                      style={{ flex: 1, padding: '8px', borderRadius: 'var(--rounded-md)', border: '1px solid var(--color-hairline)', background: 'transparent', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: 'var(--color-muted)' }}>{t.cancel}</button>
+                    <button onClick={addPriceChange} disabled={changeSaving || !priceDate || !priceAmountStr}
+                      style={{ flex: 1, padding: '8px', borderRadius: 'var(--rounded-md)', border: 'none', background: 'var(--color-primary)', color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: 600, opacity: changeSaving || !priceDate || !priceAmountStr ? 0.5 : 1 }}>
+                      {changeSaving ? '…' : t.save}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => { setShowPriceForm(true); setShowCancelForm(false); }}
+                  style={{ fontSize: '13px', padding: '6px 12px', borderRadius: 'var(--rounded-md)', border: '1px solid #f59e0b', background: 'transparent', color: '#f59e0b', cursor: 'pointer', fontWeight: 600, marginTop: showCancelForm ? 0 : 'var(--spacing-xs)' }}>
+                  💱 {t.budgetRecurringPriceAdjust}
+                </button>
+              )}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+            {item !== 'new' && (
+              <button onClick={() => setConfirmDelete(true)}
+                style={{ padding: '12px 20px', borderRadius: 'var(--rounded-md)', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontWeight: 600 }}>
+                {t.delete}
+              </button>
+            )}
+            <button onClick={onClose}
+              style={{ padding: '12px 20px', borderRadius: 'var(--rounded-md)', border: '1px solid var(--color-hairline)', background: 'transparent', cursor: 'pointer', fontWeight: 600, color: 'var(--color-muted)' }}>
+              {t.cancel}
+            </button>
+            <button onClick={save} disabled={saving || !riName.trim() || !riAmount}
+              style={{ flex: 1, padding: '12px 20px', borderRadius: 'var(--rounded-md)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, opacity: saving || !riName.trim() || !riAmount ? 0.5 : 1 }}>
+              {saving ? '…' : t.save}
+            </button>
+          </div>
+        </div>
+      </div>
+      {confirmDelete && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-md)' }}>
+          <div style={{ background: 'var(--color-canvas)', borderRadius: 'var(--rounded-lg)', padding: 'var(--spacing-lg)', maxWidth: 320, width: '100%' }}>
+            <p className="text-body-md" style={{ marginBottom: 'var(--spacing-md)', textAlign: 'center' }}>{t.budgetConfirmDelete}</p>
+            <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+              <button onClick={() => setConfirmDelete(false)} style={{ flex: 1, padding: '10px', borderRadius: 'var(--rounded-md)', border: '1px solid var(--color-hairline)', background: 'transparent', cursor: 'pointer', fontWeight: 600 }}>{t.cancel}</button>
+              <button onClick={deleteItem} style={{ flex: 1, padding: '10px', borderRadius: 'var(--rounded-md)', border: 'none', background: '#ef4444', color: 'white', cursor: 'pointer', fontWeight: 600 }}>{t.delete}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ─── BudgetSettingsView ───────────────────────────────────────────────────────
 
 function BudgetSettingsView({
   homeId, language, categories, savingsGoals, recurringItems, homeSettings, userRole,
-  onBack, onRefresh,
+  onBack, onRefresh, onOpenRecurring,
 }: {
   homeId: string; language: Lang; categories: BudgetCategory[];
   savingsGoals: SavingsGoal[]; recurringItems: RecurringItem[];
   homeSettings: HomeSettings; userRole?: 'admin' | 'member';
-  onBack: () => void; onRefresh: () => void;
+  onBack: () => void; onRefresh: () => void; onOpenRecurring: (item: RecurringItem | 'new') => void;
 }) {
   const t = getT(language);
   const [catModal, setCatModal] = useState<BudgetCategory | 'new' | null>(null);
   const [goalModal, setGoalModal] = useState<SavingsGoal | 'new' | null>(null);
-  const [recurringModal, setRecurringModal] = useState<RecurringItem | 'new' | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Category form state
@@ -1187,15 +1506,6 @@ function BudgetSettingsView({
   const [goalTarget, setGoalTarget] = useState('');
   const [goalCurrent, setGoalCurrent] = useState('');
   const [confirmDeleteGoalId, setConfirmDeleteGoalId] = useState<string | null>(null);
-
-  // Recurring item form state
-  const [riName, setRiName] = useState('');
-  const [riAmount, setRiAmount] = useState('');
-  const [riDay, setRiDay] = useState('1');
-  const [riCategoryId, setRiCategoryId] = useState<string | null>(null);
-  const [riActive, setRiActive] = useState(true);
-  const [riAutoBook, setRiAutoBook] = useState(false);
-  const [confirmDeleteRiId, setConfirmDeleteRiId] = useState<string | null>(null);
 
   // Home settings form state
   const [hSharedAccount, setHSharedAccount] = useState<'yes' | 'no'>(homeSettings.budget_shared_account);
@@ -1227,16 +1537,6 @@ function BudgetSettingsView({
       setGoalTarget(String(goal.target_amount)); setGoalCurrent(String(goal.current_amount));
     }
     setGoalModal(goal);
-  }
-
-  function openRecurringModal(item: RecurringItem | 'new') {
-    if (item === 'new') {
-      setRiName(''); setRiAmount(''); setRiDay('1'); setRiCategoryId(null); setRiActive(true); setRiAutoBook(false);
-    } else {
-      setRiName(item.name); setRiAmount(String(item.amount)); setRiDay(String(item.billing_day));
-      setRiCategoryId(item.category_id); setRiActive(item.active); setRiAutoBook(item.auto_book);
-    }
-    setRecurringModal(item);
   }
 
   async function sortCat(cat: BudgetCategory, dir: 'up' | 'down') {
@@ -1311,29 +1611,6 @@ function BudgetSettingsView({
   async function deleteGoal(id: string) {
     await supabase.from('budget_savings_goals').delete().eq('id', id);
     onRefresh(); setGoalModal(null); setConfirmDeleteGoalId(null);
-  }
-
-  async function saveRecurring() {
-    if (!riName.trim() || !riAmount) return;
-    setSaving(true);
-    try {
-      const payload = {
-        home_id: homeId, name: riName.trim(),
-        amount: parseFloat(riAmount), billing_day: Math.min(28, Math.max(1, parseInt(riDay) || 1)),
-        category_id: riCategoryId, active: riActive, auto_book: riAutoBook,
-      };
-      if (recurringModal === 'new') {
-        await supabase.from('budget_recurring_items').insert({ ...payload, sort_order: recurringItems.length });
-      } else if (recurringModal) {
-        await supabase.from('budget_recurring_items').update(payload).eq('id', recurringModal.id);
-      }
-      onRefresh(); setRecurringModal(null);
-    } finally { setSaving(false); }
-  }
-
-  async function deleteRecurring(id: string) {
-    await supabase.from('budget_recurring_items').delete().eq('id', id);
-    onRefresh(); setRecurringModal(null); setConfirmDeleteRiId(null);
   }
 
   const periodLabel = (p: string) => p === 'weekly' ? t.budgetPeriodWeekly : p === 'yearly' ? t.budgetPeriodYearly : t.budgetPeriodMonthly;
@@ -1419,14 +1696,14 @@ function BudgetSettingsView({
       <div className="card" style={{ marginBottom: 'var(--spacing-md)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
           <h2 className="text-title-md">{t.budgetRecurring}</h2>
-          <button onClick={() => openRecurringModal('new')}
+          <button onClick={() => onOpenRecurring('new')}
             style={{ background: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: 'var(--rounded-md)', padding: '6px 12px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
             + {t.budgetRecurringNew}
           </button>
         </div>
         {recurringItems.length === 0 && <p className="text-body-sm text-muted">{t.budgetRecurringNoItems}</p>}
         {recurringItems.map(item => (
-          <button key={item.id} onClick={() => openRecurringModal(item)}
+          <button key={item.id} onClick={() => onOpenRecurring(item)}
             style={{
               display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', width: '100%',
               padding: '10px 0', background: 'none', border: 'none', borderBottom: '1px solid var(--color-hairline-soft)',
@@ -1624,89 +1901,6 @@ function BudgetSettingsView({
         </div>
       )}
 
-      {/* Recurring item modal */}
-      {recurringModal !== null && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }}
-          onClick={() => setRecurringModal(null)}>
-          <div onClick={e => e.stopPropagation()} style={{
-            background: 'var(--color-canvas)', borderRadius: 'var(--rounded-lg) var(--rounded-lg) 0 0',
-            padding: 'var(--spacing-lg)', width: '100%', maxWidth: 560, maxHeight: '90dvh', overflowY: 'auto',
-          }}>
-            <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-md)' }}>
-              {recurringModal === 'new' ? t.budgetRecurringNew : t.budgetRecurring}
-            </h2>
-            <div style={{ marginBottom: 'var(--spacing-md)' }}>
-              <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetRecurringName}</label>
-              <input type="text" value={riName} onChange={e => setRiName(e.target.value)} className="form-input" autoFocus placeholder="Netflix" />
-            </div>
-            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
-              <div style={{ flex: 2 }}>
-                <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetRecurringAmountLabel}</label>
-                <input type="number" inputMode="decimal" value={riAmount} onChange={e => setRiAmount(e.target.value)}
-                  className="form-input" placeholder="12.99" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetRecurringDayLabel}</label>
-                <input type="number" inputMode="numeric" value={riDay} onChange={e => setRiDay(e.target.value)}
-                  min="1" max="28" className="form-input" placeholder="1" />
-              </div>
-            </div>
-            <div style={{ marginBottom: 'var(--spacing-md)' }}>
-              <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 6 }}>{t.budgetCategory}</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-xs)' }}>
-                {categories.filter(c => c.category_type === 'expense').map(cat => (
-                  <Chip key={cat.id} label={`${cat.icon} ${cat.name}`} active={riCategoryId === cat.id}
-                    onClick={() => setRiCategoryId(riCategoryId === cat.id ? null : cat.id)} color={cat.color} />
-                ))}
-                <Chip label={t.budgetNoCategory} active={riCategoryId === null} onClick={() => setRiCategoryId(null)} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-sm)', padding: '10px var(--spacing-base)', background: 'var(--color-surface)', borderRadius: 'var(--rounded-md)' }}>
-              <span className="text-body-md">{t.budgetRecurringActive}</span>
-              <Toggle value={riActive} onChange={setRiActive} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-lg)', padding: '10px var(--spacing-base)', background: 'var(--color-surface)', borderRadius: 'var(--rounded-md)' }}>
-              <div>
-                <div className="text-body-md">{t.budgetRecurringAutoBook}</div>
-                <div className="text-body-sm text-muted" style={{ fontSize: '12px' }}>
-                  {language === 'de' ? 'Wird monatlich automatisch als bezahlt erfasst' : 'Automatically booked as paid each month'}
-                </div>
-              </div>
-              <Toggle value={riAutoBook} onChange={setRiAutoBook} />
-            </div>
-            <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-              {recurringModal !== 'new' && (
-                <button onClick={() => setConfirmDeleteRiId(recurringModal.id)}
-                  style={{ padding: '12px 20px', borderRadius: 'var(--rounded-md)', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontWeight: 600 }}>
-                  {t.delete}
-                </button>
-              )}
-              <button onClick={() => setRecurringModal(null)}
-                style={{ padding: '12px 20px', borderRadius: 'var(--rounded-md)', border: '1px solid var(--color-hairline)', background: 'transparent', cursor: 'pointer', fontWeight: 600, color: 'var(--color-muted)' }}>
-                {t.cancel}
-              </button>
-              <button onClick={saveRecurring} disabled={saving || !riName.trim() || !riAmount}
-                style={{ flex: 1, padding: '12px 20px', borderRadius: 'var(--rounded-md)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, opacity: saving || !riName.trim() || !riAmount ? 0.5 : 1 }}>
-                {saving ? '…' : t.save}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Confirm delete recurring */}
-      {confirmDeleteRiId && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-md)' }}>
-          <div style={{ background: 'var(--color-canvas)', borderRadius: 'var(--rounded-lg)', padding: 'var(--spacing-lg)', maxWidth: 320, width: '100%' }}>
-            <p className="text-body-md" style={{ marginBottom: 'var(--spacing-md)', textAlign: 'center' }}>{t.budgetConfirmDelete}</p>
-            <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-              <button onClick={() => setConfirmDeleteRiId(null)} style={{ flex: 1, padding: '10px', borderRadius: 'var(--rounded-md)', border: '1px solid var(--color-hairline)', background: 'transparent', cursor: 'pointer', fontWeight: 600 }}>{t.cancel}</button>
-              <button onClick={() => deleteRecurring(confirmDeleteRiId)} style={{ flex: 1, padding: '10px', borderRadius: 'var(--rounded-md)', border: 'none', background: '#ef4444', color: 'white', cursor: 'pointer', fontWeight: 600 }}>{t.delete}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Confirm delete category */}
       {confirmDeleteCatId && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-md)' }}>
@@ -1807,6 +2001,7 @@ export function Budget({ homeId, language, userId, userRole }: {
   const [entries, setEntries] = useState<BudgetEntry[]>([]);
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
   const [recurringItems, setRecurringItems] = useState<RecurringItem[]>([]);
+  const [recurringChanges, setRecurringChanges] = useState<RecurringChange[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [homeSettings, setHomeSettings] = useState<HomeSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1819,6 +2014,9 @@ export function Budget({ homeId, language, userId, userRole }: {
   // AI scan modal state
   const [aiScanOpen, setAiScanOpen] = useState(false);
   const [aiPrefilled, setAiPrefilled] = useState<{ amount: string; description: string; categoryId: string | null } | null>(null);
+
+  // Recurring item modal state
+  const [recurringToEdit, setRecurringToEdit] = useState<RecurringItem | 'new' | null>(null);
 
   useEffect(() => { fetchAll(); }, [homeId, currentMonth]);
 
@@ -1845,7 +2043,21 @@ export function Budget({ homeId, language, userId, userRole }: {
 
     setCategories(catsRes.data ?? []);
     setSavingsGoals(goalsRes.data ?? []);
-    setRecurringItems(recurringRes.data ?? []);
+    const fetchedRecurring = recurringRes.data ?? [];
+    setRecurringItems(fetchedRecurring);
+
+    // Fetch changes for all recurring items
+    const recurringIds = fetchedRecurring.map((r: RecurringItem) => r.id);
+    if (recurringIds.length > 0) {
+      const { data: changesData } = await supabase
+        .from('budget_recurring_changes')
+        .select('*')
+        .in('recurring_item_id', recurringIds)
+        .order('effective_date');
+      setRecurringChanges(changesData ?? []);
+    } else {
+      setRecurringChanges([]);
+    }
 
     // Auto-book recurring items marked as auto_book — only for the current real month
     const realNow = new Date();
@@ -1854,16 +2066,24 @@ export function Budget({ homeId, language, userId, userRole }: {
     if (isCurrentMonth) {
       const rawSettings = settingsRes.data ?? [];
       const splitModeSetting = rawSettings.find(r => r.key === 'budget_split_mode')?.value ?? 'none';
+      const allChanges: RecurringChange[] = recurringIds.length > 0
+        ? ((await supabase.from('budget_recurring_changes').select('*').in('recurring_item_id', recurringIds)).data ?? [])
+        : [];
+      const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`;
       const paidIds = new Set(finalEntries.filter(e => e.recurring_item_id).map((e: any) => e.recurring_item_id as string));
-      const autoItems = (recurringRes.data ?? []).filter((r: RecurringItem) => r.active && r.auto_book && !paidIds.has(r.id));
+      const autoItems = (recurringRes.data ?? []).filter((r: RecurringItem) => {
+        if (!r.active || !r.auto_book || paidIds.has(r.id)) return false;
+        return !effectiveRecurring(r, allChanges, monthStart).cancelled;
+      });
       if (autoItems.length > 0) {
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         await Promise.all(autoItems.map((item: RecurringItem) => {
           const day = Math.min(item.billing_day, daysInMonth);
           const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const eff = effectiveRecurring(item, allChanges, monthStart);
           return supabase.from('budget_entries').insert({
             home_id: homeId, user_id: userId,
-            amount: item.amount, category_id: item.category_id,
+            amount: eff.amount, category_id: item.category_id,
             description: item.name, date,
             split_mode: splitModeSetting === 'none' ? 'personal' : 'shared',
             entry_type: 'expense', recurring_item_id: item.id,
@@ -1954,9 +2174,14 @@ export function Budget({ homeId, language, userId, userRole }: {
         {view !== 'settings' && homeSettings?.budget_setup_done && (
           <button
             onClick={() => setView('settings')}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '22px', color: 'var(--color-muted)', padding: '4px 8px' }}
             aria-label={t.budgetSettings}
-          >⚙</button>
+            style={{ background: 'var(--color-surface-strong)', border: 'none', borderRadius: 'var(--rounded-full)', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--color-muted)', flexShrink: 0 }}
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
         )}
       </div>
 
@@ -1966,6 +2191,7 @@ export function Budget({ homeId, language, userId, userRole }: {
           language={language}
           categories={categories} entries={entries}
           savingsGoals={savingsGoals} recurringItems={recurringItems}
+          recurringChanges={recurringChanges}
           homeSettings={effectiveSettings}
           currentMonth={currentMonth}
           onPrevMonth={() => setCurrentMonth(({ year, month }) => month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 })}
@@ -1975,6 +2201,8 @@ export function Budget({ homeId, language, userId, userRole }: {
           onAddIncome={openAddIncome}
           onGoToEntries={() => setView('entries')}
           onRefresh={fetchAll}
+          onNewRecurring={() => setRecurringToEdit('new')}
+          onEditRecurring={(item) => setRecurringToEdit(item)}
         />
       )}
 
@@ -1992,6 +2220,18 @@ export function Budget({ homeId, language, userId, userRole }: {
           recurringItems={recurringItems} homeSettings={effectiveSettings}
           userRole={userRole}
           onBack={() => setView('dashboard')} onRefresh={fetchAll}
+          onOpenRecurring={(item) => setRecurringToEdit(item)}
+        />
+      )}
+
+      {/* Recurring item modal */}
+      {recurringToEdit !== null && (
+        <RecurringItemModal
+          homeId={homeId} language={language}
+          categories={categories} recurringItems={recurringItems}
+          item={recurringToEdit}
+          onClose={() => setRecurringToEdit(null)}
+          onSave={() => { setRecurringToEdit(null); fetchAll(); }}
         />
       )}
 
@@ -2032,6 +2272,130 @@ export function Budget({ homeId, language, userId, userRole }: {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── BudgetQuickExpenseModal ──────────────────────────────────────────────────
+// Self-contained modal for recording a budget expense from outside the Budget
+// module (e.g., from the Shopping List). Fetches its own categories/members/settings.
+
+export function BudgetQuickExpenseModal({
+  homeId, language, userId, onClose,
+}: { homeId: string; language: Lang; userId: string; onClose: () => void }) {
+  const t = getT(language);
+  const [step, setStep] = useState<'loading' | 'menu' | 'ai' | 'form'>('loading');
+  const [categories, setCategories] = useState<BudgetCategory[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [homeSettings, setHomeSettings] = useState<HomeSettings | null>(null);
+  const [aiPrefilled, setAiPrefilled] = useState<{ amount: string; description: string; categoryId: string | null } | null>(null);
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from('budget_categories').select('*').eq('home_id', homeId).order('sort_order'),
+      supabase.from('home_members').select('user_id, profiles(display_name, avatar_color)').eq('home_id', homeId),
+      supabase.from('home_settings').select('key, value').eq('home_id', homeId)
+        .in('key', ['budget_shared_account', 'budget_split_mode', 'budget_default_period', 'budget_ai_receipts']),
+    ]).then(([catsRes, membersRes, settingsRes]) => {
+      setCategories(catsRes.data ?? []);
+      setMembers(
+        (membersRes.data ?? []).map((m: any) => ({
+          user_id: m.user_id,
+          display_name: m.profiles?.display_name ?? null,
+          avatar_color: m.profiles?.avatar_color ?? '#14d8db',
+        }))
+      );
+      const raw = settingsRes.data ?? [];
+      const get = (k: string) => raw.find((r: any) => r.key === k)?.value ?? null;
+      setHomeSettings({
+        budget_setup_done: true,
+        budget_shared_account: (get('budget_shared_account') as 'yes' | 'no') ?? 'no',
+        budget_split_mode: (get('budget_split_mode') as 'even' | 'individual' | 'none') ?? 'none',
+        budget_default_period: (get('budget_default_period') as 'monthly' | 'weekly' | 'yearly') ?? 'monthly',
+        budget_ai_receipts: (get('budget_ai_receipts') as 'yes' | 'no') ?? 'no',
+      });
+      setStep('menu');
+    });
+  }, [homeId]);
+
+  if (step === 'loading') {
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
+        <p className="text-body-sm text-muted" style={{ color: 'white' }}>{t.loading}</p>
+      </div>
+    );
+  }
+
+  if (step === 'ai') {
+    return (
+      <AiScanModal
+        language={language}
+        categories={categories}
+        onAnalysed={(pf) => { setAiPrefilled(pf); setStep('form'); }}
+        onFallback={() => { setAiPrefilled(null); setStep('form'); }}
+        onCancel={onClose}
+      />
+    );
+  }
+
+  if (step === 'form' && homeSettings) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }}
+        onClick={onClose}>
+        <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 560 }}>
+          <EntryForm
+            homeId={homeId} language={language} userId={userId}
+            categories={categories} members={members} homeSettings={homeSettings}
+            entryType="expense"
+            prefilled={aiPrefilled ?? undefined}
+            onSave={onClose}
+            onCancel={onClose}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // menu step
+  const aiEnabled = homeSettings?.budget_ai_receipts === 'yes';
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }}
+      onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: 'var(--color-canvas)', borderRadius: 'var(--rounded-lg) var(--rounded-lg) 0 0',
+        padding: 'var(--spacing-lg)', width: '100%', maxWidth: 560,
+      }}>
+        <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-md)' }}>{t.budgetAddExpense}</h2>
+        {aiEnabled && (
+          <button
+            onClick={() => setStep('ai')}
+            style={{
+              width: '100%', padding: '14px var(--spacing-base)', textAlign: 'left',
+              background: 'none', border: 'none', borderBottom: '1px solid var(--color-hairline-soft)',
+              cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: 'var(--color-fg)', fontFamily: 'inherit',
+              borderRadius: 0,
+            }}
+          >🤖 {t.budgetAiScan}</button>
+        )}
+        <button
+          onClick={() => setStep('form')}
+          style={{
+            width: '100%', padding: '14px var(--spacing-base)', textAlign: 'left',
+            background: 'none', border: 'none', borderBottom: '1px solid var(--color-hairline-soft)',
+            cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: 'var(--color-fg)', fontFamily: 'inherit',
+            borderRadius: 0,
+          }}
+        >✏️ {t.budgetManualEntry}</button>
+        <button
+          onClick={onClose}
+          style={{
+            width: '100%', padding: '14px var(--spacing-base)', textAlign: 'center',
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: '14px', fontWeight: 500, color: 'var(--color-muted)', fontFamily: 'inherit',
+            borderRadius: 0,
+          }}
+        >{t.cancel}</button>
+      </div>
     </div>
   );
 }

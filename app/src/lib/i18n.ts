@@ -114,6 +114,8 @@ const en = {
   addItemPlaceholder: 'Add item...',
   itemsLeft: (n: number) => `${n} item${n !== 1 ? 's' : ''} left`,
   noItems: 'No items yet — add something above.',
+  shoppingBudgetPrompt: 'Done shopping? Record your expenses in the budget!',
+  shoppingRecordExpense: 'Add expense',
 
   // Category Management
   categories: 'Categories',
@@ -374,6 +376,15 @@ const en = {
   budgetRecurringThisMonth: 'This month',
   budgetRecurringActive: 'Active',
   budgetRecurringAutoBook: 'Debited automatically',
+  budgetRecurringPlanChanges: 'Planned changes',
+  budgetRecurringCancelContract: 'Cancel contract',
+  budgetRecurringCancelFrom: 'Cancelled from',
+  budgetRecurringPriceAdjust: 'Price adjustment',
+  budgetRecurringEffectiveFrom: 'Effective from',
+  budgetRecurringNewPrice: 'New amount (€)',
+  budgetRecurringCancelledBadge: 'Cancelled',
+  budgetRecurringUpcomingCancel: (date: string) => `Cancels from ${date}`,
+  budgetRecurringUpcomingPrice: (date: string, amount: string) => `Price change from ${date}: ${amount} €`,
 
   // Budget — home settings edit
   budgetHomeSettings: 'Budget Setup',
@@ -587,6 +598,8 @@ const de: typeof en = {
   addItemPlaceholder: 'Artikel hinzufügen...',
   itemsLeft: (n: number) => `${n} Artikel verbleibend`,
   noItems: 'Noch keine Artikel — füge oben etwas hinzu.',
+  shoppingBudgetPrompt: 'Fertig mit dem Einkauf? Gleich die Ausgaben fürs Budget erfassen!',
+  shoppingRecordExpense: 'Ausgabe erfassen',
 
   // Todos
   moduleTodos: 'To-Do',
@@ -810,6 +823,15 @@ const de: typeof en = {
   budgetRecurringThisMonth: 'Diesen Monat',
   budgetRecurringActive: 'Aktiv',
   budgetRecurringAutoBook: 'Wird automatisch abgebucht',
+  budgetRecurringPlanChanges: 'Geplante Änderungen',
+  budgetRecurringCancelContract: 'Vertrag kündigen',
+  budgetRecurringCancelFrom: 'Gekündigt ab',
+  budgetRecurringPriceAdjust: 'Preisanpassung',
+  budgetRecurringEffectiveFrom: 'Gültig ab',
+  budgetRecurringNewPrice: 'Neuer Betrag (€)',
+  budgetRecurringCancelledBadge: 'Gekündigt',
+  budgetRecurringUpcomingCancel: (date: string) => `Kündigung ab ${date}`,
+  budgetRecurringUpcomingPrice: (date: string, amount: string) => `Preisänderung ab ${date}: ${amount} €`,
 
   // Budget — Home-Einstellungen bearbeiten
   budgetHomeSettings: 'Budget-Einstellungen',
