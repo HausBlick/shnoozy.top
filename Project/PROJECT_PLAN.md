@@ -6,12 +6,56 @@
 
 ## Current Status
 **Live unter:** https://shnoozy.top
-**Phase:** Session 11 ✅ — Snap! cancelled, Dashboard nav-links UX (2026-05-15)
-**Nächste Phase:** Nächste Schritte nach Absprache — offen
+**Phase:** Session 12 ✅ — Dokumentencloud vollständig (2026-05-15)
+**Nächste Phase:** Bug Fixes (siehe Bug_collection.md)
 
 ---
 
 ## 🗺️ Roadmap
+
+### Phase 19: Dokumentencloud ✅ Phase 1 (2026-05-15)
+
+#### 19.1 Datenbank & Storage ✅
+- [x] Tabelle `document_folders` (id, home_id, name, module_id, folder_key, parent_id, icon, color, sort_order, created_by) mit RLS
+- [x] Tabelle `documents` (id, home_id, folder_id, name, description, storage_path, file_type, file_size, uploaded_by) mit RLS
+- [x] Tabelle `pets` (id, home_id, name, species, breed) mit RLS — für My Pet Auto-Ordner
+- [x] Supabase Storage Bucket `documents` (privat, 50 MB Limit, PDF + Bilder), RLS-Policies via `is_home_member`
+
+#### 19.2 Frontend ✅
+- [x] `Documents.tsx` — eigenständiges Modul: Ordner-Grid, Dokument-Liste, Upload-Modal, Ordner-erstellen-Modal
+- [x] Modul-ID `docs` in `ModuleId`, `MODULE_META`, `NavModuleIcon`, `getNavLabel`, `renderTab`
+- [x] Auto-Setup: Module-Ordner (Home 🏠, Car 🚗, My Pet 🐾) + Unterordner werden beim ersten Öffnen erstellt, falls der entsprechende Modul aktiv ist
+  - Home-Unterordner: Lease/Mietvertrag, Utilities/Strom & Wasser, Insurance/Versicherungen, Misc/Sonstiges
+  - Car-Unterordner: TÜV/HU, Insurance/Versicherung, Registration/Zulassung, Service/Werkstatt
+- [x] Ordner-Namen i18n — Modul-Ordner über `module_id` → `t.moduleXxx`, System-Unterordner über `folder_key` → eigene i18n-Keys
+- [x] PDF/Bild-Öffnen via Signed URL (1h) → `window.open(_blank)` → System-Browser (kein In-App-Viewer)
+- [x] File-Upload: `<input type="file" accept="application/pdf,image/*">`, Storage-Upload, DB-Insert
+- [x] Datei löschen: Storage-Remove + DB-Delete
+- [x] Benutzer-Ordner erstellen/löschen (System-Ordner sind geschützt)
+- [x] i18n DE/EN für alle Strings inkl. Unterordner-Namen
+- [x] Web Share Target in `manifest.webmanifest` (POST multipart, PDF + Bilder) — Android PWA erscheint im Share-Sheet
+
+#### 19.3 UX & Features ✅ (Session 12)
+- [x] FAB Speed-Dial (➕ unten rechts) → Upload + Neuer Ordner; dreht zu ✕ wenn offen
+- [x] Three-Dot-Menü (⋮) auf Ordner-Cards (Nutzer-Ordner) + Dokument-Zeilen → ActionSheet mit Umbenennen / Verschieben / Löschen
+- [x] `RenameModal` — Dokument- und Ordner-Umbenennung (inline, Enter-Bestätigung)
+- [x] `MoveModal` — Dokument/Ordner in anderen Ordner verschieben (tappable Ordnerliste, Zyklus-Schutz für Ordner-Moves)
+- [x] Upload-Modal: Ordner-Picker als tappable Liste (kein `<select>` Dropdown mehr)
+- [x] Soft-Delete + Papierkorb: `deleted_at`-Spalte auf `documents` + `document_folders`, pg_cron purge nach 30 Tagen
+- [x] Papierkorb-Ansicht (🗑️-Icon im Header): Wiederherstellen (Ordner cascaded), Endgültig löschen, Papierkorb leeren
+- [x] Recent Files in Ordneransicht (max. 10, aus allen Unterordnern, mit Ordner-Label)
+- [x] Dokumenten-Anzahl-Badge auf Ordner-Cards (rekursiv: zeigt Gesamtanzahl inkl. Unterordner)
+- [x] Web Share Target SW-Handler: SW empfängt POST, speichert File in Cache API, leitet zu `/?share-target=pending` um → App öffnet Upload-Modal mit vorausgefüllter Datei
+- [x] Neue Ordner werden immer im aktuell geöffneten Ordner angelegt (context-aware `parent_id`)
+- [x] Erweiterte Icon-Auswahl (47 Icons, 8-Spalten-Grid) + 12 Farben für Ordner-Erstellen
+
+#### 19.4 Nächste Schritte (Phase 2+)
+- [ ] Modul-Integration: Docs-Abschnitt in Car-Modul (wenn gebaut)
+- [ ] Modul-Integration: Docs-Abschnitt in My Pet-Modul (wenn gebaut)
+- [ ] Modul-Integration: Docs-Abschnitt in Home Info-Modul (wenn gebaut)
+- [ ] My Pet: Auto-Unterordner pro Tier (bei `pets`-INSERT)
+
+---
 
 ### 🟡 Phase 6: Multi-Tenancy Implementierung (in Arbeit)
 > **Wichtig:** Datenbank wurde komplett zurückgesetzt (2026-05-07). Alle Tabellen neu aufgebaut. 142 Events (50 Geburtstage + 92 Müllabfuhr-Termine 2026) wurden wiederhergestellt.
@@ -511,3 +555,4 @@
 *   **2026-05-15 (Session 9):** Phase 17.2 (iOS PWA Install Banner): iOS Safari unterstützt kein `beforeinstallprompt`. Eigener Banner in App.tsx: detektiert iOS + nicht-Standalone + nicht-dismissed; zeigt Share-Icon + Anleitung „Zum Home-Bildschirm"; × schließt permanent via localStorage. i18n DE/EN.
 *   **2026-05-15 (Session 10/11):** Phase 18 CANCELLED — Snap!/PhotoNotes Widget entfernt. Android Chrome PWA killt den Prozess während Camera-Intent; file-input `change`-Event feuert nach Resume nie — weder native addEventListener noch visibilitychange-Fallback funktionieren. Gallery-Upload war OK, Kamera nicht. Fix würde getUserMedia (In-App-Kamera) oder Capacitor erfordern. Code archiviert in `Project/PhotoNotes.archived.tsx`. DB-Tabelle `photo_notes` + Bucket `photo-notes` bleiben in Supabase. `photo-notes` ModuleId aus App entfernt; `fetchHomeConfig` filtert unbekannte IDs via `knownIds`-Guard.
 *   **2026-05-15 (Session 11):** Dashboard Nav-Link UX: "To Calendar >", "To Budget >" und "See all >" Activity-Links auf bottom-right aligned umgestellt. ">" aus i18n-Strings entfernt; stattdessen inline SVG Chevron (gleiche Polyline wie NavArrowBtn in Calendar, nur ohne Border/Button-Rahmen, 16×16, strokeWidth 2.5).
+*   **2026-05-15 (Session 12):** Phase 19.1+19.2+19.3 abgeschlossen — Dokumentencloud vollständig: `document_folders`/`documents`/`pets`-Tabellen, Storage-Bucket `documents`, `Documents.tsx`-Modul mit Ordner-Grid, Upload, Signed-URL-Öffnen, FAB Speed-Dial, Three-Dot-Menü (Umbenennen/Verschieben/Löschen), Soft-Delete + Papierkorb (30 Tage, pg_cron Purge), Restore (cascaded für Ordner), Recent-Files in Ordneransicht, Dokumenten-Anzahl-Badge (rekursiv), Web Share Target SW-Handler (Cache API), Context-aware Neuer Ordner, erweiterter Icon/Farb-Picker. DB: `deleted_at`-Spalten + Indexes + `unique_module_root_folder`-Partial-Index (React Strict Mode Schutz). i18n ~50 neue Keys EN/DE.

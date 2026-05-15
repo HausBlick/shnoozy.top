@@ -5,7 +5,7 @@
 > Für technische Details, ToDos, Datenbank-Migrationen und das technische Log, siehe zwingend die Datei `PROJECT_PLAN.md`.
 
 ## 1. Grundprinzipien & Regeln für die KI
-*   **Interconnected-First Architektur:** Die gesamte App ist tiefgreifend miteinander verknüpft. Informationen aus verschiedenen Modulen sind übergreifend anklickbar und referenziert. *Beispielhafte Umsetzung:* Die Dokumentenablage ist ordnerbasiert. Alle Dokumente und Unterordner, die physisch im Verzeichnis "Luna" liegen, werden automatisch auch im "Luna Portal" dynamisch aggregiert und sind dort direkt abrufbar.
+*   **Interconnected-First Architektur:** Die gesamte App ist tiefgreifend miteinander verknüpft. Informationen aus verschiedenen Modulen sind übergreifend anklickbar und referenziert. *Beispielhafte Umsetzung:* Die Dokumentenablage ist ordnerbasiert. Alle Dokumente und Unterordner, die physisch im Verzeichnis "My Pet" liegen, werden automatisch auch im "My Pet Portal" dynamisch aggregiert und sind dort direkt abrufbar.
 *   **Design-Konformität:** Jede generierte UI-Komponente MUSS sich strikt an die Vorgaben in der `DESIGN.md` halten (Farben, Typografie 'Airbnb Cereal VF' / Fallbacks, Radius-Werte, Shadow-Tiers). Keine Accent-Border verwenden!
 *   **Architektur:** Cloud-native SPA (Single Page Application) als PWA (Progressive Web App). Frontend gehostet auf GitHub Pages (`shnoozy.top`), Backend über Supabase (Free Tier).
 *   **Setup-Transparenz:** Bevor Code für externe Dienste (Supabase Edge Functions, Webhooks, Google APIs) generiert wird, muss der Nutzer eine präzise, schrittweise Anleitung zur manuellen Einrichtung im jeweiligen Dashboard erhalten.
@@ -19,7 +19,7 @@ Die App ist grundlegend als Multi-Home-Plattform konzipiert. Mehrere unabhängig
 **Kerntabellen:**
 *   **`homes`** — Repräsentiert einen Haushalt (Name, Icon, Erstellungsdatum).
 *   **`home_members`** — Verknüpfungstabelle zwischen Nutzern und Homes. Enthält eine `role`-Spalte (`'admin'` oder `'member'`). Ein Nutzer kann theoretisch Mitglied mehrerer Homes sein; das Frontend beschränkt ihn vorerst auf ein einziges aktives Home.
-*   **`home_settings`** — Key-Value-Store pro Home. Steuert, welche Module (z. B. `luna_enabled`, `shopping_enabled`) für diesen Haushalt aktiviert sind.
+*   **`home_settings`** — Key-Value-Store pro Home. Steuert, welche Module (z. B. `shopping_enabled`) für diesen Haushalt aktiviert sind.
 
 **Strikte Datentrennung via `home_id`:**
 Alle Datentabellen (`events`, `sticky_notes`, `shopping_items`, etc.) tragen eine `home_id`-Spalte als Foreign Key auf `homes`. Die Isolation der Haushalte wird **zwingend** über Supabase Row Level Security (RLS) Policies sichergestellt — kein Datensatz eines Homes ist jemals für Mitglieder eines anderen Homes lesbar oder schreibbar.
@@ -33,12 +33,12 @@ Neue Mitglieder werden vom Home-Admin über **sichere, zeitlich begrenzte Share-
 *   Ein neuer Nutzer, der dem Link folgt, registriert sich (oder loggt sich ein) und wird anschließend automatisch dem entsprechenden Home mit der definierten Rolle zugewiesen.
 
 ### 2.3 Modulares Dashboard & Konfigurierbare Navigation
-Das Frontend liest beim Start die `home_settings` des aktiven Homes und rendert **ausschließlich** die Module, die der Haushalt aktiviert hat. Module wie das Luna-Portal erscheinen im Dashboard und der Navigation nur dann, wenn `luna_enabled = true` in den Settings des Homes gesetzt ist. Dies vermeidet totes UI für Homes, die bestimmte Features nicht nutzen.
+Das Frontend liest beim Start die `home_settings` des aktiven Homes und rendert **ausschließlich** die Module, die der Haushalt aktiviert hat. Module wie das My Pet-Portal erscheinen im Dashboard und der Navigation nur dann, wenn `shopping_enabled = true` in den Settings des Homes gesetzt ist. Dies vermeidet totes UI für Homes, die bestimmte Features nicht nutzen.
 
 **Konfigurierbare Bottom-Navigation ✅ (implementiert):**
 Die Bottom-Navigation hat **3 frei belegbare Slots** (2 links, 1 rechts des Home-Buttons). Der "More"-Button ist immer fix ganz rechts. Der Admin des Homes konfiguriert die Slots über "Home Einstellungen" (nur für Admins im More-Menü sichtbar).
 *   `home_settings`-Key `nav_slots`: JSON-Array mit 3 Modul-IDs (z. B. `["calendar","lists","notes"]`).
-*   `home_settings`-Key `modules_active`: geordnetes JSON-Array aller aktiven Module — bestimmt auch die Reihenfolge der Cards im More-Menü. Ersetzt separate Feature-Flags (`luna_enabled` etc.).
+*   `home_settings`-Key `modules_active`: geordnetes JSON-Array aller aktiven Module — bestimmt auch die Reihenfolge der Cards im More-Menü. Ersetzt separate Feature-Flags (`shopping_enabled` etc.).
 *   Module, die nicht in `modules_active` stehen, sind komplett inaktiv (erscheinen weder in Nav noch im More-Menü).
 *   **Modul-Manager:** Drag & Drop (Pointer Events, keine externe Library) zum Umsortieren und Aktivieren/Deaktivieren. Aktive Module oben, inaktive unten — Trennlinie ist die Grenze.
 *   Module mit eigenen Einstellungen (z. B. Shopping → Kategorien) erhalten im Bearbeiten-Modus ein ⚙️-Icon.
@@ -99,19 +99,19 @@ Die Bottom-Navigation hat **3 frei belegbare Slots** (2 links, 1 rechts des Home
 
 ### 3.2 Smart Shopping List
 *   Live-synchronisierte Checkliste via Supabase Realtime (`shopping_items` Tabelle, mit `home_id`)
-*   **KI-Kategorisierung ✅:** Jedes neu hinzugefügte Item wird automatisch über die Gemini API kategorisiert. Die Kategorien sind **per Home dynamisch** (`shopping_categories`-Tabelle): Name, Emoji-Icon, Farbe, `sort_order` und eine `description` (Freitext-Beschreibung für Gemini, z. B. "Tierbedarfsprodukte für unseren Hund Luna"). Neue Homes erhalten Standard-Kategorien (ohne Luna). Admins können Kategorien über das ⚙️-Icon in der Shopping-Liste erstellen, bearbeiten, umsortieren und löschen.
+*   **KI-Kategorisierung ✅:** Jedes neu hinzugefügte Item wird automatisch über die Gemini API kategorisiert. Die Kategorien sind **per Home dynamisch** (`shopping_categories`-Tabelle): Name, Emoji-Icon, Farbe, `sort_order` und eine `description` (Freitext-Beschreibung für Gemini, z. B. "Tierbedarfsprodukte für unseren Hund Luna"). Neue Homes erhalten Standard-Kategorien (ohne My Pet). Admins können Kategorien über das ⚙️-Icon in der Shopping-Liste erstellen, bearbeiten, umsortieren und löschen.
 *   **Optionale Google Tasks Integration:** Die Synchronisation mit Google Tasks ist **optional** und wird pro Nutzer individuell über OAuth eingerichtet. Nutzer können wählen:
     *   **Nur intern:** Die Einkaufsliste läuft vollständig über Supabase — keine externe Verknüpfung.
     *   **Mit Google verknüpft:** Der Nutzer verbindet sein eigenes Google-Konto via OAuth. Die Edge Function `sync-google-tasks` synchronisiert dann nur für diesen Nutzer (seine gespeicherten OAuth-Tokens). Die KI-Kategorisierung greift auch hier. **Niko: Ersteinmal on hold**
 *   Google Home Nest: Items per Sprache zu "Shopping list" in Google Tasks → automatisch in App (nur bei aktivierter Google-Integration) **Niko: Ersteinmal on hold**
 
-### 3.3 Luna Portal (Pet Management)
+### 3.3 My Pet Portal (Pet Management)
 *   **Status:** Placeholder (Coming soon)
-*   **Geplant:** Info-Dashboard für Luna (Chipnummer, Versicherung, Futterplan), Termine (Impfungen, Entwurmung, etc.)
+*   **Geplant:** Info-Dashboard für Haustiere (Chipnummer, Versicherung, Futterplan), Termine (Impfungen, Entwurmung, etc.)
 
 ### 3.4 Document Storage
 *   **Status:** Nicht gestartet
-*   **Geplant:** Ordnerstruktur (Apartment, Car, Insurances, Luna), Google Drive oder Supabase Storage
+*   **Geplant:** Ordnerstruktur (Apartment, Car, Insurances, My Pet), Google Drive oder Supabase Storage
 
 ### 3.5 Post-it Board (Änderungen Design/UI)
 *   **Neues UI-Konzept:** Die Post-its werden als quadratischer Stapel ("Deck") auf dem Dashboard dargestellt. Sie liegen leicht "unordentlich" (mit leichter, zufälliger Rotation) übereinander, um das physische Gefühl echter Post-its zu imitieren.

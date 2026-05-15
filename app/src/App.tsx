@@ -10,6 +10,7 @@ import { Lists } from './Lists';
 import { StickyNotes } from './StickyNotes';
 import { Todos, TodosDashboardWidget } from './Todos';
 import { Budget } from './Budget';
+import { Documents } from './Documents';
 import {
   HomeSettings,
   type ModuleId,
@@ -95,6 +96,12 @@ const CarIcon = ({ color = 'currentColor', size = 20 }: { color?: string; size?:
   </svg>
 );
 
+const DocsIcon = ({ color = 'currentColor', size = 20 }: { color?: string; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+  </svg>
+);
+
 const BudgetIcon = ({ color = 'currentColor', size = 20 }: { color?: string; size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="2" y="5" width="20" height="14" rx="2"/>
@@ -162,6 +169,7 @@ function NavModuleIcon({ id, active }: { id: ModuleId; active: boolean }) {
     case 'home-info': return <HouseInfoIcon color={c} size={24} />;
     case 'car':       return <CarIcon color={c} size={24} />;
     case 'budget':    return <BudgetIcon color={c} size={24} />;
+    case 'docs':      return <DocsIcon color={c} size={24} />;
   }
 }
 
@@ -176,6 +184,7 @@ function getNavLabel(id: ModuleId, t: ReturnType<typeof getT>): string {
     case 'home-info': return t.moduleHomeInfo;
     case 'car':       return t.moduleCar;
     case 'budget':    return t.navBudget;
+    case 'docs':      return t.navDocs;
   }
 }
 
@@ -1207,6 +1216,7 @@ function App() {
   const [userRole, setUserRole] = useState<'admin' | 'member'>('member');
 
   const [activeTab, setActiveTab] = useState('home');
+  const [sharedFile, setSharedFile] = useState<File | null>(null);
   const [navSlots, setNavSlots] = useState<ModuleId[]>(DEFAULT_NAV_SLOTS);
   const [activeModuleIds, setActiveModuleIds] = useState<ModuleId[]>(DEFAULT_ACTIVE);
 
@@ -1303,7 +1313,29 @@ function App() {
       setActiveTab('todos');
       history.replaceState(null, '', window.location.pathname);
     }
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('share-target') === 'pending') {
+      history.replaceState(null, '', window.location.pathname + window.location.hash);
+      readSharedFile().then(file => {
+        if (file) { setActiveTab('docs'); setSharedFile(file); }
+      });
+    }
   }, [homeId]);
+
+  async function readSharedFile(): Promise<File | null> {
+    try {
+      const cache = await caches.open('shnoozy-shared-file');
+      const [metaRes, dataRes] = await Promise.all([
+        cache.match('/shared-file-meta'),
+        cache.match('/shared-file-data'),
+      ]);
+      if (!metaRes || !dataRes) return null;
+      const meta: { name: string; type: string } = await metaRes.json();
+      const blob = await dataRes.blob();
+      await Promise.all([cache.delete('/shared-file-meta'), cache.delete('/shared-file-data')]);
+      return new File([blob], meta.name ?? 'shared-file', { type: meta.type });
+    } catch { return null; }
+  }
 
   useEffect(() => {
     if (!homeId) return;
@@ -1583,9 +1615,12 @@ function App() {
     if (activeTab === 'lists') return <Lists homeId={homeId} language={language} userId={session.user.id} />;
     if (activeTab === 'budget') return <Budget homeId={homeId} language={language} userId={session.user.id} userRole={userRole} />;
     if (activeTab === 'todos') return <Todos homeId={homeId} userId={session.user.id} language={language} />;
+    if (activeTab === 'docs') return (
+      <Documents homeId={homeId} userId={session.user.id} language={language} activeModuleIds={activeModuleIds} sharedFile={sharedFile} onSharedFileHandled={() => setSharedFile(null)} />
+    );
     if (activeTab === 'luna') return (
       <div>
-        <h1 className="text-display-lg" style={{ marginTop: 'var(--spacing-md)' }}>Luna Portal</h1>
+        <h1 className="text-display-lg" style={{ marginTop: 'var(--spacing-md)' }}>My Pet</h1>
         <p className="text-body-md text-muted">{t.comingSoonLuna}</p>
       </div>
     );
