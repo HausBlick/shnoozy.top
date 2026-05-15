@@ -6,7 +6,7 @@
 
 ## Current Status
 **Live unter:** https://shnoozy.top
-**Phase:** Phase 16 ✅ — Wiederkehrende Ausgaben + Geplante Änderungen (Session 9, 2026-05-15)
+**Phase:** Phase 17 ✅ — Globale Button-UX + iOS Install Banner (Session 9, 2026-05-15)
 **Nächste Phase:** Nächste Schritte nach Absprache — offen
 
 ---
@@ -296,7 +296,9 @@
 - [x] Dashboard: Stift-Button ✏️ zum Bearbeiten, effektiver Betrag angezeigt, Upcoming-Change-Badges (⚠️ Kündigung / 📈 Preiserhöhung)
 - [x] Datumsformat in Änderungs-Badges: DD.MM.YYYY (formatDate-Helper)
 
-### ✅ Phase 17: Globale UX — Abgerundete Buttons + Notizen-Header (Session 9, 2026-05-15)
+### ✅ Phase 17: Globale Button-UX + iOS Install Banner (Session 9, 2026-05-15)
+
+#### 17.1 Abgerundete Buttons + Notizen-Header
 - [x] Alle Text-Aktionsbuttons: `borderRadius: var(--rounded-full)` → `var(--rounded-sm)` (8px) in Calendar, Budget, Lists, StickyNotes
 - [x] Neuer i18n-Key `calNewEvent` (DE: "Termin", EN: "Event") — Kalender-Header-Button
 - [x] StickyNotes: "+ Notiz"-Button von Board-Unterkante in Modul-Header verschoben; `onBack`-Prop für App.tsx-Navigation
@@ -304,6 +306,14 @@
 - [x] Unberührt (korrekte Pill-Form beibehalten): Farbswatches, Icon-Kreis-Buttons (Gear/Close/Add), Chips, AQI/Pollen-Badges, Member-Selector
 - [x] TS6133-Bugfix: `PlusIcon`-Komponente aus Calendar.tsx entfernt (war nach FAB-Entfernung nicht mehr referenziert)
 - [x] `.fab`-CSS-Klasse aus index.css entfernt (Dead Code seit Phase 14)
+
+#### 17.2 iOS PWA Install Banner
+- [x] iOS Safari unterstützt kein `beforeinstallprompt` — eigener Banner nötig
+- [x] Erkennung: `iPhone|iPad|iPod` im UserAgent + nicht im Standalone-Modus (`navigator.standalone` / `display-mode: standalone`)
+- [x] Fixer Banner über der Bottom-Nav (z-index 95, `bottom: calc(70px + env(safe-area-inset-bottom))`)
+- [x] Zeigt iOS-Share-Icon (↑) + Anleitung: "Tippe auf ↑ und dann 'Zum Home-Bildschirm'"
+- [x] × schließt dauerhaft (localStorage-Key `shnoozy_ios_install_dismissed`)
+- [x] i18n: `iosInstallHint` + `iosInstallHintThen` (DE/EN)
 
 ---
 
@@ -497,4 +507,5 @@
 *   **2026-05-15 (Session 8):** Phase 14 (UX-Polish): Budget Quick-Actions 50/50, "+ Neuer Eintrag" bei Wiederkehrenden + "+ Betrag einzahlen" bei Sparzielen als teal Buttons. `RecurringItemModal` als eigenständige Komponente extrahiert. Kalender: FAB entfernt → Header-Pill-Button; Event-Modal auf Bottom-Sheet umgestellt. Gear-Icon in Budget + Kalender + Listen vereinheitlicht (36×36, surface-strong Hintergrund).
 *   **2026-05-15 (Session 8):** Phase 15 (Shopping→Budget Bridge): `BudgetQuickExpenseModal` in Budget.tsx exportiert (self-contained). Lists.tsx zeigt "Fertig mit dem Einkauf?"-Card am Listenende (nur wenn Budget aktiviert). i18n: `shoppingBudgetPrompt` + `shoppingRecordExpense`.
 *   **2026-05-15 (Session 8):** Phase 16 (Wiederkehrende Ausgaben — Geplante Änderungen): DB-Tabelle `budget_recurring_changes` (RLS via JOIN auf recurring_items). `effectiveRecurring()`-Helper für monatsgenaue Betrag-/Kündigungs-Logik. `RecurringItemModal` erweitert: Kündigung (Datum) + Preisanpassung (Datum + neuer Betrag) + Löschen. Dashboard: ✏️-Bearbeiten-Button, effektive Beträge, Upcoming-Change-Badges (⚠️/📈). Datumsformat DD.MM.YYYY.
-*   **2026-05-15 (Session 9):** Phase 17 (Globale Button-UX): Alle Text-Aktionsbuttons app-weit von `rounded-full` auf `rounded-sm` (8px) umgestellt (Calendar, Budget, Lists, StickyNotes). Neuer i18n-Key `calNewEvent` (Termin/Event). StickyNotes: "+ Notiz"-Button aus Board-Unterkante in Modul-Header verschoben, `onBack`-Prop für Zurück-Navigation. TS6133-Bugfix (PlusIcon in Calendar.tsx). Dead-Code `.fab`-CSS entfernt.
+*   **2026-05-15 (Session 9):** Phase 17.1 (Globale Button-UX): Alle Text-Aktionsbuttons app-weit von `rounded-full` auf `rounded-sm` (8px) umgestellt (Calendar, Budget, Lists, StickyNotes). Neuer i18n-Key `calNewEvent` (Termin/Event). StickyNotes: "+ Notiz"-Button aus Board-Unterkante in Modul-Header verschoben, `onBack`-Prop für Zurück-Navigation. TS6133-Bugfix (PlusIcon in Calendar.tsx). Dead-Code `.fab`-CSS entfernt.
+*   **2026-05-15 (Session 9):** Phase 17.2 (iOS PWA Install Banner): iOS Safari unterstützt kein `beforeinstallprompt`. Eigener Banner in App.tsx: detektiert iOS + nicht-Standalone + nicht-dismissed; zeigt Share-Icon + Anleitung „Zum Home-Bildschirm"; × schließt permanent via localStorage. i18n DE/EN.
