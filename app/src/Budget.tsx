@@ -14,6 +14,17 @@ interface BudgetCategory {
   period: 'weekly' | 'monthly' | 'yearly';
   category_type: 'expense' | 'income';
   sort_order: number;
+  description: string | null;
+}
+
+interface RecurringItem {
+  id: string;
+  name: string;
+  amount: number;
+  billing_day: number;
+  category_id: string | null;
+  active: boolean;
+  sort_order: number;
 }
 
 interface BudgetEntry {
@@ -26,6 +37,7 @@ interface BudgetEntry {
   entry_type: 'expense' | 'income';
   paid_by: string | null;
   user_id: string;
+  recurring_item_id: string | null;
   budget_categories: { name: string; icon: string; color: string } | null;
 }
 
@@ -438,13 +450,13 @@ const defaultCatColors = ['#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6','#f9
 // ─── BudgetDashboard ──────────────────────────────────────────────────────────
 
 function BudgetDashboard({
-  language, categories, entries, savingsGoals, homeSettings,
+  homeId, userId, language, categories, entries, savingsGoals, recurringItems, homeSettings,
   currentMonth, onPrevMonth, onNextMonth,
   onAddExpense, onAddExpenseAI, onAddIncome, onGoToEntries, onGoToSettings, onRefresh,
 }: {
-  language: Lang;
+  homeId: string; userId: string; language: Lang;
   categories: BudgetCategory[]; entries: BudgetEntry[];
-  savingsGoals: SavingsGoal[]; homeSettings: HomeSettings;
+  savingsGoals: SavingsGoal[]; recurringItems: RecurringItem[]; homeSettings: HomeSettings;
   currentMonth: { year: number; month: number };
   onPrevMonth: () => void; onNextMonth: () => void;
   onAddExpense: () => void; onAddExpenseAI: () => void; onAddIncome: () => void;
@@ -455,7 +467,38 @@ function BudgetDashboard({
   const [goalModal, setGoalModal] = useState<SavingsGoal | null>(null);
   const [goalAddAmount, setGoalAddAmount] = useState('');
   const [goalSaving, setGoalSaving] = useState(false);
+  const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const paidRecurringIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const e of entries) {
+      if (e.recurring_item_id) ids.add(e.recurring_item_id);
+    }
+    return ids;
+  }, [entries]);
+
+  const activeRecurring = recurringItems.filter(r => r.active);
+  const recurringTotal = activeRecurring.reduce((s, r) => s + Number(r.amount), 0);
+
+  async function markAsPaid(item: RecurringItem) {
+    setMarkingPaidId(item.id);
+    try {
+      const daysInMonth = new Date(currentMonth.year, currentMonth.month + 1, 0).getDate();
+      const day = Math.min(item.billing_day, daysInMonth);
+      const date = `${currentMonth.year}-${String(currentMonth.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      await supabase.from('budget_entries').insert({
+        home_id: homeId, user_id: userId,
+        amount: item.amount, category_id: item.category_id,
+        description: item.name, date,
+        split_mode: homeSettings.budget_split_mode === 'none' ? 'personal' : 'shared',
+        entry_type: 'expense', recurring_item_id: item.id,
+      });
+      onRefresh();
+    } finally {
+      setMarkingPaidId(null);
+    }
+  }
 
   const expenseEntries = entries.filter(e => e.entry_type !== 'income');
   const incomeEntries = entries.filter(e => e.entry_type === 'income');
@@ -675,6 +718,48 @@ function BudgetDashboard({
           })}
           <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: 'var(--spacing-sm)', borderTop: '1px solid var(--color-hairline-soft)', paddingTop: 'var(--spacing-sm)' }}>
             ℹ️ {t.budgetSavingsGoalBankingHint}
+          </div>
+        </div>
+      )}
+
+      {/* Recurring expenses */}
+      {activeRecurring.length > 0 && (
+        <div className="card" style={{ marginBottom: 'var(--spacing-md)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-sm)' }}>
+            <h3 className="text-title-sm">{t.budgetRecurring}</h3>
+            <span className="text-body-sm text-muted">{t.budgetRecurringThisMonth}</span>
+          </div>
+          {activeRecurring.map(item => {
+            const paid = paidRecurringIds.has(item.id);
+            const busy = markingPaidId === item.id;
+            return (
+              <div key={item.id} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '8px 0', borderBottom: '1px solid var(--color-hairline-soft)',
+              }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="text-body-md" style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+                  <div className="text-body-sm text-muted">{formatAmt(item.amount, language)} €</div>
+                </div>
+                {paid ? (
+                  <span style={{ fontSize: '13px', color: '#10b981', fontWeight: 600, flexShrink: 0 }}>{t.budgetRecurringPaid}</span>
+                ) : (
+                  <button
+                    onClick={() => markAsPaid(item)}
+                    disabled={busy}
+                    style={{
+                      fontSize: '12px', padding: '5px 10px', borderRadius: 'var(--rounded-full)',
+                      border: '1px solid var(--color-primary)', background: 'transparent',
+                      color: 'var(--color-primary)', cursor: busy ? 'default' : 'pointer',
+                      fontWeight: 600, flexShrink: 0, opacity: busy ? 0.5 : 1,
+                    }}
+                  >{busy ? '…' : t.budgetRecurringMarkPaid}</button>
+                )}
+              </div>
+            );
+          })}
+          <div className="text-body-sm text-muted" style={{ marginTop: 'var(--spacing-sm)', textAlign: 'right' }}>
+            {t.budgetRecurringTotal(formatAmt(recurringTotal, language))}
           </div>
         </div>
       )}
@@ -953,7 +1038,7 @@ function AiScanModal({
 
       const catList = categories
         .filter(c => c.category_type === 'expense')
-        .map(c => ({ id: c.id, name: c.name }));
+        .map(c => ({ id: c.id, name: c.name, description: c.description ?? '' }));
 
       const { data, error: fnErr } = await supabase.functions.invoke('analyze-receipt', {
         body: { imageBase64: base64, mimeType: file.type, categories: catList },
@@ -1044,16 +1129,18 @@ function AiScanModal({
 // ─── BudgetSettingsView ───────────────────────────────────────────────────────
 
 function BudgetSettingsView({
-  homeId, language, categories, savingsGoals, homeSettings,
+  homeId, language, categories, savingsGoals, recurringItems, homeSettings, userRole,
   onBack, onRefresh,
 }: {
   homeId: string; language: Lang; categories: BudgetCategory[];
-  savingsGoals: SavingsGoal[]; homeSettings: HomeSettings;
+  savingsGoals: SavingsGoal[]; recurringItems: RecurringItem[];
+  homeSettings: HomeSettings; userRole?: 'admin' | 'member';
   onBack: () => void; onRefresh: () => void;
 }) {
   const t = getT(language);
   const [catModal, setCatModal] = useState<BudgetCategory | 'new' | null>(null);
   const [goalModal, setGoalModal] = useState<SavingsGoal | 'new' | null>(null);
+  const [recurringModal, setRecurringModal] = useState<RecurringItem | 'new' | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Category form state
@@ -1063,6 +1150,7 @@ function BudgetSettingsView({
   const [catLimit, setCatLimit] = useState('');
   const [catPeriod, setCatPeriod] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
   const [catType, setCatType] = useState<'expense' | 'income'>('expense');
+  const [catDesc, setCatDesc] = useState('');
   const [confirmDeleteCatId, setConfirmDeleteCatId] = useState<string | null>(null);
 
   // Goal form state
@@ -1073,14 +1161,31 @@ function BudgetSettingsView({
   const [goalCurrent, setGoalCurrent] = useState('');
   const [confirmDeleteGoalId, setConfirmDeleteGoalId] = useState<string | null>(null);
 
+  // Recurring item form state
+  const [riName, setRiName] = useState('');
+  const [riAmount, setRiAmount] = useState('');
+  const [riDay, setRiDay] = useState('1');
+  const [riCategoryId, setRiCategoryId] = useState<string | null>(null);
+  const [riActive, setRiActive] = useState(true);
+  const [confirmDeleteRiId, setConfirmDeleteRiId] = useState<string | null>(null);
+
+  // Home settings form state
+  const [hSharedAccount, setHSharedAccount] = useState<'yes' | 'no'>(homeSettings.budget_shared_account);
+  const [hSplitMode, setHSplitMode] = useState<'even' | 'individual' | 'none'>(homeSettings.budget_split_mode);
+  const [hDefaultPeriod, setHDefaultPeriod] = useState<'monthly' | 'weekly' | 'yearly'>(homeSettings.budget_default_period);
+  const [hAiReceipts, setHAiReceipts] = useState<'yes' | 'no'>(homeSettings.budget_ai_receipts);
+  const [hSaving, setHSaving] = useState(false);
+  const [hSaved, setHSaved] = useState(false);
+
   function openCatModal(cat: BudgetCategory | 'new') {
     if (cat === 'new') {
       setCatName(''); setCatIcon('💰'); setCatColor('#6366f1');
-      setCatLimit(''); setCatPeriod('monthly'); setCatType('expense');
+      setCatLimit(''); setCatPeriod('monthly'); setCatType('expense'); setCatDesc('');
     } else {
       setCatName(cat.name); setCatIcon(cat.icon); setCatColor(cat.color);
       setCatLimit(cat.budget_limit != null ? String(cat.budget_limit) : '');
       setCatPeriod(cat.period); setCatType(cat.category_type);
+      setCatDesc(cat.description ?? '');
     }
     setCatModal(cat);
   }
@@ -1096,6 +1201,43 @@ function BudgetSettingsView({
     setGoalModal(goal);
   }
 
+  function openRecurringModal(item: RecurringItem | 'new') {
+    if (item === 'new') {
+      setRiName(''); setRiAmount(''); setRiDay('1'); setRiCategoryId(null); setRiActive(true);
+    } else {
+      setRiName(item.name); setRiAmount(String(item.amount)); setRiDay(String(item.billing_day));
+      setRiCategoryId(item.category_id); setRiActive(item.active);
+    }
+    setRecurringModal(item);
+  }
+
+  async function sortCat(cat: BudgetCategory, dir: 'up' | 'down') {
+    const idx = categories.findIndex(c => c.id === cat.id);
+    const otherIdx = dir === 'up' ? idx - 1 : idx + 1;
+    if (otherIdx < 0 || otherIdx >= categories.length) return;
+    const other = categories[otherIdx];
+    await supabase.from('budget_categories').update({ sort_order: other.sort_order }).eq('id', cat.id);
+    await supabase.from('budget_categories').update({ sort_order: cat.sort_order }).eq('id', other.id);
+    onRefresh();
+  }
+
+  async function saveHomeSettings() {
+    setHSaving(true);
+    try {
+      await supabase.from('home_settings').upsert([
+        { home_id: homeId, key: 'budget_shared_account', value: hSharedAccount },
+        { home_id: homeId, key: 'budget_split_mode', value: hSplitMode },
+        { home_id: homeId, key: 'budget_default_period', value: hDefaultPeriod },
+        { home_id: homeId, key: 'budget_ai_receipts', value: hAiReceipts },
+      ], { onConflict: 'home_id,key' });
+      onRefresh();
+      setHSaved(true);
+      setTimeout(() => setHSaved(false), 2000);
+    } finally {
+      setHSaving(false);
+    }
+  }
+
   async function saveCategory() {
     if (!catName.trim()) return;
     setSaving(true);
@@ -1104,6 +1246,7 @@ function BudgetSettingsView({
         home_id: homeId, name: catName.trim(), icon: catIcon, color: catColor,
         budget_limit: catLimit ? parseFloat(catLimit) : null,
         period: catPeriod, category_type: catType,
+        description: catDesc.trim() || null,
       };
       if (catModal === 'new') {
         await supabase.from('budget_categories').insert({ ...payload, sort_order: categories.length });
@@ -1142,6 +1285,29 @@ function BudgetSettingsView({
     onRefresh(); setGoalModal(null); setConfirmDeleteGoalId(null);
   }
 
+  async function saveRecurring() {
+    if (!riName.trim() || !riAmount) return;
+    setSaving(true);
+    try {
+      const payload = {
+        home_id: homeId, name: riName.trim(),
+        amount: parseFloat(riAmount), billing_day: Math.min(28, Math.max(1, parseInt(riDay) || 1)),
+        category_id: riCategoryId, active: riActive,
+      };
+      if (recurringModal === 'new') {
+        await supabase.from('budget_recurring_items').insert({ ...payload, sort_order: recurringItems.length });
+      } else if (recurringModal) {
+        await supabase.from('budget_recurring_items').update(payload).eq('id', recurringModal.id);
+      }
+      onRefresh(); setRecurringModal(null);
+    } finally { setSaving(false); }
+  }
+
+  async function deleteRecurring(id: string) {
+    await supabase.from('budget_recurring_items').delete().eq('id', id);
+    onRefresh(); setRecurringModal(null); setConfirmDeleteRiId(null);
+  }
+
   const periodLabel = (p: string) => p === 'weekly' ? t.budgetPeriodWeekly : p === 'yearly' ? t.budgetPeriodYearly : t.budgetPeriodMonthly;
   const PRESET_COLORS = ['#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6','#f97316','#ec4899','#14b8a6','#14d8db','#0ea5e9'];
 
@@ -1162,24 +1328,35 @@ function BudgetSettingsView({
           </button>
         </div>
         {categories.length === 0 && <p className="text-body-sm text-muted">{t.budgetNoCategories}</p>}
-        {categories.map(cat => (
-          <button key={cat.id} onClick={() => openCatModal(cat)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', width: '100%',
-              padding: '10px 0', background: 'none', border: 'none', borderBottom: '1px solid var(--color-hairline-soft)',
-              cursor: 'pointer', textAlign: 'left',
-            }}>
-            <span style={{ fontSize: '20px' }}>{cat.icon}</span>
-            <div style={{ flex: 1 }}>
-              <div className="text-body-md" style={{ fontWeight: 500 }}>{cat.name}</div>
-              <div className="text-body-sm text-muted">
-                {cat.budget_limit != null ? `${formatAmt(cat.budget_limit, language)} € · ${periodLabel(cat.period)}` : t.budgetNoLimit}
-                {' · '}{cat.category_type === 'expense' ? t.budgetExpense : t.budgetIncome}
-              </div>
+        {categories.map((cat, idx) => (
+          <div key={cat.id} style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            borderBottom: '1px solid var(--color-hairline-soft)',
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0 }}>
+              <button onClick={() => sortCat(cat, 'up')} disabled={idx === 0}
+                style={{ background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', color: idx === 0 ? 'var(--color-hairline)' : 'var(--color-muted)', fontSize: '12px', padding: '1px 4px', lineHeight: 1 }}>↑</button>
+              <button onClick={() => sortCat(cat, 'down')} disabled={idx === categories.length - 1}
+                style={{ background: 'none', border: 'none', cursor: idx === categories.length - 1 ? 'default' : 'pointer', color: idx === categories.length - 1 ? 'var(--color-hairline)' : 'var(--color-muted)', fontSize: '12px', padding: '1px 4px', lineHeight: 1 }}>↓</button>
             </div>
-            <div style={{ width: 10, height: 10, borderRadius: '50%', background: cat.color, flexShrink: 0 }} />
-            <span style={{ color: 'var(--color-muted)', fontSize: '16px' }}>›</span>
-          </button>
+            <button onClick={() => openCatModal(cat)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', flex: 1,
+                padding: '10px 0', background: 'none', border: 'none',
+                cursor: 'pointer', textAlign: 'left',
+              }}>
+              <span style={{ fontSize: '20px' }}>{cat.icon}</span>
+              <div style={{ flex: 1 }}>
+                <div className="text-body-md" style={{ fontWeight: 500 }}>{cat.name}</div>
+                <div className="text-body-sm text-muted">
+                  {cat.budget_limit != null ? `${formatAmt(cat.budget_limit, language)} € · ${periodLabel(cat.period)}` : t.budgetNoLimit}
+                  {' · '}{cat.category_type === 'expense' ? t.budgetExpense : t.budgetIncome}
+                </div>
+              </div>
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: cat.color, flexShrink: 0 }} />
+              <span style={{ color: 'var(--color-muted)', fontSize: '16px' }}>›</span>
+            </button>
+          </div>
         ))}
       </div>
 
@@ -1209,6 +1386,74 @@ function BudgetSettingsView({
           </button>
         ))}
       </div>
+
+      {/* Recurring expenses card */}
+      <div className="card" style={{ marginBottom: 'var(--spacing-md)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+          <h2 className="text-title-md">{t.budgetRecurring}</h2>
+          <button onClick={() => openRecurringModal('new')}
+            style={{ background: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: 'var(--rounded-md)', padding: '6px 12px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
+            + {t.budgetRecurringNew}
+          </button>
+        </div>
+        {recurringItems.length === 0 && <p className="text-body-sm text-muted">{t.budgetRecurringNoItems}</p>}
+        {recurringItems.map(item => (
+          <button key={item.id} onClick={() => openRecurringModal(item)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', width: '100%',
+              padding: '10px 0', background: 'none', border: 'none', borderBottom: '1px solid var(--color-hairline-soft)',
+              cursor: 'pointer', textAlign: 'left', opacity: item.active ? 1 : 0.5,
+            }}>
+            <div style={{ flex: 1 }}>
+              <div className="text-body-md" style={{ fontWeight: 500 }}>{item.name}</div>
+              <div className="text-body-sm text-muted">{formatAmt(item.amount, language)} € · {t.budgetRecurringDayLabel.split('(')[0].trim()} {item.billing_day}</div>
+            </div>
+            {!item.active && <span className="text-body-sm text-muted" style={{ fontSize: '11px' }}>inaktiv</span>}
+            <span style={{ color: 'var(--color-muted)', fontSize: '16px' }}>›</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Home settings card — admin only */}
+      {userRole === 'admin' && (
+        <div className="card" style={{ marginBottom: 'var(--spacing-md)' }}>
+          <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-md)' }}>{t.budgetHomeSettings}</h2>
+          <div style={{ marginBottom: 'var(--spacing-md)' }}>
+            <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 6 }}>{t.budgetSetupQ1}</label>
+            <div style={{ display: 'flex', gap: 'var(--spacing-xs)', flexWrap: 'wrap' }}>
+              <Chip label={t.budgetSetupA1Yes} active={hSharedAccount === 'yes'} onClick={() => setHSharedAccount('yes')} />
+              <Chip label={t.budgetSetupA1No} active={hSharedAccount === 'no'} onClick={() => setHSharedAccount('no')} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 'var(--spacing-md)' }}>
+            <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 6 }}>{t.budgetSetupQ2}</label>
+            <div style={{ display: 'flex', gap: 'var(--spacing-xs)', flexWrap: 'wrap' }}>
+              <Chip label={t.budgetSetupA2Even} active={hSplitMode === 'even'} onClick={() => setHSplitMode('even')} />
+              <Chip label={t.budgetSetupA2Individual} active={hSplitMode === 'individual'} onClick={() => setHSplitMode('individual')} />
+              <Chip label={t.budgetSetupA2None} active={hSplitMode === 'none'} onClick={() => setHSplitMode('none')} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 'var(--spacing-md)' }}>
+            <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 6 }}>{t.budgetSetupQ4}</label>
+            <div style={{ display: 'flex', gap: 'var(--spacing-xs)', flexWrap: 'wrap' }}>
+              <Chip label={t.budgetSetupA4Monthly} active={hDefaultPeriod === 'monthly'} onClick={() => setHDefaultPeriod('monthly')} />
+              <Chip label={t.budgetSetupA4Weekly} active={hDefaultPeriod === 'weekly'} onClick={() => setHDefaultPeriod('weekly')} />
+              <Chip label={t.budgetSetupA4Yearly} active={hDefaultPeriod === 'yearly'} onClick={() => setHDefaultPeriod('yearly')} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+            <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 6 }}>{t.budgetSetupQ8}</label>
+            <div style={{ display: 'flex', gap: 'var(--spacing-xs)', flexWrap: 'wrap' }}>
+              <Chip label={t.budgetSetupA8Yes} active={hAiReceipts === 'yes'} onClick={() => setHAiReceipts('yes')} />
+              <Chip label={t.budgetSetupA8No} active={hAiReceipts === 'no'} onClick={() => setHAiReceipts('no')} />
+            </div>
+          </div>
+          <button onClick={saveHomeSettings} disabled={hSaving}
+            style={{ padding: '10px 20px', borderRadius: 'var(--rounded-md)', background: hSaved ? '#10b981' : 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, transition: 'background 0.3s' }}>
+            {hSaving ? '…' : hSaved ? t.saved : t.save}
+          </button>
+        </div>
+      )}
 
       {/* Category modal */}
       {catModal !== null && (
@@ -1257,13 +1502,20 @@ function BudgetSettingsView({
                 style={{ width: '100%', boxSizing: 'border-box', padding: '10px var(--spacing-base)', borderRadius: 'var(--rounded-md)', border: '1px solid var(--color-hairline)', background: 'var(--color-surface)', color: 'var(--color-fg)', fontSize: '15px' }}
               />
             </div>
-            <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+            <div style={{ marginBottom: 'var(--spacing-md)' }}>
               <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 6 }}>{t.budgetCategoryPeriod}</label>
               <div style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>
                 {(['monthly','weekly','yearly'] as const).map(p => (
                   <Chip key={p} label={periodLabel(p)} active={catPeriod === p} onClick={() => setCatPeriod(p)} />
                 ))}
               </div>
+            </div>
+            <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+              <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetCategoryAiHint}</label>
+              <input type="text" value={catDesc} onChange={e => setCatDesc(e.target.value)}
+                placeholder={t.budgetCategoryAiHintPlaceholder}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '10px var(--spacing-base)', borderRadius: 'var(--rounded-md)', border: '1px solid var(--color-hairline)', background: 'var(--color-surface)', color: 'var(--color-fg)', fontSize: '14px' }}
+              />
             </div>
             <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
               {catModal !== 'new' && (
@@ -1339,6 +1591,80 @@ function BudgetSettingsView({
                 style={{ flex: 1, padding: '12px 20px', borderRadius: 'var(--rounded-md)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, opacity: saving || !goalName.trim() || !goalTarget ? 0.5 : 1 }}>
                 {saving ? '…' : t.save}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recurring item modal */}
+      {recurringModal !== null && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }}
+          onClick={() => setRecurringModal(null)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--color-canvas)', borderRadius: 'var(--rounded-lg) var(--rounded-lg) 0 0',
+            padding: 'var(--spacing-lg)', width: '100%', maxWidth: 560, maxHeight: '90dvh', overflowY: 'auto',
+          }}>
+            <h2 className="text-title-md" style={{ marginBottom: 'var(--spacing-md)' }}>
+              {recurringModal === 'new' ? t.budgetRecurringNew : t.budgetRecurring}
+            </h2>
+            <div style={{ marginBottom: 'var(--spacing-md)' }}>
+              <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetRecurringName}</label>
+              <input type="text" value={riName} onChange={e => setRiName(e.target.value)} className="form-input" autoFocus placeholder="Netflix" />
+            </div>
+            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
+              <div style={{ flex: 2 }}>
+                <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetRecurringAmountLabel}</label>
+                <input type="number" inputMode="decimal" value={riAmount} onChange={e => setRiAmount(e.target.value)}
+                  className="form-input" placeholder="12.99" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 4 }}>{t.budgetRecurringDayLabel}</label>
+                <input type="number" inputMode="numeric" value={riDay} onChange={e => setRiDay(e.target.value)}
+                  min="1" max="28" className="form-input" placeholder="1" />
+              </div>
+            </div>
+            <div style={{ marginBottom: 'var(--spacing-md)' }}>
+              <label className="text-body-sm text-muted" style={{ display: 'block', marginBottom: 6 }}>{t.budgetCategory}</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-xs)' }}>
+                {categories.filter(c => c.category_type === 'expense').map(cat => (
+                  <Chip key={cat.id} label={`${cat.icon} ${cat.name}`} active={riCategoryId === cat.id}
+                    onClick={() => setRiCategoryId(riCategoryId === cat.id ? null : cat.id)} color={cat.color} />
+                ))}
+                <Chip label={t.budgetNoCategory} active={riCategoryId === null} onClick={() => setRiCategoryId(null)} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--spacing-lg)', padding: '10px var(--spacing-base)', background: 'var(--color-surface)', borderRadius: 'var(--rounded-md)' }}>
+              <span className="text-body-md">{t.budgetRecurringActive}</span>
+              <Toggle value={riActive} onChange={setRiActive} />
+            </div>
+            <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+              {recurringModal !== 'new' && (
+                <button onClick={() => setConfirmDeleteRiId(recurringModal.id)}
+                  style={{ padding: '12px 20px', borderRadius: 'var(--rounded-md)', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontWeight: 600 }}>
+                  {t.delete}
+                </button>
+              )}
+              <button onClick={() => setRecurringModal(null)}
+                style={{ padding: '12px 20px', borderRadius: 'var(--rounded-md)', border: '1px solid var(--color-hairline)', background: 'transparent', cursor: 'pointer', fontWeight: 600, color: 'var(--color-muted)' }}>
+                {t.cancel}
+              </button>
+              <button onClick={saveRecurring} disabled={saving || !riName.trim() || !riAmount}
+                style={{ flex: 1, padding: '12px 20px', borderRadius: 'var(--rounded-md)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 600, opacity: saving || !riName.trim() || !riAmount ? 0.5 : 1 }}>
+                {saving ? '…' : t.save}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm delete recurring */}
+      {confirmDeleteRiId && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-md)' }}>
+          <div style={{ background: 'var(--color-canvas)', borderRadius: 'var(--rounded-lg)', padding: 'var(--spacing-lg)', maxWidth: 320, width: '100%' }}>
+            <p className="text-body-md" style={{ marginBottom: 'var(--spacing-md)', textAlign: 'center' }}>{t.budgetConfirmDelete}</p>
+            <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+              <button onClick={() => setConfirmDeleteRiId(null)} style={{ flex: 1, padding: '10px', borderRadius: 'var(--rounded-md)', border: '1px solid var(--color-hairline)', background: 'transparent', cursor: 'pointer', fontWeight: 600 }}>{t.cancel}</button>
+              <button onClick={() => deleteRecurring(confirmDeleteRiId)} style={{ flex: 1, padding: '10px', borderRadius: 'var(--rounded-md)', border: 'none', background: '#ef4444', color: 'white', cursor: 'pointer', fontWeight: 600 }}>{t.delete}</button>
             </div>
           </div>
         </div>
@@ -1443,6 +1769,7 @@ export function Budget({ homeId, language, userId, userRole }: {
   const [categories, setCategories] = useState<BudgetCategory[]>([]);
   const [entries, setEntries] = useState<BudgetEntry[]>([]);
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
+  const [recurringItems, setRecurringItems] = useState<RecurringItem[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [homeSettings, setHomeSettings] = useState<HomeSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1466,13 +1793,14 @@ export function Budget({ homeId, language, userId, userRole }: {
     const endMonth = month === 11 ? 1 : month + 2;
     const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
 
-    const [catsRes, entriesRes, goalsRes, membersRes, settingsRes] = await Promise.all([
+    const [catsRes, entriesRes, goalsRes, recurringRes, membersRes, settingsRes] = await Promise.all([
       supabase.from('budget_categories').select('*').eq('home_id', homeId).order('sort_order'),
       supabase.from('budget_entries')
         .select('*, budget_categories(name,icon,color)')
         .eq('home_id', homeId).gte('date', startDate).lt('date', endDate)
         .order('date', { ascending: false }),
       supabase.from('budget_savings_goals').select('*').eq('home_id', homeId).order('sort_order'),
+      supabase.from('budget_recurring_items').select('*').eq('home_id', homeId).order('sort_order'),
       supabase.from('home_members').select('user_id, profiles(display_name, avatar_color)').eq('home_id', homeId),
       supabase.from('home_settings').select('key, value').eq('home_id', homeId)
         .in('key', ['budget_setup_done','budget_shared_account','budget_split_mode','budget_default_period','budget_ai_receipts']),
@@ -1481,6 +1809,7 @@ export function Budget({ homeId, language, userId, userRole }: {
     setCategories(catsRes.data ?? []);
     setEntries(entriesRes.data ?? []);
     setSavingsGoals(goalsRes.data ?? []);
+    setRecurringItems(recurringRes.data ?? []);
     setMembers(
       (membersRes.data ?? []).map((m: any) => ({
         user_id: m.user_id,
@@ -1559,9 +1888,10 @@ export function Budget({ homeId, language, userId, userRole }: {
 
       {view === 'dashboard' && (
         <BudgetDashboard
+          homeId={homeId} userId={userId}
           language={language}
           categories={categories} entries={entries}
-          savingsGoals={savingsGoals}
+          savingsGoals={savingsGoals} recurringItems={recurringItems}
           homeSettings={effectiveSettings}
           currentMonth={currentMonth}
           onPrevMonth={() => setCurrentMonth(({ year, month }) => month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 })}
@@ -1586,7 +1916,8 @@ export function Budget({ homeId, language, userId, userRole }: {
         <BudgetSettingsView
           homeId={homeId} language={language}
           categories={categories} savingsGoals={savingsGoals}
-          homeSettings={effectiveSettings}
+          recurringItems={recurringItems} homeSettings={effectiveSettings}
+          userRole={userRole}
           onBack={() => setView('dashboard')} onRefresh={fetchAll}
         />
       )}

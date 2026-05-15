@@ -361,6 +361,26 @@ const en = {
   budgetMiniWidgetCats: 'Select categories to display (max 5):',
   budgetMiniWidgetNoCats: 'No budget categories set up yet.',
 
+  // Budget — recurring expenses
+  budgetRecurring: 'Recurring Expenses',
+  budgetRecurringNew: 'New Recurring',
+  budgetRecurringName: 'Name',
+  budgetRecurringAmountLabel: 'Monthly amount (€)',
+  budgetRecurringDayLabel: 'Billing day (1–28)',
+  budgetRecurringMarkPaid: 'Mark as paid',
+  budgetRecurringPaid: 'Paid ✓',
+  budgetRecurringNoItems: 'No recurring expenses yet.',
+  budgetRecurringTotal: (n: string) => `Total: ${n} € / month`,
+  budgetRecurringThisMonth: 'This month',
+  budgetRecurringActive: 'Active',
+
+  // Budget — home settings edit
+  budgetHomeSettings: 'Budget Setup',
+
+  // Budget — category AI hint
+  budgetCategoryAiHint: 'AI hint (optional)',
+  budgetCategoryAiHintPlaceholder: 'e.g. Netflix, Spotify, Amazon Prime',
+
   // Activity Log
   activityLog: 'Activity',
   activityLogSeeAll: 'See all →',
@@ -771,6 +791,26 @@ const de: typeof en = {
   budgetDefaultCats: ['Haushalt','Lebensmittel','Restaurant & Freizeit','Auto & Transport','Drogerie & Gesundheit','Urlaub','Kleidung','Sonstiges'],
   budgetMiniWidgetCats: 'Kategorien für die Startseite auswählen (max. 5):',
   budgetMiniWidgetNoCats: 'Noch keine Budget-Kategorien eingerichtet.',
+
+  // Budget — Wiederkehrende Ausgaben
+  budgetRecurring: 'Wiederkehrende Ausgaben',
+  budgetRecurringNew: 'Neuer Eintrag',
+  budgetRecurringName: 'Bezeichnung',
+  budgetRecurringAmountLabel: 'Monatlicher Betrag (€)',
+  budgetRecurringDayLabel: 'Abbuchungstag (1–28)',
+  budgetRecurringMarkPaid: 'Als bezahlt markieren',
+  budgetRecurringPaid: 'Bezahlt ✓',
+  budgetRecurringNoItems: 'Noch keine wiederkehrenden Ausgaben.',
+  budgetRecurringTotal: (n: string) => `Gesamt: ${n} € / Monat`,
+  budgetRecurringThisMonth: 'Diesen Monat',
+  budgetRecurringActive: 'Aktiv',
+
+  // Budget — Home-Einstellungen bearbeiten
+  budgetHomeSettings: 'Budget-Einstellungen',
+
+  // Budget — KI-Hinweis für Kategorien
+  budgetCategoryAiHint: 'KI-Hinweis (optional)',
+  budgetCategoryAiHintPlaceholder: 'z.B. Netflix, Spotify, Amazon Prime',
 
   // Activity Log
   activityLog: 'Aktivitäten',
