@@ -1078,7 +1078,6 @@ function AiScanModal({
   const [analysing, setAnalysing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
 
   async function handleFile(file: File) {
     setAnalysing(true);
@@ -1136,38 +1135,26 @@ function AiScanModal({
             </p>
 
             <input
-              ref={cameraRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              style={{ display: 'none' }}
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
-            />
-            <input
               ref={fileRef}
               type="file"
               accept="image/*"
               style={{ display: 'none' }}
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+              onChange={e => {
+                const f = e.target.files?.[0];
+                e.target.value = '';
+                if (f) handleFile(f);
+              }}
             />
 
-            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
+            <div style={{ marginBottom: 'var(--spacing-md)' }}>
               <button
-                onClick={() => cameraRef.current?.click()}
+                onClick={() => fileRef.current?.click()}
                 style={{
-                  flex: 1, padding: '14px', borderRadius: 'var(--rounded-md)',
+                  width: '100%', padding: '14px', borderRadius: 'var(--rounded-md)',
                   background: 'var(--color-primary)', color: 'white', border: 'none',
                   cursor: 'pointer', fontSize: '15px', fontWeight: 600,
                 }}
               >📷 {t.budgetScanCamera}</button>
-              <button
-                onClick={() => fileRef.current?.click()}
-                style={{
-                  flex: 1, padding: '14px', borderRadius: 'var(--rounded-md)',
-                  background: 'var(--color-surface-strong)', color: 'var(--color-ink)', border: 'none',
-                  cursor: 'pointer', fontSize: '15px', fontWeight: 600,
-                }}
-              >🖼 {t.budgetScanGallery}</button>
             </div>
 
             {error && (
