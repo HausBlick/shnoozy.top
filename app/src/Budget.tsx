@@ -1077,25 +1077,85 @@ function AiScanModal({
   const t = getT(language);
   const [analysing, setAnalysing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    return () => { stream?.getTracks().forEach(tr => tr.stop()); };
+  }, [stream]);
+
+  useEffect(() => {
+    if (videoRef.current && stream) videoRef.current.srcObject = stream;
+  }, [stream]);
+
+  async function openCamera() {
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
+      });
+      setStream(s);
+    } catch {
+      fileRef.current?.click();
+    }
+  }
+
+  function stopCamera() {
+    stream?.getTracks().forEach(tr => tr.stop());
+    setStream(null);
+  }
+
+  function captureFromVideo() {
+    const video = videoRef.current;
+    if (!video) return;
+    const MAX = 1280;
+    const scale = Math.min(1, MAX / Math.max(video.videoWidth, video.videoHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+    canvas.getContext('2d')!.drawImage(video, 0, 0, canvas.width, canvas.height);
+    stopCamera();
+    canvas.toBlob(blob => {
+      if (blob) handleFile(new File([blob], 'receipt.jpg', { type: 'image/jpeg' }));
+    }, 'image/jpeg', 0.85);
+  }
+
+  async function compressFile(file: File): Promise<{ base64: string; mimeType: string }> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const MAX = 1280;
+        const scale = Math.min(1, MAX / Math.max(img.width || 1, img.height || 1));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round((img.width || MAX) * scale);
+        canvas.height = Math.round((img.height || MAX) * scale);
+        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(blob => {
+          if (!blob) { reject(new Error('compress failed')); return; }
+          const reader = new FileReader();
+          reader.onload = () => resolve({ base64: (reader.result as string).split(',')[1], mimeType: 'image/jpeg' });
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        }, 'image/jpeg', 0.85);
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
 
   async function handleFile(file: File) {
     setAnalysing(true);
     setError(null);
     try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve((reader.result as string).split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-
+      const { base64, mimeType } = await compressFile(file);
       const catList = categories
         .filter(c => c.category_type === 'expense')
-        .map(c => ({ id: c.id, name: c.name, description: c.description ?? '' }));
+        .map(c => ({ id: c.id, name: c.name }));
 
       const { data, error: fnErr } = await supabase.functions.invoke('analyze-receipt', {
-        body: { imageBase64: base64, mimeType: file.type, categories: catList },
+        body: { imageBase64: base64, mimeType, categories: catList },
       });
 
       if (fnErr) throw fnErr;
@@ -1110,6 +1170,25 @@ function AiScanModal({
       setError(t.budgetAnalysisError);
       setAnalysing(false);
     }
+  }
+
+  // In-app camera viewfinder
+  if (stream) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: '#000', zIndex: 200, display: 'flex', flexDirection: 'column' }}>
+        <video ref={videoRef} autoPlay playsInline muted style={{ flex: 1, objectFit: 'cover', width: '100%' }} />
+        <div style={{ display: 'flex', gap: 'var(--spacing-sm)', padding: 'var(--spacing-lg)', background: '#000' }}>
+          <button onClick={stopCamera}
+            style={{ flex: 1, padding: '14px', borderRadius: 'var(--rounded-md)', background: 'rgba(255,255,255,0.15)', color: 'white', border: 'none', cursor: 'pointer', fontSize: '15px' }}>
+            {t.cancel}
+          </button>
+          <button onClick={captureFromVideo}
+            style={{ flex: 2, padding: '14px', borderRadius: 'var(--rounded-md)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 700 }}>
+            📷 {t.budgetScanCapture}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -1134,36 +1213,27 @@ function AiScanModal({
               {t.budgetAiScanHint}
             </p>
 
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={e => {
-                const f = e.target.files?.[0];
-                e.target.value = '';
-                if (f) handleFile(f);
-              }}
-            />
+            <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }}
+              onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) handleFile(f); }} />
 
-            <div style={{ marginBottom: 'var(--spacing-md)' }}>
-              <button
-                onClick={() => fileRef.current?.click()}
-                style={{
-                  width: '100%', padding: '14px', borderRadius: 'var(--rounded-md)',
-                  background: 'var(--color-primary)', color: 'white', border: 'none',
-                  cursor: 'pointer', fontSize: '15px', fontWeight: 600,
-                }}
-              >📷 {t.budgetScanCamera}</button>
+            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
+              <button onClick={openCamera}
+                style={{ flex: 1, padding: '14px', borderRadius: 'var(--rounded-md)', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 600 }}>
+                📷 {t.budgetScanCamera}
+              </button>
+              <button onClick={() => fileRef.current?.click()}
+                style={{ flex: 1, padding: '14px', borderRadius: 'var(--rounded-md)', background: 'var(--color-surface-strong)', color: 'var(--color-ink)', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 600 }}>
+                🖼 {t.budgetScanGallery}
+              </button>
             </div>
 
             {error && (
               <div style={{ marginBottom: 'var(--spacing-md)' }}>
                 <p style={{ color: '#ef4444', fontSize: '14px', marginBottom: 8 }}>{error}</p>
-                <button
-                  onClick={onFallback}
-                  style={{ fontSize: '14px', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                >✏️ {t.budgetManualEntry}</button>
+                <button onClick={onFallback}
+                  style={{ fontSize: '14px', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  ✏️ {t.budgetManualEntry}
+                </button>
               </div>
             )}
 

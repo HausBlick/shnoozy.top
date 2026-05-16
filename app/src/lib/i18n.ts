@@ -401,8 +401,9 @@ const en = {
   // Activity Log
   activityLog: 'Activity',
   activityLogSeeAll: 'See all',
-  budgetScanCamera: 'Choose Photo',
-  budgetScanGallery: 'From Gallery',
+  budgetScanCamera: 'Camera',
+  budgetScanGallery: 'Gallery',
+  budgetScanCapture: 'Take Photo',
   todoSelectList: 'Select list',
   activityLogEmpty: 'No activity yet.',
   activityLogTitle: 'Activity Log',
@@ -902,8 +903,9 @@ const de: typeof en = {
   // Activity Log
   activityLog: 'Aktivitäten',
   activityLogSeeAll: 'Alle anzeigen',
-  budgetScanCamera: 'Foto wählen',
-  budgetScanGallery: 'Aus Galerie',
+  budgetScanCamera: 'Kamera',
+  budgetScanGallery: 'Galerie',
+  budgetScanCapture: 'Foto aufnehmen',
   todoSelectList: 'Liste auswählen',
   activityLogEmpty: 'Noch keine Aktivitäten.',
   activityLogTitle: 'Aktivitäts-Log',
