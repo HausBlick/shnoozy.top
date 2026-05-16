@@ -1166,8 +1166,9 @@ function AiScanModal({
         description: data.description ?? '',
         categoryId: data.suggested_category_id ?? null,
       });
-    } catch {
-      setError(t.budgetAnalysisError);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg.slice(0, 200) || t.budgetAnalysisError);
       setAnalysing(false);
     }
   }

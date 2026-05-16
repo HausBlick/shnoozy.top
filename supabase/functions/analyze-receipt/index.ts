@@ -9,18 +9,21 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { imageBase64, mimeType, categories } = await req.json();
+    const body = await req.json();
+    const { imageBase64, mimeType, categories } = body;
+
+    console.log(`analyze-receipt: imageBase64 length=${imageBase64?.length ?? 0}, mimeType=${mimeType}, categories=${Array.isArray(categories) ? categories.length : 0}`);
 
     if (!imageBase64 || !mimeType) {
       return new Response(JSON.stringify({ error: 'imageBase64 and mimeType required' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const geminiKey = Deno.env.get('GEMINI_API_KEY');
     if (!geminiKey) {
       return new Response(JSON.stringify({ error: 'GEMINI_API_KEY not configured' }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -44,7 +47,7 @@ Rules:
 - If no category matches well, use null for suggested_category_id
 - The suggested_category_id must be one of the IDs listed above, or null`;
 
-    const body = {
+    const reqBody = {
       contents: [{
         parts: [
           { text: prompt },
@@ -54,24 +57,34 @@ Rules:
       generationConfig: { temperature: 0.1, maxOutputTokens: 256 },
     };
 
+    const approxKB = Math.round(imageBase64.length * 0.75 / 1024);
+    console.log(`analyze-receipt: sending to gemini-2.5-flash, image ~${approxKB}KB`);
+
     const resp = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(reqBody) },
     );
 
     if (!resp.ok) {
       const errText = await resp.text();
-      throw new Error(`Gemini API error ${resp.status}: ${errText}`);
+      console.error(`analyze-receipt: Gemini error ${resp.status}: ${errText}`);
+      return new Response(JSON.stringify({ error: `Gemini ${resp.status}: ${errText.slice(0, 300)}` }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const data = await resp.json();
     const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    console.log(`analyze-receipt: Gemini response text="${text.slice(0, 200)}"`);
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('No JSON found in Gemini response');
+    if (!jsonMatch) {
+      return new Response(JSON.stringify({ error: `No JSON in Gemini response: "${text.slice(0, 100)}"` }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     const parsed = JSON.parse(jsonMatch[0]);
-
     const validCatId = catList.find(c => c.id === parsed.suggested_category_id)?.id ?? null;
 
     return new Response(JSON.stringify({
@@ -85,8 +98,8 @@ Rules:
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     console.error('analyze-receipt error:', msg);
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    return new Response(JSON.stringify({ error: `EF error: ${msg}` }), {
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
