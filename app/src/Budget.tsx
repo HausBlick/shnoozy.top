@@ -2270,7 +2270,7 @@ export function Budget({ homeId, language, userId, userRole }: {
       )}
       {fabExpenseOpen && (
         <div style={{ position: 'fixed', bottom: 148, right: 16, zIndex: 300, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-          {effectiveSettings.budget_ai_receipts === 'yes' && (
+          {false && effectiveSettings.budget_ai_receipts === 'yes' && (
             <button onClick={() => { setFabOpen(false); setFabExpenseOpen(false); openAddExpenseAI(); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 24, background: 'var(--color-canvas)', border: '1px solid var(--color-hairline)', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: 'var(--color-ink)', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>🤖 {t.budgetAiScan}</button>
           )}
           <button onClick={() => { setFabOpen(false); setFabExpenseOpen(false); openAddExpense(); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 24, background: 'var(--color-canvas)', border: '1px solid var(--color-hairline)', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: 'var(--color-ink)', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>✏️ {t.budgetManualEntry}</button>
@@ -2431,7 +2431,7 @@ export function BudgetQuickExpenseModal({
   }
 
   // menu step
-  const aiEnabled = homeSettings?.budget_ai_receipts === 'yes';
+  const aiEnabled = false && homeSettings?.budget_ai_receipts === 'yes';
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }}
       onClick={onClose}>

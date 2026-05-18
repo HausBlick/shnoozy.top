@@ -54,7 +54,7 @@ Rules:
           { inline_data: { mime_type: mimeType, data: imageBase64 } },
         ],
       }],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 256 },
+      generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
     };
 
     const approxKB = Math.round(imageBase64.length * 0.75 / 1024);
@@ -74,7 +74,8 @@ Rules:
     }
 
     const data = await resp.json();
-    const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const parts: { text?: string; thought?: boolean }[] = data.candidates?.[0]?.content?.parts ?? [];
+    const text: string = (parts.find(p => !p.thought) ?? parts[0])?.text ?? '';
     console.log(`analyze-receipt: Gemini response text="${text.slice(0, 200)}"`);
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
