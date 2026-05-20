@@ -13,7 +13,6 @@ Deno.serve(async () => {
     Deno.env.get('VAPID_PRIVATE_KEY')!
   );
 
-  // Resolve today and tomorrow in Europe/Berlin time
   const berlinNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
   const todayM = berlinNow.getMonth() + 1;
   const todayD = berlinNow.getDate();
@@ -36,20 +35,57 @@ Deno.serve(async () => {
 
   const userIds = [...new Set(subs.map(s => s.user_id))];
 
+  // Resolve each user's home_id — only notifications from their own home
+  const { data: memberships } = await supabase
+    .from('home_members')
+    .select('user_id, home_id')
+    .in('user_id', userIds);
+
+  const userHomeId = new Map<string, string>(
+    (memberships ?? []).map((m: { user_id: string; home_id: string }) => [m.user_id, m.home_id])
+  );
+  const homeIds = [...new Set((memberships ?? []).map((m: { home_id: string }) => m.home_id))];
+
+  if (homeIds.length === 0)
+    return new Response(JSON.stringify({ sent: 0 }), { headers: { 'Content-Type': 'application/json' } });
+
   const [profilesRes, eventsRes, dueTodayRes] = await Promise.all([
     supabase.from('profiles').select('id, notification_preferences').in('id', userIds),
-    supabase.from('events').select('title, category, recurrence_type, start_time'),
+    supabase.from('events')
+      .select('title, recurrence_type, start_time, home_id')
+      .in('home_id', homeIds),
     supabase.from('todo_items')
-      .select('title, assigned_to')
+      .select('title, assigned_to, home_id')
       .not('assigned_to', 'is', null)
       .eq('done', false)
-      .eq('due_date', todayStr),
+      .eq('due_date', todayStr)
+      .in('home_id', homeIds),
   ]);
 
   const prefMap = new Map(
-    (profilesRes.data ?? []).map(p => [p.id, (p.notification_preferences ?? {}) as Record<string, boolean>])
+    (profilesRes.data ?? []).map((p: { id: string; notification_preferences: unknown }) =>
+      [p.id, (p.notification_preferences ?? {}) as Record<string, boolean>])
   );
 
+  // Build per-home event lists for today/tomorrow
+  const eventsByHome = new Map<string, { today: string[]; tomorrow: string[] }>();
+  for (const e of eventsRes.data ?? []) {
+    if (!eventsByHome.has(e.home_id)) eventsByHome.set(e.home_id, { today: [], tomorrow: [] });
+    const he = eventsByHome.get(e.home_id)!;
+    const d = new Date(e.start_time);
+    const em = d.getUTCMonth() + 1;
+    const ed = d.getUTCDate();
+    const dateOnly = e.start_time.slice(0, 10);
+    if (e.recurrence_type === 'yearly') {
+      if (em === todayM && ed === todayD) he.today.push(e.title);
+      else if (em === tmrwM && ed === tmrwD) he.tomorrow.push(e.title);
+    } else {
+      if (dateOnly === todayStr) he.today.push(e.title);
+      else if (dateOnly === tmrwStr) he.tomorrow.push(e.title);
+    }
+  }
+
+  // Build per-user due-today map
   const dueByUser = new Map<string, string[]>();
   for (const task of dueTodayRes.data ?? []) {
     const uid = task.assigned_to as string;
@@ -57,45 +93,30 @@ Deno.serve(async () => {
     dueByUser.get(uid)!.push(task.title);
   }
 
-  const todayTitles: string[] = [];
-  const tmrwTitles: string[] = [];
-
-  for (const e of eventsRes.data ?? []) {
-    const d = new Date(e.start_time);
-    const em = d.getUTCMonth() + 1;
-    const ed = d.getUTCDate();
-    const dateOnly = e.start_time.slice(0, 10);
-
-    if (e.recurrence_type === 'yearly') {
-      if (em === todayM && ed === todayD) todayTitles.push(e.title);
-      else if (em === tmrwM && ed === tmrwD) tmrwTitles.push(e.title);
-    } else {
-      if (dateOnly === todayStr) todayTitles.push(e.title);
-      else if (dateOnly === tmrwStr) tmrwTitles.push(e.title);
-    }
-  }
-
   let sent = 0;
 
   for (const sub of subs) {
+    const homeId = userHomeId.get(sub.user_id);
+    if (!homeId) continue; // user has no home membership — skip
+
     const prefs = prefMap.get(sub.user_id) ?? {};
     const wantsCalendar = prefs.calendar_daily !== false;
     const wantsDueToday = prefs.todo_due_today !== false;
 
+    const homeEvents = eventsByHome.get(homeId) ?? { today: [], tomorrow: [] };
     const notifications: { title: string; body: string; tag: string }[] = [];
 
     if (wantsCalendar) {
-      if (todayTitles.length > 0)
-        notifications.push({ title: 'Today 📅', body: todayTitles.join(' · '), tag: 'today' });
-      if (tmrwTitles.length > 0)
-        notifications.push({ title: 'Tomorrow 🗓️', body: tmrwTitles.join(' · '), tag: 'tomorrow' });
+      if (homeEvents.today.length > 0)
+        notifications.push({ title: 'Today 📅', body: homeEvents.today.join(' · '), tag: 'today' });
+      if (homeEvents.tomorrow.length > 0)
+        notifications.push({ title: 'Tomorrow 🗓️', body: homeEvents.tomorrow.join(' · '), tag: 'tomorrow' });
     }
 
     if (wantsDueToday) {
       const dueTasks = dueByUser.get(sub.user_id);
-      if (dueTasks && dueTasks.length > 0) {
+      if (dueTasks && dueTasks.length > 0)
         notifications.push({ title: '✅ Due today', body: dueTasks.join(' · '), tag: 'due-today' });
-      }
     }
 
     for (const notif of notifications) {
