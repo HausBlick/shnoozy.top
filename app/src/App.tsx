@@ -621,17 +621,25 @@ function formatActivityText(
   return `${entity[entry.entity_type] ?? entry.entity_type} ${action[entry.action_type] ?? entry.action_type}: ${entry.entity_title}`;
 }
 
-function ActivityLogRow({ entry, memberColors, memberDisplayNames, t, language }: {
+function ActivityLogRow({ entry, memberColors, memberDisplayNames, memberAvatarUrls = {}, t, language }: {
   entry: any; memberColors: Record<string, string>; memberDisplayNames: Record<string, string>;
+  memberAvatarUrls?: Record<string, string>;
   t: ReturnType<typeof getT>; language: Lang;
 }) {
   const color = memberColors[entry.user_id] || '#14d8db';
   const name = memberDisplayNames[entry.user_id] || entry.user_id.slice(0, 6);
+  const avatarUrl = memberAvatarUrls[entry.user_id];
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--color-hairline-soft)' }}>
-      <div style={{ width: 28, height: 28, borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'white', flexShrink: 0 }}>
-        {name.charAt(0).toUpperCase()}
-      </div>
+      {avatarUrl ? (
+        <div style={{ width: 28, height: 28, borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
+          <img src={avatarUrl} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        </div>
+      ) : (
+        <div style={{ width: 28, height: 28, borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'white', flexShrink: 0 }}>
+          {name.charAt(0).toUpperCase()}
+        </div>
+      )}
       <div style={{ flex: 1, minWidth: 0 }}>
         <span className="text-body-sm" style={{ fontWeight: 600 }}>{name} </span>
         <span className="text-body-sm text-muted" style={{ wordBreak: 'break-word' }}>{formatActivityText(entry, t)}</span>
@@ -1164,9 +1172,10 @@ function PollenWidget({ language }: { language: Lang }) {
 
 // ─── ActivityLogModal ─────────────────────────────────────────────────────────
 
-function ActivityLogModal({ homeId, language, memberColors, memberDisplayNames, onClose }: {
+function ActivityLogModal({ homeId, language, memberColors, memberDisplayNames, memberAvatarUrls, onClose }: {
   homeId: string; language: Lang;
   memberColors: Record<string, string>; memberDisplayNames: Record<string, string>;
+  memberAvatarUrls: Record<string, string>;
   onClose: () => void;
 }) {
   const t = getT(language);
@@ -1190,7 +1199,7 @@ function ActivityLogModal({ homeId, language, memberColors, memberDisplayNames, 
           ) : entries.length === 0 ? (
             <p className="text-body-sm text-muted">{t.activityLogEmpty}</p>
           ) : entries.map(e => (
-            <ActivityLogRow key={e.id} entry={e} memberColors={memberColors} memberDisplayNames={memberDisplayNames} t={t} language={language} />
+            <ActivityLogRow key={e.id} entry={e} memberColors={memberColors} memberDisplayNames={memberDisplayNames} memberAvatarUrls={memberAvatarUrls} t={t} language={language} />
           ))}
         </div>
       </div>
@@ -1243,6 +1252,7 @@ function App() {
   const [activityEntries, setActivityEntries] = useState<any[]>([]);
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [memberDisplayNames, setMemberDisplayNames] = useState<Record<string, string>>({});
+  const [memberAvatarUrls, setMemberAvatarUrls] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<string | null>(null);
   const [showIOSBanner, setShowIOSBanner] = useState(false);
   const [wifiSsid, setWifiSsid] = useState('');
@@ -1383,16 +1393,19 @@ function App() {
     const userIds = members.map((m: any) => m.user_id);
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, avatar_color, display_name')
+      .select('id, avatar_color, display_name, avatar_url')
       .in('id', userIds);
     const colors: Record<string, string> = {};
     const names: Record<string, string> = {};
+    const avatars: Record<string, string> = {};
     for (const p of profiles ?? []) {
       colors[p.id] = p.avatar_color || '#14d8db';
       if (p.display_name) names[p.id] = p.display_name;
+      if (p.avatar_url) avatars[p.id] = p.avatar_url;
     }
     setMemberColors(colors);
     setMemberDisplayNames(names);
+    setMemberAvatarUrls(avatars);
   }
 
   async function fetchUserHome(userId: string) {
@@ -1912,6 +1925,7 @@ function App() {
                 key={e.id} entry={e}
                 memberColors={memberColors}
                 memberDisplayNames={memberDisplayNames}
+                memberAvatarUrls={memberAvatarUrls}
                 t={t} language={language}
               />
             ))
@@ -1937,6 +1951,7 @@ function App() {
             language={language}
             memberColors={memberColors}
             memberDisplayNames={memberDisplayNames}
+            memberAvatarUrls={memberAvatarUrls}
             onClose={() => setShowActivityModal(false)}
           />
         )}

@@ -55,6 +55,7 @@ interface Member {
   user_id: string;
   display_name: string | null;
   avatar_color: string;
+  avatar_url?: string;
 }
 
 interface HomeSettings {
@@ -157,6 +158,13 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
 // ─── Avatar dot ───────────────────────────────────────────────────────────────
 
 function AvatarDot({ member, size = 28 }: { member: Member; size?: number }) {
+  if (member.avatar_url) {
+    return (
+      <div style={{ width: size, height: size, borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
+        <img src={member.avatar_url} alt={member.display_name ?? ''} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+    );
+  }
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%', background: member.avatar_color,
@@ -2079,7 +2087,7 @@ export function Budget({ homeId, language, userId, userRole }: {
         .order('date', { ascending: false }),
       supabase.from('budget_savings_goals').select('*').eq('home_id', homeId).order('sort_order'),
       supabase.from('budget_recurring_items').select('*').eq('home_id', homeId).order('sort_order'),
-      supabase.from('home_members').select('user_id, profiles(display_name, avatar_color)').eq('home_id', homeId),
+      supabase.from('home_members').select('user_id, profiles(display_name, avatar_color, avatar_url)').eq('home_id', homeId),
       supabase.from('home_settings').select('key, value').eq('home_id', homeId)
         .in('key', ['budget_setup_done','budget_shared_account','budget_split_mode','budget_default_period','budget_ai_receipts']),
     ]);
@@ -2145,6 +2153,7 @@ export function Budget({ homeId, language, userId, userRole }: {
         user_id: m.user_id,
         display_name: m.profiles?.display_name ?? null,
         avatar_color: m.profiles?.avatar_color ?? '#14d8db',
+        avatar_url: m.profiles?.avatar_url ?? undefined,
       }))
     );
 
@@ -2367,7 +2376,7 @@ export function BudgetQuickExpenseModal({
   useEffect(() => {
     Promise.all([
       supabase.from('budget_categories').select('*').eq('home_id', homeId).order('sort_order'),
-      supabase.from('home_members').select('user_id, profiles(display_name, avatar_color)').eq('home_id', homeId),
+      supabase.from('home_members').select('user_id, profiles(display_name, avatar_color, avatar_url)').eq('home_id', homeId),
       supabase.from('home_settings').select('key, value').eq('home_id', homeId)
         .in('key', ['budget_shared_account', 'budget_split_mode', 'budget_default_period', 'budget_ai_receipts']),
     ]).then(([catsRes, membersRes, settingsRes]) => {
@@ -2377,6 +2386,7 @@ export function BudgetQuickExpenseModal({
           user_id: m.user_id,
           display_name: m.profiles?.display_name ?? null,
           avatar_color: m.profiles?.avatar_color ?? '#14d8db',
+          avatar_url: m.profiles?.avatar_url ?? undefined,
         }))
       );
       const raw = settingsRes.data ?? [];
