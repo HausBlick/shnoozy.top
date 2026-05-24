@@ -890,13 +890,65 @@ function EntryForm({ homeId, language, userId, categories, members, homeSettings
   const [paidBy, setPaidBy] = useState<string>(editingEntry?.paid_by ?? userId);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [individualSplits, setIndividualSplits] = useState<Record<string, string>>({});
 
   const filteredCats = categories.filter(c => c.category_type === entryType);
   const isExpense = entryType === 'expense';
 
+  // Load existing splits if editing a shared entry in individual split mode
+  useEffect(() => {
+    if (editingEntry) {
+      const fetchSplits = async () => {
+        const { data, error } = await supabase
+          .from('budget_entry_splits')
+          .select('user_id, amount')
+          .eq('entry_id', editingEntry.id);
+        if (data && !error && data.length > 0) {
+          const splitsMap: Record<string, string> = {};
+          data.forEach((s: any) => {
+            splitsMap[s.user_id] = String(s.amount).replace('.', ',');
+          });
+          setIndividualSplits(splitsMap);
+        }
+      };
+      fetchSplits();
+    }
+  }, [editingEntry]);
+
+  // Distribute the total amount equally among all members
+  const distributeEqually = () => {
+    const parsedAmount = parseFloat(amount.replace(',', '.'));
+    if (isNaN(parsedAmount) || parsedAmount <= 0 || members.length === 0) return;
+    const share = (parsedAmount / members.length).toFixed(2);
+    const newSplits: Record<string, string> = {};
+    members.forEach(m => {
+      newSplits[m.user_id] = share.replace('.', ',');
+    });
+    // Adjust for rounding issues
+    const totalSplit = parseFloat(share) * members.length;
+    const diff = parsedAmount - totalSplit;
+    if (Math.abs(diff) > 0.001 && members.length > 0) {
+      const firstMemberId = members[0].user_id;
+      const adjustedShare = (parseFloat(share) + diff).toFixed(2);
+      newSplits[firstMemberId] = adjustedShare.replace('.', ',');
+    }
+    setIndividualSplits(newSplits);
+  };
+
+  const parsedTotal = parseFloat(amount.replace(',', '.'));
+  const splitSum = Object.values(individualSplits).reduce((sum, val) => {
+    const parsedVal = parseFloat(val.replace(',', '.'));
+    return sum + (isNaN(parsedVal) ? 0 : parsedVal);
+  }, 0);
+  const diff = parsedTotal - splitSum;
+  const isIndividualMode = isExpense && splitMode === 'shared' && homeSettings.budget_split_mode === 'individual';
+  const hasMismatch = isIndividualMode && Math.abs(diff) >= 0.01;
+
   async function handleSave() {
     const parsedAmount = parseFloat(amount.replace(',', '.'));
     if (isNaN(parsedAmount) || parsedAmount <= 0) return;
+    if (isIndividualMode && hasMismatch) return;
+
     setSaving(true);
     try {
       const payload = {
@@ -907,14 +959,47 @@ function EntryForm({ homeId, language, userId, categories, members, homeSettings
         paid_by: isExpense ? paidBy : null,
       };
       const label = `${formatAmt(parsedAmount)} € ${description.trim() ? '· ' + description.trim().slice(0, 40) : ''}`.trim();
+      
+      let entryId = editingEntry?.id;
       if (editingEntry) {
         await supabase.from('budget_entries').update(payload).eq('id', editingEntry.id);
         logActivity(homeId, userId, 'edited', 'budget_entry', label);
       } else {
-        await supabase.from('budget_entries').insert(payload);
+        const { data, error } = await supabase.from('budget_entries').insert(payload).select('id').single();
+        if (error) throw error;
+        entryId = data.id;
         logActivity(homeId, userId, 'added', 'budget_entry', label);
       }
+
+      // Handle split entry table persistence
+      if (isIndividualMode && entryId) {
+        // Delete existing splits for this entry first
+        await supabase.from('budget_entry_splits').delete().eq('entry_id', entryId);
+        
+        // Build split rows
+        const splitRows = Object.entries(individualSplits).map(([uid, val]) => {
+          const parsedVal = parseFloat(val.replace(',', '.'));
+          return {
+            entry_id: entryId,
+            home_id: homeId,
+            user_id: uid,
+            amount: isNaN(parsedVal) ? 0 : parsedVal,
+            is_settled: false
+          };
+        }).filter(row => row.amount > 0);
+
+        if (splitRows.length > 0) {
+          const { error: splitErr } = await supabase.from('budget_entry_splits').insert(splitRows);
+          if (splitErr) throw splitErr;
+        }
+      } else if (editingEntry) {
+        // If split mode was changed to personal or split settings changed, clean up old splits
+        await supabase.from('budget_entry_splits').delete().eq('entry_id', editingEntry.id);
+      }
+
       onSave();
+    } catch (err) {
+      console.error('Error saving entry splits:', err);
     } finally {
       setSaving(false);
     }
@@ -922,6 +1007,8 @@ function EntryForm({ homeId, language, userId, categories, members, homeSettings
 
   async function handleDelete() {
     if (!editingEntry || !onDelete) return;
+    // Foreign key deletes cascade, but let's delete explicitly for clarity
+    await supabase.from('budget_entry_splits').delete().eq('entry_id', editingEntry.id);
     await supabase.from('budget_entries').delete().eq('id', editingEntry.id);
     logActivity(homeId, userId, 'deleted', 'budget_entry', `${formatAmt(Number(editingEntry.amount))} €`);
     onDelete(editingEntry.id);
@@ -1025,6 +1112,82 @@ function EntryForm({ homeId, language, userId, categories, members, homeSettings
         </div>
       )}
 
+      {/* Custom Split UI */}
+      {isIndividualMode && (
+        <div style={{
+          marginBottom: 'var(--spacing-lg)',
+          padding: 'var(--spacing-md)',
+          background: 'var(--color-surface)',
+          borderRadius: 'var(--rounded-md)',
+          border: '1px solid var(--color-hairline-soft)',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+            <span className="text-body-sm text-muted" style={{ fontWeight: 600 }}>{t.budgetSplitCustom}</span>
+            <button className="btn-secondary" style={{ padding: '4px 10px', fontSize: '12px', height: 'auto', borderRadius: 'var(--rounded-sm)' }}
+              onClick={distributeEqually}>
+              {t.budgetSplitEqually}
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-sm)' }}>
+            {members.map(m => (
+              <div key={m.user_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--spacing-md)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AvatarDot member={m} size={24} />
+                  <span className="text-body-sm" style={{ fontWeight: 500 }}>{m.display_name ?? m.user_id.slice(0, 6)}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={individualSplits[m.user_id] ?? ''}
+                    placeholder="0,00"
+                    onChange={e => {
+                      const val = e.target.value.replace('.', ',');
+                      setIndividualSplits(prev => ({ ...prev, [m.user_id]: val }));
+                    }}
+                    style={{
+                      width: '80px',
+                      padding: '6px 10px',
+                      borderRadius: 'var(--rounded-md)',
+                      border: '1px solid var(--color-hairline)',
+                      background: 'var(--color-canvas)',
+                      color: 'var(--color-fg)',
+                      fontSize: '14px',
+                      textAlign: 'right',
+                    }}
+                  />
+                  <span className="text-body-sm text-muted">€</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Validation Feedback */}
+          {hasMismatch && (
+            <div style={{
+              marginTop: 'var(--spacing-sm)',
+              padding: '8px 12px',
+              borderRadius: 'var(--rounded-md)',
+              background: 'rgba(239, 68, 68, 0.08)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              fontSize: '12px',
+              color: '#ef4444',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '2px',
+            }}>
+              <span style={{ fontWeight: 600 }}>⚠️ {t.budgetSplitMismatch}</span>
+              <span>
+                {diff > 0 
+                  ? t.budgetSplitRemaining(diff.toFixed(2).replace('.', ','))
+                  : t.budgetSplitOver(Math.abs(diff).toFixed(2).replace('.', ','))}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Actions */}
       <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
         {editingEntry && onDelete && (
@@ -1038,12 +1201,12 @@ function EntryForm({ homeId, language, userId, categories, members, homeSettings
           {t.cancel}
         </button>
         <button onClick={handleSave}
-          disabled={saving || !amount || parseFloat(amount.replace(',', '.')) <= 0}
+          disabled={saving || !amount || parseFloat(amount.replace(',', '.')) <= 0 || hasMismatch}
           style={{
             flex: 1, padding: '12px 20px', borderRadius: 'var(--rounded-md)',
             background: isExpense ? '#ef4444' : '#10b981', color: 'white',
             border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '15px',
-            opacity: (saving || !amount || parseFloat(amount.replace(',', '.')) <= 0) ? 0.5 : 1,
+            opacity: (saving || !amount || parseFloat(amount.replace(',', '.')) <= 0 || hasMismatch) ? 0.5 : 1,
           }}>
           {saving ? '…' : t.budgetSave}
         </button>
