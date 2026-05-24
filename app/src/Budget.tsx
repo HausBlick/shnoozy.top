@@ -1996,10 +1996,15 @@ function EntriesView({ entries, members, language, onEdit, onBack }: {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {entries.map(entry => {
             const cat = entry.budget_categories;
-            const member = members.find(m => m.user_id === entry.user_id);
+            const creator = members.find(m => m.user_id === entry.user_id);
+            const payer = entry.paid_by ? members.find(m => m.user_id === entry.paid_by) : null;
             const d = new Date(entry.date + 'T12:00:00');
             const dateStr = `${d.getDate()}. ${t.monthNames[d.getMonth()].slice(0, 3)}`;
             const isIncome = entry.entry_type === 'income';
+
+            // Show payer name in subtitle for expenses in multi-member homes
+            const showPayerLabel = !isIncome && payer && members.length > 1;
+
             return (
               <button key={entry.id} onClick={() => onEdit(entry)}
                 style={{
@@ -2020,9 +2025,14 @@ function EntriesView({ entries, members, language, onEdit, onBack }: {
                   </div>
                   <div className="text-body-sm text-muted">
                     {dateStr} · {entry.split_mode === 'shared' ? t.budgetShared : t.budgetPersonal}
+                    {showPayerLabel && ` · ${t.budgetPaidBy}: ${payer.display_name}`}
                   </div>
                 </div>
-                {member && <div style={{ width: 20, height: 20, borderRadius: '50%', background: member.avatar_color, flexShrink: 0 }} />}
+                {showPayerLabel ? (
+                  <AvatarDot member={payer} size={20} />
+                ) : (
+                  creator && <AvatarDot member={creator} size={20} />
+                )}
                 <div className="text-body-md" style={{ fontWeight: 700, minWidth: 60, textAlign: 'right', flexShrink: 0, color: isIncome ? '#10b981' : 'var(--color-fg)' }}>
                   {isIncome ? '+' : ''}{formatAmt(Number(entry.amount))} €
                 </div>
